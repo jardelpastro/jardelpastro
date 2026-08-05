@@ -3,17 +3,20 @@
    ================================================================== */
 
 :root {
-  --bg: #f4f6f8;
+  --bg: #eef1f5;
   --surface: #ffffff;
   --surface-2: #fafbfc;
-  --border: #d8dee4;
-  --border-forte: #b9c2cc;
+  --border: #d6dde6;
+  --border-forte: #b3bdca;
   --texto: #1b2733;
   --texto-2: #5b6875;
   --texto-3: #8a97a4;
-  --azul: #14559b;
-  --azul-claro: #e8f0f9;
-  --azul-escuro: #0e3d70;
+  --azul: #0E2148;            /* navy da marca */
+  --azul-claro: #e7ecf4;
+  --azul-escuro: #060f24;
+  --teal: #0E6F66;            /* teal da marca */
+  --teal-claro: #e2f4f2;
+  --teal-vivo: #14A5A0;
   --verde: #0f7b3f;
   --verde-bg: #e4f4ea;
   --ambar: #8a5a00;
@@ -34,9 +37,12 @@
   --texto: #e6ebf0;
   --texto-2: #a4b1bf;
   --texto-3: #76838f;
-  --azul: #5aa2e8;
-  --azul-claro: #1b2c3f;
-  --azul-escuro: #8cc2f5;
+  --azul: #7fb2e8;
+  --azul-claro: #17253c;
+  --azul-escuro: #a9cdf5;
+  --teal: #35c3ba;
+  --teal-claro: #10302e;
+  --teal-vivo: #3ad2c8;
   --verde: #56c98a;
   --verde-bg: #14301f;
   --ambar: #e0b050;
@@ -74,9 +80,20 @@ header.topo {
   top: 0;
   z-index: 40;
 }
-header.topo .marca { display: flex; align-items: baseline; gap: 10px; }
-header.topo h1 { font-size: 16px; letter-spacing: -.2px; }
+header.topo .marca { display: flex; align-items: center; gap: 13px; min-width: 0; }
+header.topo h1 { font-size: 15px; letter-spacing: -.2px; }
+header.topo h1 .sub { display: block; font-size: 11px; font-weight: 400; color: var(--texto-3); letter-spacing: .3px; }
 header.topo .versao { font-size: 11px; color: var(--texto-3); }
+
+.marca-bloco { display: flex; align-items: center; gap: 9px; color: var(--azul); }
+[data-tema="escuro"] .marca-bloco { color: #cfe0f5; }
+.marca-simbolo { display: block; line-height: 0; }
+.marca-img { display: block; width: auto; max-width: 240px; object-fit: contain; }
+.marca-nome { display: flex; flex-direction: column; line-height: 1; font-family: Georgia, "Times New Roman", serif; }
+.marca-nome b { font-size: 19px; letter-spacing: .5px; color: var(--azul); }
+.marca-nome i { font-size: 10.5px; font-style: normal; letter-spacing: 1.6px; color: var(--teal); font-weight: 600; }
+[data-tema="escuro"] .marca-nome b { color: #cfe0f5; }
+.marca-divisoria { width: 1px; align-self: stretch; background: var(--border); margin: 2px 3px; }
 header.topo .acoes { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 
 nav.abas {
@@ -102,7 +119,14 @@ nav.abas button {
   white-space: nowrap;
 }
 nav.abas button:hover { color: var(--texto); background: var(--surface-2); }
-nav.abas button[aria-selected="true"] { color: var(--azul); border-bottom-color: var(--azul); }
+nav.abas button[aria-selected="true"] { color: var(--azul); border-bottom-color: var(--teal-vivo); background: var(--surface-2); }
+[data-tema="escuro"] nav.abas button[aria-selected="true"] { color: var(--azul-escuro); }
+nav.abas .sep { width: 1px; background: var(--border); margin: 7px 6px; flex: none; }
+nav.abas button .marcador {
+  display: inline-block; min-width: 16px; height: 16px; line-height: 16px; margin-left: 6px;
+  border-radius: 8px; background: var(--ambar); color: #fff; font-size: 10.5px; font-weight: 700;
+  text-align: center; padding: 0 4px; vertical-align: 1px;
+}
 
 main { max-width: 1500px; margin: 0 auto; padding: 16px; }
 
@@ -115,6 +139,11 @@ main { max-width: 1500px; margin: 0 auto; padding: 16px; }
 .chip { display: flex; flex-direction: column; gap: 1px; min-width: 92px; }
 .chip .rot { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--texto-3); }
 .chip .val { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip.forte { padding: 2px 11px 3px; border-left: 3px solid var(--teal-vivo); background: var(--teal-claro); border-radius: 0 4px 4px 0; }
+.chip.forte .val { font-size: 18px; }
+.chip.alerta { padding: 2px 11px 3px; border-left: 3px solid var(--vermelho); background: var(--vermelho-bg); border-radius: 0 4px 4px 0; }
+.chip .val .sinal { color: var(--vermelho); font-weight: 700; margin-left: 4px; cursor: help; }
+.chip .val .sinal.atencao { color: var(--ambar); }
 .chip .val small { font-size: 11px; font-weight: 500; color: var(--texto-2); }
 
 /* ---------------- cartões ---------------- */
@@ -133,6 +162,13 @@ main { max-width: 1500px; margin: 0 auto; padding: 16px; }
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
 }
+.cartao > .cab::before {
+  content: ''; width: 3px; align-self: stretch; margin: -10px 4px -10px -13px;
+  background: var(--teal-vivo); flex: none;
+}
+.cartao.destaque { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal), var(--sombra); }
+.cartao.destaque > .cab { background: var(--teal-claro); }
+.cartao.neutro > .cab::before { background: var(--border-forte); }
 .cartao > .cab h2, .cartao > .cab h3 { font-size: 13.5px; }
 .cartao > .cab .sub { font-size: 12px; color: var(--texto-2); font-weight: 400; }
 .cartao > .cab .dir { margin-left: auto; display: flex; gap: 6px; align-items: center; }
@@ -147,6 +183,14 @@ main { max-width: 1500px; margin: 0 auto; padding: 16px; }
 /* ---------------- campos ---------------- */
 
 label.campo { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+label.campo.chave {
+  background: var(--teal-claro); border: 1px solid var(--teal); border-radius: 5px;
+  padding: 7px 9px 8px;
+}
+label.campo.chave > span.rot { color: var(--teal); font-weight: 700; }
+[data-tema="escuro"] label.campo.chave > span.rot { color: var(--teal); }
+label.campo.chave input { border-color: var(--teal); font-weight: 600; }
+
 label.campo > span.rot {
   font-size: 11.5px; font-weight: 600; color: var(--texto-2);
   display: flex; align-items: center; gap: 5px;
@@ -184,6 +228,9 @@ button.btn {
 button.btn:hover { background: var(--surface-2); border-color: var(--texto-3); }
 button.btn.primario { background: var(--azul); border-color: var(--azul); color: #fff; }
 button.btn.primario:hover { background: var(--azul-escuro); border-color: var(--azul-escuro); }
+[data-tema="escuro"] button.btn.primario { background: var(--teal); border-color: var(--teal); color: #06231f; }
+button.btn.teal { background: var(--teal); border-color: var(--teal); color: #fff; }
+button.btn.teal:hover { filter: brightness(1.12); }
 button.btn.perigo:hover { background: var(--vermelho-bg); border-color: var(--vermelho); color: var(--vermelho); }
 button.btn.mini { padding: 3px 7px; font-size: 12px; }
 button.btn.icone { padding: 3px 7px; line-height: 1; }
@@ -253,6 +300,8 @@ tr.selecionada td { font-weight: 600; }
 .pecas-tab .col-qtd { width: 74px; }
 .pecas-tab .col-k { width: 88px; }
 .pecas-tab .col-di { width: 104px; }
+.pecas-tab .col-dn { width: 168px; }
+.pecas-tab .col-dn select { max-width: 168px; }
 .pecas-tab .col-x { width: 32px; }
 
 /* ---------------- conjuntos / trechos ---------------- */
@@ -276,6 +325,33 @@ tr.selecionada td { font-weight: 600; }
   color: var(--texto-3); margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1px solid var(--border);
 }
 .subtitulo:first-child { margin-top: 0; }
+
+/* ---------------- esquemas explicativos ---------------- */
+
+.esquema { width: 100%; max-width: 760px; height: auto; display: block; margin: 4px auto 2px; }
+.esquema text { font-size: 9.5px; fill: var(--texto-2); font-family: inherit; }
+.esquema text.rotulo { font-weight: 700; fill: var(--azul); }
+[data-tema="escuro"] .esquema text.rotulo { fill: var(--azul-escuro); }
+.esquema .agua { fill: var(--teal-vivo); opacity: .28; }
+.esquema .agua-l { stroke: var(--teal); stroke-width: 1.2; fill: none; }
+.esquema .estrutura { stroke: var(--texto-2); stroke-width: 1.4; fill: none; }
+.esquema .terreno { stroke: var(--texto-3); stroke-width: 1.2; fill: none; stroke-dasharray: 3 2; }
+.esquema .tubo { stroke: var(--azul); stroke-width: 2.6; fill: none; }
+[data-tema="escuro"] .esquema .tubo { stroke: var(--azul-escuro); }
+.esquema .cota { stroke: var(--vermelho); stroke-width: .9; }
+.esquema .cota-t { fill: var(--vermelho); font-weight: 600; }
+.esquema .bomba { fill: var(--teal); stroke: var(--azul); stroke-width: 1.2; }
+
+.caixa-esquema {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 9px 11px; margin: 4px 0 11px;
+}
+.caixa-esquema > .tit {
+  font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--texto-3); margin-bottom: 4px; display: flex; align-items: center; gap: 7px;
+}
+.caixa-esquema.recolhida svg, .caixa-esquema.recolhida .leg { display: none; }
+.caixa-esquema .leg { font-size: 11.5px; color: var(--texto-2); margin-top: 5px; }
 
 /* ---------------- perfil piezométrico ---------------- */
 

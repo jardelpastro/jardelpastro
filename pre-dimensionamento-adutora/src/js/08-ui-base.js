@@ -134,7 +134,7 @@
         h('span', { class: 'nota', style: 'align-self:center;padding-left:2px;white-space:nowrap' }, op.sufixo));
     }
 
-    return h('label', { class: 'campo' + (op.compacto ? ' compacto' : '') },
+    return h('label', { class: 'campo' + (op.compacto ? ' compacto' : '') + (op.chave ? ' chave' : '') },
       h('span', { class: 'rot' }, rot, op.dica ? UI.dica(op.dica) : null),
       campoInterno);
   };
@@ -164,7 +164,7 @@
         return h('option', { value: o.v, selected: String(o.v) === String(atual) }, o.rot);
       }));
     if (!rot) return sel;
-    return h('label', { class: 'campo' },
+    return h('label', { class: 'campo' + (op.chave ? ' chave' : '') },
       h('span', { class: 'rot' }, rot, op.dica ? UI.dica(op.dica) : null), sel);
   };
 

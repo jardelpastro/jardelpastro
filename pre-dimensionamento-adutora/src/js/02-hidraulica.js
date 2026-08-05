@@ -177,11 +177,41 @@
 
   /* ---------------- transitório hidráulico (pré-avaliação) ---------------- */
 
+  /* Casos de ancoragem longitudinal (Halliwell, 1963).
+     psi multiplica o termo D/(eE): quanto MAIOR o psi, menor a celeridade.
+     O caso mais desfavorável (maior celeridade e maior sobrepressão) é o
+     tubo ancorado em todo o comprimento. */
+  H.ancoragem = [
+    { id: 'juntas',   rot: 'Com juntas de dilatação em todo o comprimento',
+      psi: function () { return 1; },
+      nota: 'psi = 1. O tubo pode se deformar livremente na direção longitudinal. É o caso usual de tubulação enterrada com junta elástica, e o que resulta na MENOR celeridade.' },
+    { id: 'montante', rot: 'Ancorado apenas na extremidade de montante',
+      psi: function (nu) { return 1 - nu / 2; },
+      nota: 'psi = 1 − ν/2, com ν o coeficiente de Poisson do material.' },
+    { id: 'ancorado', rot: 'Ancorado contra movimento longitudinal em todo o comprimento',
+      psi: function (nu) { return 1 - nu * nu; },
+      nota: 'psi = 1 − ν². Tubo travado axialmente (blocos de ancoragem contínuos, tubo em galeria engastado). Resulta na MAIOR celeridade e, portanto, na maior sobrepressão — é o caso mais desfavorável.' },
+    { id: 'manual',   rot: 'Informar psi diretamente',
+      psi: function (nu, valor) { return valor; },
+      nota: 'Valor informado pelo usuário.' }
+  ];
+
+  H.psiDe = function (idCaso, nu, valorManual) {
+    var i;
+    for (i = 0; i < H.ancoragem.length; i++) {
+      if (H.ancoragem[i].id === idCaso) {
+        return H.ancoragem[i].psi(nu === undefined || nu === null ? 0.3 : nu,
+                                  valorManual === undefined || valorManual === null ? 1 : valorManual);
+      }
+    }
+    return 1;
+  };
+
   /* Celeridade da onda [m/s]
        a = 1 / sqrt( rho·(1/Ka + psi·D/(e·E)) )
      Ka  módulo de elasticidade volumétrica da água [Pa]
      E   módulo de elasticidade do material [Pa]
-     psi coeficiente de ancoragem (1,0 para tubo com juntas de dilatação) */
+     psi coeficiente de ancoragem longitudinal (ver H.ancoragem) */
   H.celeridade = function (D, e, E, rho, Ka, psi) {
     rho = rho || 998.2;
     Ka = Ka || 2.19e9;
@@ -233,6 +263,8 @@
     { id: 'npsh', txt: 'NPSH disponível: NPSHd = (patm − pv)/γ ± z − hf,sucção — ABNT NBR 12214:1992 (projeto de sistema de bombeamento de água); TSUTIYA, cap. 10.' },
     { id: 'celeridade', txt: 'Celeridade: a = 1/√[ρ(1/K + ψD/(eE))] — STREETER & WYLIE, "Fluid Transients"; PORTO, cap. 9.' },
     { id: 'joukowsky', txt: 'Sobrepressão máxima (manobra rápida): Δh = a·Δv/g — JOUKOWSKY (1898); PORTO, cap. 9.' },
+    { id: 'ancoragem', txt: 'Coeficiente de ancoragem longitudinal ψ: 1 (juntas de dilatação), 1 − ν/2 (ancorado só a montante) e 1 − ν² (ancorado em todo o comprimento) — HALLIWELL, A. R. (1963), "Velocity of a water-hammer wave in an elastic pipe", ASCE Journal of the Hydraulics Division, 89(4); STREETER & WYLIE, "Fluid Transients", cap. 2.' },
+    { id: 'envoltoria', txt: 'Envoltórias de pressão do pré-dimensionamento: reta de (Hm ± Δh) na elevatória até o nível de chegada, hipótese simplificada usual em anteprojeto (equivalente ao traçado clássico com os gráficos de Allievi) — PORTO, cap. 9; ABNT NBR 12215.' },
     { id: 'michaud', txt: 'Manobra lenta (Michaud/Allievi): Δh = 2·L·v/(g·t) — PORTO, cap. 9.' },
     { id: 'viscosidade', txt: 'Viscosidade cinemática da água: ν = 1,792·10⁻⁶/(1 + 0,0337·T + 0,000221·T²) — AZEVEDO NETTO, cap. 1.' }
   ];

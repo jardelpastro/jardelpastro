@@ -2,7 +2,7 @@
 
 Registro do que foi encontrado ao transportar os dados e as fórmulas das duas
 planilhas para o programa. As correções também aparecem dentro do programa, na
-aba **Fontes e critérios**.
+aba **Fontes**.
 
 ## 1. Divergências corrigidas
 
@@ -82,7 +82,7 @@ Reproduzidas sem alteração, para garantir continuidade dos resultados:
 
 | Item | Formulação |
 |---|---|
-| Hazen-Williams | `J = k·Q^a·C^−a·D^−b`, com k, a e b editáveis na aba Projeto |
+| Hazen-Williams | `J = k·Q^a·C^−a·D^−b`, com k, a e b editáveis na aba Parâmetros de cálculo |
 | Perda localizada | `hₗ = K·v²/2g`, equivalente ao `0,0826·K·Q²/D⁴` da planilha |
 | Potência de eixo | `P = γ·Q·Hm/(75·η)` [cv, Q em L/s] |
 | Coeficientes K | os 19 valores da aba `Conexões`, mais 19 da tabela do Manual de Hidráulica |
@@ -91,7 +91,7 @@ Reproduzidas sem alteração, para garantir continuidade dos resultados:
 | Espessuras PEAD | transcritas das nove abas de PEAD (exceto os dois valores do item 1) |
 
 As constantes de Hazen-Williams das planilhas (`10,646` e expoente `4,87`) ficam
-disponíveis para ajuste na aba Projeto. O padrão do programa é `10,643` e
+disponíveis para ajuste na aba Parâmetros de cálculo. O padrão do programa é `10,643` e
 `4,871`, do Manual de Hidráulica — a diferença nos resultados é inferior a 0,1 %.
 
 Verificação cruzada nos testes (`tests/run.js`, seção 3): com as constantes da
@@ -159,6 +159,54 @@ vazão total.
 No programa cada trecho recebe a sua vazão: individual conduz uma bomba, e cada
 trecho do barrilete comum conduz o número de bombas que ele reúne.
 
+### 3.6 Coeficiente de ancoragem do transitório
+
+A planilha não tratava transitório. Na primeira versão deste programa, o campo ψ
+aceitava apenas o valor 1,0 e a dica afirmava que esse era o caso mais
+conservador para a celeridade — **o que está invertido**. Como ψ multiplica o
+termo `D/(e·E)` no denominador da celeridade, um ψ maior reduz a celeridade:
+
+| Caso de ancoragem longitudinal | ψ | Celeridade |
+|---|---|---|
+| Com juntas de dilatação em todo o comprimento | 1 | a menor |
+| Ancorado apenas na extremidade de montante | 1 − ν/2 | intermediária |
+| Ancorado contra movimento longitudinal em todo o comprimento | 1 − ν² | **a maior** |
+
+O tubo travado axialmente é mais rígido, a onda anda mais rápido e a sobrepressão
+é maior — é o caso desfavorável. Os três casos, mais a entrada manual, estão
+disponíveis, com o coeficiente de Poisson ν de cada material (Halliwell, 1963;
+Streeter & Wylie).
+
+### 3.7 Pressão negativa classificada como adequada
+
+Defeito da primeira versão deste programa, encontrado em uso: a verificação de
+pressão comparava a pressão apenas com o PN do tubo. Um ponto com **−21,95 mca**
+saía como "Adequado", porque −21,95 é menor que o PN.
+
+Corrigido: a classificação agora testa também os limites físicos. Pressão
+negativa nunca é adequada — significa que a linha piezométrica passa abaixo da
+tubulação. Abaixo de −10 mca, a coluna d'água se rompe.
+
+A causa raiz naquele caso era outra, e também foi tratada: a **cota de chegada**
+do bloco de níveis divergia da **cota final do último trecho** da adutora
+(124,05 m contra 146,00 m). A altura geométrica saía do primeiro campo e o perfil
+era desenhado com o segundo, e nada avisava. Agora os dois campos são um único
+número — editar um ajusta o outro — e um verificador acusa qualquer divergência
+remanescente, com correção em um clique.
+
+### 3.8 Vazão em dobro na curva do sistema
+
+Defeito da segunda versão, encontrado pelos testes ao implementar a curva da
+bomba: a função que calcula a altura do sistema para uma vazão arbitrária
+escalava a vazão *por bomba* e depois multiplicava pelo número de bombas,
+dobrando a vazão total no cenário com dois conjuntos. Isso deslocava a curva do
+sistema e o ponto de operação em paralelo.
+
+Corrigido: a vazão por bomba passa a ser `qTotal/n`. O teste que guarda essa
+propriedade verifica que, para a mesma vazão total, a altura do sistema é a mesma
+com uma ou com duas bombas — porque as perdas são da tubulação, não do número de
+conjuntos.
+
 ## 4. Itens que dependem de conferência do fornecedor
 
 Marcados no programa com a etiqueta **"conferir catálogo"** e listados no painel
@@ -174,7 +222,14 @@ de avisos dos resultados:
   Conferem exatamente com as espessuras de DN 700 a 1200 da aba
   `FD Flanges Água` da planilha, o que valida a fórmula.
 
-Não foi cadastrada a **PFA (pressão de serviço admissível) do ferro fundido
-dúctil**, porque depende da classe, do DN e do tipo de junta, e adotar um valor
-único levaria a erro de projeto. O campo *PN / PFA do tubo* de cada trecho
-permite informá-la e habilitar a verificação de pressão.
+- **Ferro fundido flangeado PN 10 / 16 / 25 / 40**: a espessura de parede segue a
+  classe K (K9 até DN 600 e K12 acima, nas classes até PN 16; K12 em toda a faixa
+  nas classes PN 25 e PN 40), e a classe de pressão do conjunto é limitada pelo
+  flange conforme EN 1092-2. A PFA por DN e a disponibilidade de cada diâmetro
+  devem ser confirmadas no catálogo do fabricante.
+
+Não foi cadastrada a **PFA (pressão de serviço admissível) das classes K do ferro
+fundido dúctil** (K7, K9, K12), porque depende da classe, do DN e do tipo de
+junta, e adotar um valor único levaria a erro de projeto. Há dois caminhos: usar
+os catálogos flangeados, que já trazem o PN da classe de pressão, ou informar o
+valor no campo *PN / PFA do tubo* de cada trecho da adutora.

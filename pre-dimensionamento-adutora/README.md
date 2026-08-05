@@ -29,17 +29,36 @@ O projeto em andamento é guardado automaticamente no navegador daquele
 computador. Para levar de uma máquina a outra, use **Salvar** (gera um arquivo
 `.json`) e **Abrir**.
 
+## Por onde começar
+
+A aba **Resumo** é a porta de entrada: os campos com borda destacada são o
+mínimo necessário — vazão, fluido, cota de partida, cota de chegada e número de
+bombas. Logo abaixo aparecem a altura geométrica, a altura manométrica e o
+panorama de todos os trechos com material, diâmetro, perdas, extensões e
+potências. É o resumo do resumo.
+
+O esquema desenhado nessa mesma aba mostra onde cada cota entra: todos os campos
+de cota pedem **altitude absoluta**, na mesma referência de nível do
+levantamento — não profundidade nem altura em relação ao fundo do poço. A cota de
+chegada e a cota final do último trecho da adutora são o mesmo número, e o
+programa mantém as duas iguais: editar uma ajusta a outra.
+
+As abas seguintes detalham (bombas e níveis, sucção, barriletes, adutora,
+perfil), e a aba **Parâmetros de cálculo**, no fim, reúne o que já vem com valor
+padrão: fórmula de perda de carga, faixas que definem as cores, custos da análise
+econômica e linha de motores.
+
 ## O que o programa faz
 
 **Entrada com unidades à escolha** — vazão em L/s, m³/h, m³/s, m³/dia, L/min,
 L/dia ou gpm; extensão em m, km, cm, ft ou mi; pressão em mca, kPa, bar, MPa,
 kgf/cm² ou psi.
 
-**Catálogos de tubos com diâmetro interno e rugosidade** — 31 catálogos na base:
+**Catálogos de tubos com diâmetro interno e rugosidade** — 35 catálogos na base:
 
 | Família | Catálogos |
 |---|---|
-| Ferro fundido dúctil | K7, K9, K12, flangeado para água, esgoto junta elástica, esgoto série PH |
+| Ferro fundido dúctil | K7, K9, K12, flangeado para água, flangeado PN 10 / 16 / 25 / 40, esgoto junta elástica, esgoto série PH |
 | PEAD | PE 80 e PE 100 nos SDR 33, 26, 21, 17, 13,6, 11, 9, 7,4 e 6 (18 catálogos, PN 3,2 a 32) |
 | PVC | DEFoFo, PVC-M DEFoFo, PBA classes 12, 15 e 20 |
 | PVC-O | classe 450 nos PN 12,5, 16, 20 e 25 |
@@ -78,7 +97,33 @@ derivação) ou um valor absoluto. Trechos podem ser adicionados, duplicados,
 desativados e removidos.
 
 **Peças e conexões** — 38 peças com coeficiente K de tabela, cada uma com
-quantidade, K sobreponível e diâmetro próprio quando diferente do tubo do trecho.
+quantidade e K sobreponível. Quando a peça tem diâmetro diferente do tubo do
+trecho — uma redução, uma válvula menor que a linha — basta escolher o **DN
+comercial**: o programa busca o diâmetro interno correspondente no catálogo e
+calcula a perda com a velocidade nesse diâmetro.
+
+**Desenhos esquemáticos** — as informações que dão margem a dúvida vêm com um
+desenho que se atualiza com os dados do projeto: as cotas da elevatória, a
+divisão do barrilete individual e comum, a ramificação da adutora, a composição
+do NPSH disponível e as envoltórias do transitório.
+
+**Curva da bomba e ponto de operação** — com três ou mais pontos da curva do
+fabricante, o programa ajusta H = a₀ + a₁Q + a₂Q² por mínimos quadrados, traça a
+curva do sistema e mostra o cruzamento. Também calcula a operação em paralelo
+para cada quantidade de conjuntos, deixando visível que o ganho de vazão ao
+ligar mais uma bomba é sempre menor que a vazão de uma bomba isolada.
+
+**Perfil da linha e envoltórias de pressão** — cole da sua planilha as distâncias
+e as cotas da geratriz da tubulação. O programa interpola a linha piezométrica em
+cada ponto, soma e subtrai a sobrepressão do transitório e mostra, ponto a ponto,
+onde a pressão estoura a classe do tubo e onde cai abaixo de zero (subpressão) ou
+abaixo de −10 mca (separação de coluna).
+
+**Análise econômica de diâmetro** — opcional. Acrescenta à tabela de comparação
+o custo do tubo, o custo anual da energia associada à perda de carga daquele
+trecho e o custo anual total, marcando com **$** o diâmetro de menor custo. O
+preço do tubo é estimado por lei de potência sobre o DN, com coeficientes
+editáveis: serve para localizar o mínimo, não para orçar.
 
 **Bombas de 1 a 50** — um cenário de cálculo para cada quantidade em operação
 simultânea, com vazão, altura manométrica, potência útil, potência de eixo,
@@ -88,8 +133,15 @@ potência elétrica e NPSH disponível. A linha de motores é editável.
 **Verificações** — NPSH disponível com pressão atmosférica pela altitude e
 pressão de vapor pela temperatura; linha piezométrica com perfil desenhado e
 pressão ponto a ponto contra o PN do tubo; pré-avaliação de golpe de aríete
-(celeridade, tempo crítico, Joukowsky e Michaud) com conferência da classe de
-pressão. Um painel no topo dos resultados lista tudo o que ficou fora de faixa.
+(celeridade com os quatro casos de ancoragem longitudinal, tempo crítico,
+Joukowsky e Michaud) com conferência da classe de pressão. Pressão negativa nunca
+é classificada como adequada. Um painel no topo dos resultados lista tudo o que
+ficou fora de faixa, e um **!** ao lado de cada resultado marca o que costuma
+passar batido: perdas acima de 60 % da altura manométrica, altura manométrica
+muito acima da geométrica, motor com folga excessiva, NPSH apertado, pressão fora
+da classe do tubo. O contador na aba Resultados mostra quantos pontos estão fora
+de faixa; o da aba Resumo avisa que há incoerência nos dados de entrada, com
+botão de correção em um clique.
 
 **Comparação entre as quatro fórmulas** — mesmos dados, mesmas peças, mesmos
 diâmetros: Hazen-Williams, Colebrook-White iterativa, Swamee-Jain e
@@ -121,14 +173,17 @@ src/js/04-catalogos.js      catálogos de tubos da base
 src/js/05-pecas-motores.js  peças e coeficientes K, motores, critérios de verificação
 src/js/06-estado.js         modelo de dados, persistência, migração
 src/js/07-calculo.js        motor de cálculo (cenários, varredura, piezométrica, golpe)
+src/js/00-marca.js          marca do cabeçalho e carregamento da logo
 src/js/08-ui-base.js        utilidades de interface
+src/js/08b-esquemas.js      desenhos esquemáticos
 src/js/09-ui-forms.js       painéis de entrada
-src/js/10-ui-resultados.js  resultados, perfil e memorial
+src/js/09b-ui-perfil.js     perfil da linha e envoltórias
+src/js/10-ui-resultados.js  resultados, piezométrica e memorial
 src/js/11-ui-catalogos.js   catálogos e fontes
 src/js/12-app.js            aplicação, ações, arquivos
 build.py                    gera dist/Pre-dimensionamento-Adutora.html
-tests/run.js                129 testes do núcleo de cálculo
-tests/ui.js                 100 testes de interface em navegador
+tests/run.js                210 testes do núcleo de cálculo
+tests/ui.js                 157 testes de interface em navegador
 docs/AUDITORIA-PLANILHAS.md auditoria das planilhas de origem
 ```
 
@@ -146,7 +201,16 @@ Os testes do núcleo conferem o fator de atrito contra valores do diagrama de
 Moody, a reprodução exata da formulação das planilhas de origem, a coerência das
 espessuras dos catálogos com as fórmulas normativas (`e = K(0,5+0,001·DN)` para
 ferro fundido, `e = DE/SDR` para PEAD), a monotonicidade dos coeficientes com a
-idade, os cenários de bombeamento, a classificação por cores e o transitório.
+idade, os cenários de bombeamento, a classificação por cores, a curva do sistema,
+o ponto de operação em paralelo, as envoltórias do transitório e o ótimo
+econômico de diâmetro.
+
+## A logo
+
+O símbolo do cabeçalho é um desenho vetorial feito para acompanhar as cores da
+marca. O botão **Logo** carrega o arquivo oficial (PNG com fundo transparente,
+JPG ou SVG) e ele substitui o desenho, inclusive na impressão do memorial. Fica
+gravado no navegador daquele computador.
 
 ## Alcance
 
@@ -155,11 +219,21 @@ manométrica e potência, e sinaliza o que precisa de atenção. O projeto execu
 continua exigindo a curva da bomba, o ponto de operação real, a verificação do
 NPSH requerido e a análise do transitório com dispositivos de proteção.
 
-A operação em paralelo é tratada de forma simplificada: a vazão por bomba é
-mantida constante e a vazão total cresce proporcionalmente ao número de
-conjuntos. Em paralelo real cada bomba entrega menos vazão do que operando
-isolada, e o ponto de operação sai da interseção da curva conjunta com a curva
-do sistema.
+Nos cenários por número de bombas, a operação em paralelo é tratada de forma
+simplificada: a vazão por bomba é mantida constante e a vazão total cresce
+proporcionalmente ao número de conjuntos. Para o comportamento real, lance a
+curva da bomba na aba Bombas e níveis — aí o ponto de operação sai da interseção
+da curva conjunta com a curva do sistema, e a tabela de operação em paralelo
+mostra o ganho efetivo de vazão de cada conjunto adicional.
+
+A avaliação do transitório é preliminar e considera a **tubulação sem
+dispositivos de proteção**: sem tanque de alívio, chaminé de equilíbrio, válvula
+antecipadora de onda, ventosa de duplo efeito ou volante de inércia. Não integra
+as equações do transitório pelo método das características, não representa
+reflexões nas mudanças de diâmetro e de material e não modela separação e retorno
+de coluna. Serve para saber se a classe de pressão tem folga e se o transitório
+exige estudo específico — e, quando exige, o caminho não é engrossar a parede do
+tubo, é dimensionar a proteção.
 
 Dimensões marcadas como **"conferir catálogo"** na base de tubos foram estimadas
 por fórmula normativa e precisam ser confirmadas com o fornecedor antes do

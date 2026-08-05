@@ -31,6 +31,7 @@ function prox(nome, a, b, tol) {
   else { falhas++; console.log(`  FALHA ${nome}  obtido ${a} esperado ${b} (desvio ${(rel * 100).toFixed(3)} %)`); }
 }
 function titulo(t) { console.log('\n' + t); }
+function UI0(v) { return v === null || v === undefined ? '—' : Number(v).toFixed(2); }
 
 const H = PDA.H, U = PDA.U, R = PDA.R, CAT = PDA.CAT, C = PDA.C, E = PDA.E;
 
@@ -454,6 +455,293 @@ ok('tubo antigo exige mais altura manométrica', hVelho > hNovo,
 /* override de rugosidade tem precedência */
 const stO = E.clone(stV); stO.adutoras[0].epsOverride = 5;
 ok('eps informado manualmente prevalece', C.resumo(stO, cats).projeto.Hm > hVelho);
+
+/* ---------------------------------------------------------------- */
+titulo('18. Pressão negativa nunca é adequada');
+/* o caso relatado: cota de chegada global divergindo da cota final do trecho */
+const stNeg = E.padrao();
+stNeg.calculo.metodo = 'colebrook';
+stNeg.vazao = { valor: 100, unidade: 'L/s', base: 'total' };
+stNeg.barrileteComum.ativo = false; stNeg.barrileteIndividual.ativo = false;
+stNeg.succaoIndividual.ativo = false;
+stNeg.cotas = { nivelSuccaoMin: 122, nivelSuccaoMax: 122, eixoBomba: 120,
+                cotaPartida: null, nivelChegada: 124.05, unid: 'm' };
+stNeg.adutoras = [E.novaAdutora(1)];
+stNeg.adutoras[0].catalogoId = 'pead_pe100_sdr21';
+stNeg.adutoras[0].itemRot = 'DE 200';
+stNeg.adutoras[0].extensao = 3000;
+stNeg.adutoras[0].usarCotas = true;
+stNeg.adutoras[0].cotaIni = 122; stNeg.adutoras[0].cotaFim = 146;
+let rNeg = C.resumo(stNeg, cats);
+const pFim = rNeg.piezometrica[rNeg.piezometrica.length - 1];
+ok('reproduz a pressão negativa do caso relatado', pFim.pressao < -20, UI0(pFim.pressao));
+ok('pressão negativa classificada como inadequada', pFim.classe === 'ruim', pFim.classe);
+ok('o motivo explica o que aconteceu', /negativa|abaixo/.test(pFim.motivos.join(' ')), pFim.motivos.join('; '));
+
+ok('classificarPressao: negativa reprovada', C.classificarPressao(-5, 120).classe === 'ruim');
+ok('classificarPressao: abaixo de -10 reprovada com aviso de vaporização',
+   C.classificarPressao(-12, 120).classe === 'ruim' &&
+   /vaporiza/.test(C.classificarPressao(-12, 120).motivos.join(' ')));
+ok('classificarPressao: dentro do PN aprovada', C.classificarPressao(60, 120).classe === 'bom');
+ok('classificarPressao: acima de 85 % do PN em atenção', C.classificarPressao(110, 120).classe === 'atencao');
+ok('classificarPressao: acima do PN reprovada', C.classificarPressao(130, 120).classe === 'ruim');
+ok('classificarPressao: sem PN fica indefinida', C.classificarPressao(60, null).classe === 'na');
+ok('classificarPressao: zero é aceitável', C.classificarPressao(0, 120).classe === 'bom');
+
+/* ---------------------------------------------------------------- */
+titulo('19. Detecção da incoerência de cotas');
+const avs = rNeg.avisosDados;
+ok('a incoerência de cota de chegada é detectada',
+   avs.some(function (a) { return a.id === 'cotaChegada' && a.grave; }),
+   JSON.stringify(avs.map(function (a) { return a.id; })));
+const avCota = avs.filter(function (a) { return a.id === 'cotaChegada'; })[0];
+ok('o aviso cita os dois valores divergentes',
+   /124/.test(avCota.txt) && /146/.test(avCota.txt), avCota.txt.slice(0, 80));
+ok('o aviso oferece as duas correções', avCota.acoes.length === 2);
+
+/* aplicada a correção, o aviso desaparece e a pressão fica positiva */
+stNeg.cotas.nivelChegada = 146;
+rNeg = C.resumo(stNeg, cats);
+ok('corrigida a cota, a incoerência desaparece',
+   !rNeg.avisosDados.some(function (a) { return a.id === 'cotaChegada'; }));
+ok('e a pressão no fim deixa de ser negativa',
+   rNeg.piezometrica[rNeg.piezometrica.length - 1].pressao >= -0.01,
+   UI0(rNeg.piezometrica[rNeg.piezometrica.length - 1].pressao));
+
+/* nível máximo abaixo do mínimo */
+const stNiv = E.clone(stNeg);
+stNiv.cotas.nivelSuccaoMax = 100;
+ok('nível máximo abaixo do mínimo é detectado',
+   C.resumo(stNiv, cats).avisosDados.some(function (a) { return a.id === 'niveis'; }));
+
+/* cota do eixo em outra referência */
+const stEixo = E.clone(stNeg);
+stEixo.cotas.eixoBomba = 3;
+ok('cota do eixo em referência diferente é detectada',
+   C.resumo(stEixo, cats).avisosDados.some(function (a) { return a.id === 'eixoDistante'; }));
+
+/* ---------------------------------------------------------------- */
+titulo('20. Cota de partida');
+ok('em branco, a cota de partida é o nível de sucção mínimo',
+   C.cotaPartida(stNeg) === 122, String(C.cotaPartida(stNeg)));
+const stPart = E.clone(stNeg);
+stPart.cotas.cotaPartida = 125;
+ok('informada, prevalece', C.cotaPartida(stPart) === 125);
+ok('a piezométrica parte da cota de partida',
+   C.resumo(stPart, cats).piezometrica[0].cota === 125);
+
+/* ---------------------------------------------------------------- */
+titulo('21. DN da peça buscado no catálogo');
+const stDN = E.clone(stNeg);
+stDN.adutoras[0].pecas = [E.novaPeca('reducao_conc')];
+let rDN = C.resumo(stDN, cats);
+const tuboDN = rDN.projeto.adutoras[0].tubo;
+ok('sem DN informado, usa o DI do trecho',
+   Math.abs(rDN.projeto.adutoras[0].pecas[0].diMm - tuboDN.diMm) < 1e-9);
+stDN.adutoras[0].pecas[0].dnLocal = 'DE 160';
+rDN = C.resumo(stDN, cats);
+const diEsperado = 160 - 2 * 7.7;   /* PEAD SDR 21, DE 160 */
+ok('com DN informado, busca o DI correspondente no catálogo',
+   Math.abs(rDN.projeto.adutoras[0].pecas[0].diMm - diEsperado) < 1e-9,
+   UI0(rDN.projeto.adutoras[0].pecas[0].diMm) + ' vs ' + diEsperado);
+ok('a perda cresce ao reduzir o diâmetro da peça',
+   rDN.projeto.adutoras[0].pecas[0].h > 0);
+/* DI direto continua tendo precedência */
+stDN.adutoras[0].pecas[0].diLocalMm = 100;
+rDN = C.resumo(stDN, cats);
+ok('DI informado diretamente tem precedência sobre o DN',
+   Math.abs(rDN.projeto.adutoras[0].pecas[0].diMm - 100) < 1e-9);
+
+/* ---------------------------------------------------------------- */
+titulo('22. Ancoragem e celeridade');
+ok('quatro casos de ancoragem', H.ancoragem.length === 4);
+ok('juntas de dilatação -> psi = 1', H.psiDe('juntas', 0.3) === 1);
+prox('ancorado a montante -> 1 - nu/2', H.psiDe('montante', 0.3), 0.85, 1e-12);
+prox('ancorado em todo o comprimento -> 1 - nu²', H.psiDe('ancorado', 0.3), 0.91, 1e-12);
+prox('manual usa o valor informado', H.psiDe('manual', 0.3, 0.7), 0.7, 1e-12);
+/* o caso ancorado é o mais desfavorável: maior celeridade */
+const aJ = H.celeridade(0.5, 0.007, 170e9, 998.2, 2.19e9, H.psiDe('juntas', 0.28));
+const aA = H.celeridade(0.5, 0.007, 170e9, 998.2, 2.19e9, H.psiDe('ancorado', 0.28));
+ok('tubo ancorado tem celeridade maior que com juntas de dilatação', aA > aJ,
+   UI0(aA) + ' > ' + UI0(aJ));
+
+const stAnc = E.clone(stNeg);
+stAnc.adutoras[0].catalogoId = 'fd_k7';
+stAnc.adutoras[0].itemRot = 'DN 300';
+stAnc.golpe = { avaliar: true, tempoManobra: 5, ancoragem: 'juntas', psi: 1 };
+const dhJuntas = C.resumo(stAnc, cats).golpe[0].dh;
+stAnc.golpe.ancoragem = 'ancorado';
+const dhAnc = C.resumo(stAnc, cats).golpe[0].dh;
+ok('a sobrepressão é maior no caso ancorado', dhAnc > dhJuntas,
+   UI0(dhAnc) + ' > ' + UI0(dhJuntas));
+ok('a pressão mínima do transitório é calculada',
+   C.resumo(stAnc, cats).golpe[0].pressaoMinMca < C.resumo(stAnc, cats).projeto.Hm);
+
+/* ---------------------------------------------------------------- */
+titulo('23. Perfil e envoltórias');
+const stP = E.clone(stNeg);
+stP.adutoras[0].catalogoId = 'fd_k7';
+stP.adutoras[0].itemRot = 'DN 300';
+stP.adutoras[0].pnMcaOverride = 250;
+stP.perfil = { ativo: true, modo: 'acumulada', unidExt: 'm',
+  pontos: [{ est: 0, cota: 122 }, { est: 750, cota: 150, rot: 'ponto alto' },
+           { est: 1500, cota: 130 }, { est: 2250, cota: 140 }, { est: 3000, cota: 146 }] };
+let rP = C.resumo(stP, cats);
+ok('envoltória calculada', !!rP.envoltoria);
+ok('um ponto de envoltória por ponto de perfil', rP.envoltoria.pontos.length === 5);
+ok('a envoltória máxima fica acima da piezométrica permanente',
+   rP.envoltoria.pontos[0].envMax > rP.envoltoria.pontos[0].hgl);
+ok('a envoltória mínima fica abaixo da piezométrica permanente',
+   rP.envoltoria.pontos[0].envMin < rP.envoltoria.pontos[0].hgl);
+ok('o Δh decai até zero na chegada',
+   Math.abs(rP.envoltoria.pontos[4].envMax - rP.envoltoria.pontos[4].hgl) < 1e-9);
+ok('Δh cheio na elevatória',
+   Math.abs((rP.envoltoria.pontos[0].envMax - rP.envoltoria.pontos[0].hgl) - rP.envoltoria.dh) < 1e-9);
+ok('o ponto crítico de pressão máxima é identificado', !!rP.envoltoria.criticoMax);
+ok('o ponto crítico de pressão mínima é identificado', !!rP.envoltoria.criticoMin);
+ok('o ponto alto do perfil tem a menor pressão permanente',
+   rP.envoltoria.pontos[1].pPerm < rP.envoltoria.pontos[2].pPerm,
+   UI0(rP.envoltoria.pontos[1].pPerm) + ' < ' + UI0(rP.envoltoria.pontos[2].pPerm));
+
+/* modo "extensão individual" acumula */
+const stP2 = E.clone(stP);
+stP2.perfil.modo = 'individual';
+stP2.perfil.pontos = [{ est: 0, cota: 122 }, { est: 750, cota: 150 }, { est: 750, cota: 130 },
+                      { est: 750, cota: 140 }, { est: 750, cota: 146 }];
+const pp2 = C.perfilPontos(stP2);
+ok('modo individual acumula as extensões', pp2.ultimoX === 3000, String(pp2.ultimoX));
+/* unidade km */
+const stP3 = E.clone(stP);
+stP3.perfil.unidExt = 'km';
+stP3.perfil.pontos = [{ est: 0, cota: 122 }, { est: 3, cota: 146 }];
+ok('unidade km convertida', C.perfilPontos(stP3).ultimoX === 3000);
+/* divergência de extensão detectada */
+const stP4 = E.clone(stP);
+stP4.perfil.pontos = [{ est: 0, cota: 122 }, { est: 5000, cota: 146 }];
+ok('divergência entre perfil e trechos é avisada',
+   C.resumo(stP4, cats).avisosDados.some(function (a) { return a.id === 'perfilExtensao'; }));
+
+/* ---------------------------------------------------------------- */
+titulo('24. Curva do sistema e ponto de operação');
+const stCB = E.clone(stNeg);
+stCB.adutoras[0].catalogoId = 'fd_k7';
+stCB.adutoras[0].itemRot = 'DN 300';
+const ctxCB = C.contexto(stCB, cats);
+const cs = C.curvaSistema(stCB, ctxCB, 1, 10, 1.5);
+ok('curva do sistema com 11 pontos', cs.length === 11);
+prox('com vazão nula a curva do sistema vale Hg', cs[0].H, C.resumo(stCB, cats).projeto.Hg, 1e-9);
+/* a curva do sistema não pode depender de quantas bombas produzem a vazão:
+   para a mesma vazão total, a altura é a mesma (as perdas são da tubulação) */
+const csA = C.hmDoSistema(stCB, ctxCB, 0.08, 1).Hm;
+const csB = C.hmDoSistema(stCB, ctxCB, 0.08, 2).Hm;
+prox('mesma vazão total -> mesma altura do sistema, com 1 ou 2 bombas', csB, csA, 1e-9);
+ok('a curva do sistema é crescente', (function () {
+  for (var i = 1; i < cs.length; i++) if (cs[i].H <= cs[i - 1].H) return false;
+  return true;
+})());
+
+/* ajuste de curva por 3 pontos exatos de uma parábola conhecida */
+const aj = C.ajustarCurvaBomba([{ q: 0, H: 60 }, { q: 0.05, H: 55 }, { q: 0.1, H: 40 }]);
+ok('ajuste devolve os coeficientes', !!aj);
+prox('passa pelo 1º ponto', aj.H(0), 60, 1e-6);
+prox('passa pelo 2º ponto', aj.H(0.05), 55, 1e-6);
+prox('passa pelo 3º ponto', aj.H(0.1), 40, 1e-6);
+ok('menos de 3 pontos não ajusta', C.ajustarCurvaBomba([{ q: 0, H: 60 }]) === null);
+
+stCB.curvaBomba = { ativo: true, unidQ: 'L/s', npshr: null,
+  pontos: [{ q: 0, H: 60 }, { q: 60, H: 52 }, { q: 120, H: 30 }] };
+stCB.bombas.instaladas = 2; stCB.bombas.operando = 1;
+const rCB = C.resumo(stCB, cats);
+ok('ponto de operação encontrado', rCB.operacao && !rCB.operacao.erro,
+   rCB.operacao ? (rCB.operacao.erro || 'ok') : 'null');
+const opCB = rCB.operacao;
+prox('no ponto de operação a curva da bomba e a do sistema se cruzam',
+     rCB.curvaBomba.H(opCB.qBomba), C.hmDoSistema(stCB, C.contexto(stCB, cats), opCB.qTotal, 1).Hm, 1e-4);
+ok('a vazão de operação é positiva e dentro da curva informada',
+   opCB.qTotal > 0 && opCB.qTotal <= 0.12, UI0(opCB.qTotal * 1000) + ' L/s');
+ok('operação calculada para cada quantidade de bombas', rCB.operacaoPorN.length === 2);
+const op1 = rCB.operacaoPorN[0].op, op2 = rCB.operacaoPorN[1].op;
+ok('duas bombas dão mais vazão que uma', op2.qTotal > op1.qTotal,
+   UI0(op1.qTotal * 1000) + ' -> ' + UI0(op2.qTotal * 1000));
+ok('em paralelo o ganho é menor que dobrar', op2.qTotal < 2 * op1.qTotal,
+   UI0(op2.qTotal * 1000) + ' < ' + UI0(2 * op1.qTotal * 1000));
+ok('cada bomba entrega menos em paralelo', op2.qBomba < op1.qTotal,
+   UI0(op2.qBomba * 1000) + ' < ' + UI0(op1.qTotal * 1000));
+ok('a altura sobe com mais bombas', op2.H > op1.H, UI0(op2.H) + ' > ' + UI0(op1.H));
+/* bomba forte demais para os pontos informados */
+const stCurta = E.clone(stCB);
+stCurta.curvaBomba.pontos = [{ q: 0, H: 200 }, { q: 20, H: 195 }, { q: 40, H: 185 }];
+const rCurta = C.resumo(stCurta, cats);
+ok('curva que termina antes da interseção é sinalizada',
+   rCurta.operacao && /vazão maior/.test(rCurta.operacao.erro || ''),
+   rCurta.operacao ? (rCurta.operacao.erro || 'sem erro') : 'null');
+
+/* bomba fraca demais */
+const stFraca = E.clone(stCB);
+stFraca.curvaBomba.pontos = [{ q: 0, H: 5 }, { q: 20, H: 4 }, { q: 40, H: 2 }];
+const rFraca = C.resumo(stFraca, cats);
+ok('bomba que não vence a altura geométrica é sinalizada',
+   rFraca.operacao && !!rFraca.operacao.erro, rFraca.operacao ? rFraca.operacao.erro : 'null');
+
+/* ---------------------------------------------------------------- */
+titulo('25. Análise econômica');
+prox('CRF de 8 % em 20 anos', C.crf(8, 20), 0.101852, 1e-4);
+prox('CRF com taxa nula é 1/n', C.crf(0, 20), 0.05, 1e-12);
+const stEco = E.clone(stCB);
+stEco.economia = { ativo: true, tarifa: 0.65, horasDia: 20, anos: 20, taxa: 8,
+                   custoA: 0.9, custoB: 1.45, custoInstalacao: 40 };
+const ctxEco = C.contexto(stEco, cats);
+const vEco = C.varrer(stEco, ctxEco, stEco.adutoras[0], 'adutoras.0', 1);
+ok('a varredura calcula custos', vEco.ecoAtiva && vEco.linhas[0].eco);
+ok('há um ótimo econômico marcado',
+   vEco.linhas.filter(function (l) { return l.otimoEconomico; }).length === 1);
+ok('o custo do tubo cresce com o diâmetro', (function () {
+  for (var i = 1; i < vEco.linhas.length; i++) {
+    if (vEco.linhas[i].eco.custoTubo <= vEco.linhas[i - 1].eco.custoTubo) return false;
+  }
+  return true;
+})());
+ok('o custo de energia cai com o diâmetro', (function () {
+  for (var i = 1; i < vEco.linhas.length; i++) {
+    if (vEco.linhas[i].eco.anualEnergia >= vEco.linhas[i - 1].eco.anualEnergia) return false;
+  }
+  return true;
+})());
+/* o ótimo fica num mínimo interior, não nos extremos */
+const idxOt = vEco.linhas.findIndex(function (l) { return l.otimoEconomico; });
+ok('o ótimo econômico não é o menor nem o maior diâmetro do catálogo',
+   idxOt > 0 && idxOt < vEco.linhas.length - 1, 'índice ' + idxOt + ' de ' + vEco.linhas.length);
+/* tarifa maior empurra para diâmetro maior */
+const stEco2 = E.clone(stEco);
+stEco2.economia.tarifa = 5;
+const vEco2 = C.varrer(stEco2, C.contexto(stEco2, cats), stEco2.adutoras[0], 'adutoras.0', 1);
+const idxOt2 = vEco2.linhas.findIndex(function (l) { return l.otimoEconomico; });
+ok('tarifa mais alta desloca o ótimo para diâmetro maior', idxOt2 >= idxOt,
+   idxOt + ' -> ' + idxOt2);
+/* sem economia ativa, sem colunas */
+const vSem = C.varrer(stCB, C.contexto(stCB, cats), stCB.adutoras[0], 'adutoras.0', 1);
+ok('desativada, a varredura não calcula custo', !vSem.ecoAtiva && !vSem.linhas[0].eco);
+
+/* ---------------------------------------------------------------- */
+titulo('26. Catálogo de flanges Saint-Gobain');
+['fd_flg_pn10', 'fd_flg_pn16', 'fd_flg_pn25', 'fd_flg_pn40'].forEach(function (id) {
+  const c = CAT.buscar(CAT.padrao, id);
+  ok(id + ' existe com PN cadastrado', !!c && c.itens.every(function (i) { return i.pn > 0; }));
+});
+const flg16 = CAT.buscar(CAT.padrao, 'fd_flg_pn16');
+ok('PN 16 = 160 mca', flg16.itens[0].pn === 16);
+prox('flangeado PN 16 DN 300 usa espessura K9', flg16.itens.filter(function (i) { return i.dn === 300; })[0].e, 7.2, 1e-9);
+const flg40 = CAT.buscar(CAT.padrao, 'fd_flg_pn40');
+prox('flangeado PN 40 DN 300 usa espessura K12', flg40.itens.filter(function (i) { return i.dn === 300; })[0].e, 9.6, 1e-9);
+ok('PN 40 vai só até DN 600', Math.max.apply(null, flg40.itens.map(function (i) { return i.dn; })) === 600);
+/* com o flangeado, a verificação de pressão passa a concluir */
+const stFlg = E.clone(stNeg);
+stFlg.adutoras[0].catalogoId = 'fd_flg_pn16';
+stFlg.adutoras[0].itemRot = 'DN 300';
+stFlg.adutoras[0].pnMcaOverride = null;
+ok('PN do catálogo de flanges habilita a verificação',
+   C.resumo(stFlg, cats).piezometrica[1].pnMca === 160,
+   String(C.resumo(stFlg, cats).piezometrica[1].pnMca));
 
 console.log('\n' + '='.repeat(60));
 console.log(falhas === 0 ? `TODOS OS ${total} TESTES PASSARAM` : `${falhas} de ${total} TESTES FALHARAM`);

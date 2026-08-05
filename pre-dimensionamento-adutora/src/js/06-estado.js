@@ -33,8 +33,11 @@
   }
   E.novoConjunto = novoConjunto;
 
+  /* dnLocal: DN comercial da peça, quando diferente do tubo do trecho.
+     O DI é buscado no catálogo do trecho — assim não é preciso lembrar o DI. */
   E.novaPeca = function (pecaId) {
-    return { pecaId: pecaId || 'curva90', qtd: 1, kOverride: null, diLocalMm: null };
+    return { pecaId: pecaId || 'curva90', qtd: 1, kOverride: null,
+             dnLocal: '', diLocalMm: null };
   };
 
   E.novoTrechoComum = function (n) {
@@ -79,7 +82,9 @@
         motores: PDA.P.motores.slice()
       },
       cotas: {
-        nivelSuccaoMin: 0, nivelSuccaoMax: 0, eixoBomba: 0, nivelChegada: 0,
+        nivelSuccaoMin: 0, nivelSuccaoMax: 0, eixoBomba: 0,
+        cotaPartida: null,        /* em branco = igual ao nível de sucção mínimo */
+        nivelChegada: 0,
         unid: 'm'
       },
       criterios: clone(PDA.P.criterios),
@@ -89,7 +94,22 @@
       barrileteComum: { ativo: true, trechos: [] },
       adutoras: [E.novaAdutora(1)],
       golpe: {
-        avaliar: true, tipoManobra: 'rapida', tempoManobra: 5, psi: 1.0
+        avaliar: true, tempoManobra: 5,
+        ancoragem: 'juntas',      /* ver PDA.H.ancoragem */
+        psi: 1.0                  /* usado apenas quando ancoragem = 'manual' */
+      },
+      /* perfil da linha colado de planilha, para a envoltória de pressões */
+      perfil: {
+        ativo: false, modo: 'acumulada', unidExt: 'm', pontos: []
+      },
+      /* curva da bomba informada por pontos (Q, H) */
+      curvaBomba: {
+        ativo: false, unidQ: 'L/s', pontos: [], npshr: null
+      },
+      /* análise econômica de diâmetro */
+      economia: {
+        ativo: false, tarifa: 0.65, horasDia: 20, anos: 20, taxa: 8,
+        custoA: 0.9, custoB: 1.45, custoInstalacao: 40
       },
       selecao: {}   /* { conjuntoKey: itemRot } escolhas manuais de diâmetro */
     };

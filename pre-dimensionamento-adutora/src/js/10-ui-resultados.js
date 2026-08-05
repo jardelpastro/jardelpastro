@@ -14,22 +14,99 @@
 
   Res.faixa = function (st, ctx, res) {
     var c = res.projeto;
+    var av = Res.alertas(st, ctx, res);
     return h('div', { class: 'faixa-resumo' },
       PDA.F.chip('Vazão total', UI.num(ctx.qTotal * 1000, 1), 'L/s'),
       PDA.F.chip('Por bomba', UI.num(ctx.qBomba * 1000, 1), 'L/s'),
-      PDA.F.chip('Hg', UI.num(c.Hg, 2), 'm'),
-      PDA.F.chip('Perdas totais', UI.num(c.hSuccao + c.hRecalque, 2), 'm'),
-      PDA.F.chip('Hm', UI.num(c.Hm, 2), 'mca'),
+      PDA.F.chipAlerta('Hg', UI.num(c.Hg, 2), 'm', av.hg),
+      PDA.F.chipAlerta('Perdas totais', UI.num(c.hSuccao + c.hRecalque, 2), 'm', av.perdas),
+      PDA.F.chipAlerta('Hm', UI.num(c.Hm, 2), 'mca', av.hm, 'forte'),
       PDA.F.chip('BHP por bomba', UI.num(c.bhpCv, 1), 'cv'),
-      PDA.F.chip('Motor', UI.numEdit(c.motorCv), 'cv (' + UI.num(c.motorKw, 1) + ' kW)'),
-      c.npshd !== null ? PDA.F.chip('NPSH disp.', UI.num(c.npshd, 2), 'mca') : null,
+      PDA.F.chipAlerta('Motor', UI.numEdit(c.motorCv), 'cv (' + UI.num(c.motorKw, 1) + ' kW)', av.motor),
+      c.npshd !== null ? PDA.F.chipAlerta('NPSH disp.', UI.num(c.npshd, 2), 'mca', av.npsh) : null,
+      PDA.F.chipAlerta('Pressão máx.',
+        res.golpe && res.golpe.length ? UI.num(Math.max.apply(null, res.golpe.map(function (g) { return g.pressaoMaxMca; })), 0) : '—',
+        'mca c/ transitório', av.pressao),
       PDA.F.chip('Bombas', ctx.nOp + ' de ' + ctx.nInst, 'em operação'));
+  };
+
+  /* Sinais de atenção para os resultados que costumam passar batido */
+  Res.alertas = function (st, ctx, res) {
+    var c = res.projeto, av = {};
+
+    if (c.Hg <= 0) {
+      av.hg = { grave: true, txt: 'Altura geométrica nula ou negativa: a cota de chegada não é superior ao nível de sucção. Confira se as duas cotas estão na mesma referência de nível.' };
+    } else if ((res.avisosDados || []).some(function (a) { return a.grave; })) {
+      av.hg = { grave: true, txt: 'Há incoerência entre a cota de chegada e a cota final do último trecho da adutora. Veja a aba Resumo.' };
+    }
+
+    var perdas = c.hSuccao + c.hRecalque;
+    if (c.Hm > 0) {
+      var fracao = perdas / c.Hm;
+      if (fracao > 0.6) {
+        av.perdas = { grave: fracao > 0.8,
+          txt: 'As perdas de carga respondem por ' + UI.num(fracao * 100, 0) + ' % da altura manométrica. ' +
+               'Acima de 50 a 60 % é sinal de diâmetro apertado: normalmente compensa aumentar o diâmetro, ' +
+               'porque o custo de energia domina o custo do tubo.' };
+      }
+    }
+    if (perdas > 0 && (c.hlSuccao + c.hlRecalque) / perdas > 0.5) {
+      av.perdas = av.perdas || {};
+      av.perdas.txt = (av.perdas.txt ? av.perdas.txt + ' ' : '') +
+        'As perdas localizadas são mais da metade do total (' +
+        UI.num((c.hlSuccao + c.hlRecalque) / perdas * 100, 0) + ' %). Em adutoras longas isso é atípico — ' +
+        'confira as quantidades de peças e os diâmetros lançados nelas.';
+    }
+
+    if (c.Hm > 0 && c.Hg > 0 && c.Hm / c.Hg > 3) {
+      av.hm = { grave: false,
+        txt: 'A altura manométrica é ' + UI.num(c.Hm / c.Hg, 1) + ' vezes a altura geométrica. ' +
+             'Reveja o diâmetro da adutora — a energia gasta em perda de carga é maior que a gasta em elevar a água.' };
+    }
+    if (c.Hm <= 0) av.hm = { grave: true, txt: 'Altura manométrica não positiva. Revise cotas e perdas.' };
+
+    if (c.motorCv && c.bhpCv > 0 && c.motorCv / c.bhpCv > 1.6) {
+      av.motor = { grave: false,
+        txt: 'O motor comercial escolhido tem ' + UI.num((c.motorCv / c.bhpCv - 1) * 100, 0) +
+             ' % de folga sobre a potência de eixo, porque a potência calculada caiu logo acima de uma faixa ' +
+             'comercial. Vale conferir se um ajuste de diâmetro traz o BHP para a faixa de baixo.' };
+    }
+
+    if (c.npshd !== null) {
+      if (c.npshd < 0) av.npsh = { grave: true, txt: 'NPSH disponível negativo: a bomba não consegue aspirar nessa configuração.' };
+      else if (c.npshd < 3) av.npsh = { grave: true, txt: 'NPSH disponível de apenas ' + UI.num(c.npshd, 2) + ' mca. Confira o NPSH requerido da bomba — a margem usual mínima é de 0,5 a 1,0 mca.' };
+      else if (st.curvaBomba.npshr && c.npshd - Number(st.curvaBomba.npshr) < 0.5) {
+        av.npsh = { grave: c.npshd - Number(st.curvaBomba.npshr) < 0,
+          txt: 'Margem de apenas ' + UI.num(c.npshd - Number(st.curvaBomba.npshr), 2) + ' mca sobre o NPSH requerido.' };
+      }
+    }
+
+    var pior = null;
+    (res.golpe || []).forEach(function (g) {
+      if (g.atende === false) pior = { grave: true, txt: g.rot + ': pressão máxima de ' + UI.num(g.pressaoMaxMca, 1) +
+        ' mca com o transitório, acima da admissível do tubo (' + UI.num(g.pnMca, 0) + ' mca).' };
+      else if (!pior && g.subpressao) pior = { grave: false, txt: g.rot + ': o transitório leva a pressão a ' +
+        UI.num(g.pressaoMinMca, 1) + ' mca. Subpressão pede avaliação de ventosas e de proteção contra o golpe.' };
+    });
+    if (res.envoltoria) {
+      if (res.envoltoria.criticoMin.pMin <= -10) {
+        pior = { grave: true, txt: 'Separação de coluna prevista em ' + UI.num(res.envoltoria.criticoMin.x, 0) +
+          ' m (pressão mínima de ' + UI.num(res.envoltoria.criticoMin.pMin, 1) + ' mca). Veja a aba Perfil.' };
+      } else if (!pior && res.envoltoria.criticoMin.pMin < 0) {
+        pior = { grave: false, txt: 'Subpressão de ' + UI.num(res.envoltoria.criticoMin.pMin, 1) + ' mca em ' +
+          UI.num(res.envoltoria.criticoMin.x, 0) + ' m. Veja a aba Perfil.' };
+      }
+    }
+    av.pressao = pior;
+
+    return av;
   };
 
   /* ---------------- aba completa ---------------- */
 
   Res.aba = function (st, ctx, res) {
     var out = [];
+    (res.avisosDados || []).forEach(function (a) { out.push(PDA.F.blocoAviso(a)); });
     var avisos = Res.coletarAvisos(st, ctx, res);
     if (avisos.length) {
       out.push(h('div', { class: 'aviso' },
@@ -214,14 +291,16 @@
     var temCotas = st.adutoras.some(function (a) { return a.usarCotas; });
 
     var linhas = pts.map(function (p) {
-      var cl = p.pnMca ? (p.pressao > p.pnMca ? 'ruim' : (p.pressao > 0.85 * p.pnMca ? 'atencao' : 'bom')) : null;
-      return h('tr', { class: cl },
+      return h('tr', { class: p.classe === 'na' ? null : p.classe, title: p.motivos.join(' · ') },
         h('td', { class: 'esq' }, p.rot),
         h('td', {}, UI.num(p.cota, 2)),
         h('td', {}, UI.num(p.hgl, 2)),
-        h('td', {}, h('b', {}, UI.num(p.pressao, 2))),
+        h('td', {}, h('b', {}, UI.num(p.pressao, 2)),
+          p.pressao < 0 ? h('span', { class: 'sinal', title: p.motivos.join('; ') }, ' !') : null),
         h('td', {}, p.pnMca ? UI.num(p.pnMca, 0) : '—'),
-        h('td', {}, p.pnMca ? UI.tagClasse(cl) : h('span', { class: 'nota' }, 'PN não cadastrado')));
+        h('td', {}, p.classe === 'na'
+          ? h('span', { class: 'nota', title: p.motivos.join('; ') }, 'PN não informado')
+          : UI.tagClasse(p.classe)));
     });
 
     var corpo = [
@@ -321,6 +400,7 @@
         h('td', { class: 'esq' }, g.rot),
         h('td', { class: 'esq' }, g.materialRot || '—'),
         h('td', {}, UI.num(g.E_GPa, 0)),
+        h('td', {}, UI.num(g.psi, 3)),
         h('td', {}, g.eMm ? UI.num(g.eMm, 1) : '—'),
         h('td', {}, UI.num(g.v, 2)),
         h('td', {}, g.celeridade ? UI.num(g.celeridade, 0) : '—'),
@@ -330,24 +410,47 @@
         h('td', {}, isFinite(g.dhMichaud) ? UI.num(g.dhMichaud, 1) : '—'),
         h('td', {}, h('b', {}, isFinite(g.dh) ? UI.num(g.dh, 1) : '—')),
         h('td', {}, UI.num(g.pressaoMaxMca, 1)),
+        h('td', {}, UI.num(g.pressaoMinMca, 1),
+          g.subpressao ? h('span', { class: 'sinal', title: 'A pressão mínima fica negativa: subpressão. Avalie ventosas de duplo efeito e proteção contra o golpe.' }, ' !') : null),
         h('td', {}, g.pnMca ? UI.num(g.pnMca, 0) : '—'),
-        h('td', {}, g.atende === null ? h('span', { class: 'nota' }, 'PN não cadastrado') : UI.tagClasse(cl)));
+        h('td', {}, g.atende === null ? h('span', { class: 'nota' }, 'PN não informado') : UI.tagClasse(cl)));
     });
 
     return UI.cartao('Transitório hidráulico — pré-avaliação',
       'Sobrepressão estimada e conferência da classe de pressão', [
-      UI.tabela([{ rot: 'Trecho', esq: true }, { rot: 'Material', esq: true }, 'E (GPa)', 'e (mm)',
-                 'v (m/s)', { rot: 'Celeridade (m/s)', title: 'a = 1/√[ρ(1/K + ψD/(eE))]' },
-                 { rot: 'tc = 2L/a (s)', title: 'Tempo crítico: abaixo dele a manobra é rápida' },
+      UI.tabela([{ rot: 'Trecho', esq: true }, { rot: 'Material', esq: true }, 'E (GPa)',
+                 { rot: 'ψ', dica: 'Coeficiente de ancoragem longitudinal, do caso escolhido na aba Adutora. ψ = 1 para tubo com juntas de dilatação; 1 − ν/2 ancorado só a montante; 1 − ν² ancorado em todo o comprimento (o caso mais desfavorável).' },
+                 'e (mm)', 'v (m/s)',
+                 { rot: 'Celeridade (m/s)', dica: 'a = 1/√[ρ(1/K + ψD/(eE))], com K = 2,19 GPa para a água. Quanto mais rígido o tubo, maior a celeridade e maior a sobrepressão.' },
+                 { rot: 'tc = 2L/a (s)', dica: 'Tempo crítico: o tempo que a onda leva para ir até a extremidade e voltar. Se a manobra for mais rápida que isso, vale a sobrepressão integral de Joukowsky.' },
                  'Manobra', 'Δh Joukowsky', 'Δh Michaud', 'Δh adotado (mca)',
-                 { rot: 'p máx. (mca)', title: 'Hm + Δh' }, 'PN (mca)', 'Situação'], linhas),
+                 { rot: 'p máx. (mca)', dica: 'Hm + Δh — o que a classe de pressão do tubo tem de suportar.' },
+                 { rot: 'p mín. (mca)', dica: 'Hm − Δh. Valor negativo indica subpressão na elevatória, com risco de cavitação e de entrada de ar.' },
+                 'PN (mca)', 'Situação'], linhas),
       h('div', { class: 'aviso' },
-        h('b', {}, 'Limite desta verificação'),
-        'Estes números são uma triagem: indicam se a classe de pressão escolhida tem folga e se o ' +
-        'transitório precisa de atenção. Não representam a envoltória real de pressões, não avaliam ' +
-        'a depressão (risco de cavitação e colapso de tubo de parede fina) e não consideram dispositivos ' +
-        'de proteção como TAU, chaminé de equilíbrio, válvula antecipadora de onda ou volante de inércia. ' +
-        'Adutoras longas, com perfil acidentado ou de material de parede fina exigem modelagem específica do transitório.')
+        h('b', {}, 'Como este resultado é obtido, e até onde ele vale'),
+        h('p', { style: 'margin:0 0 5px' },
+          'Passo 1 — celeridade da onda no tubo escolhido: a = 1/√[ρ(1/K + ψ·D/(e·E))], com K = 2,19 GPa da água, ' +
+          'E e ν do material, e ψ do caso de ancoragem selecionado. Passo 2 — tempo crítico tc = 2L/a. ' +
+          'Passo 3 — se o tempo de manobra informado é menor que tc, a manobra é rápida e a sobrepressão é a de ' +
+          'Joukowsky, Δh = a·Δv/g, com Δv igual à velocidade de regime (parada total do escoamento). ' +
+          'Se é maior, aplica-se a fórmula de manobra lenta de Michaud/Allievi, Δh = 2·L·v/(g·t), e o programa ' +
+          'adota o menor dos dois. Passo 4 — a pressão de conferência é Hm ± Δh.'),
+        h('p', { style: 'margin:0' },
+          'É a tubulação NUA: não há tanque de alívio, chaminé de equilíbrio, válvula antecipadora de onda, ' +
+          'ventosa de duplo efeito nem volante de inércia. Também não há integração das equações do transitório ' +
+          'pelo método das características, nem reflexão de ondas nas mudanças de diâmetro e material, nem ' +
+          'modelagem da separação e do retorno da coluna líquida. Serve para saber se a classe de pressão tem ' +
+          'folga e se o transitório é crítico o suficiente para exigir estudo específico — e, se estourar, o ' +
+          'caminho usual não é engrossar a parede do tubo, é dimensionar a proteção. ' +
+          'Com o perfil lançado na aba Perfil, o programa traça as envoltórias ponto a ponto.')),
+      res.envoltoria ? h('div', { class: 'aviso info' },
+        h('b', {}, 'Envoltórias ao longo da linha'),
+        'O perfil está lançado: a pressão máxima é ' + UI.num(res.envoltoria.criticoMax.pMax, 1) + ' mca em ' +
+        UI.num(res.envoltoria.criticoMax.x, 0) + ' m, e a mínima é ' + UI.num(res.envoltoria.criticoMin.pMin, 1) +
+        ' mca em ' + UI.num(res.envoltoria.criticoMin.x, 0) + ' m. ',
+        h('button', { class: 'btn mini naoimprime', type: 'button', 'data-acao': 'irAba', 'data-aba': 'perfil',
+                      style: 'margin-left:6px' }, 'Ver o perfil')) : null
     ]);
   };
 
@@ -482,7 +585,44 @@
         c.npshd !== null ? it('NPSH disponível', UI.num(c.npshd, 2) + ' mca') : null,
         st.bombas.usarRendMotor ? it('Potência elétrica por bomba', UI.num(c.eletricaKw, 2) + ' kW') : null))),
 
-      h('h2', {}, '5. Ressalvas'),
+      st.projeto.obs ? h('div', {}, h('h2', {}, '5. Observações do projeto'),
+        h('p', { style: 'white-space:pre-wrap' }, st.projeto.obs)) : null,
+
+      res.operacao && !res.operacao.erro ? h('div', {},
+        h('h2', {}, (st.projeto.obs ? '6' : '5') + '. Ponto de operação com a curva da bomba'),
+        h('div', { class: 'rolagem' }, h('table', {}, h('tbody', {},
+          it('Curva ajustada', 'H = ' + UI.num(res.curvaBomba.a0, 3) + ' + (' + UI.num(res.curvaBomba.a1, 3) +
+             ')·Q + (' + UI.num(res.curvaBomba.a2, 3) + ')·Q²  [H em mca, Q em m³/s]'),
+          it('Pontos informados', res.curvaBomba.pontos.map(function (p) {
+            return UI.num(p.q * 1000, 1) + ' L/s / ' + UI.num(p.H, 1) + ' mca';
+          }).join('   ·   ')),
+          it('Vazão de operação', UI.num(res.operacao.qTotal * 1000, 2) + ' L/s total, ' +
+             UI.num(res.operacao.qBomba * 1000, 2) + ' L/s por bomba, com ' + res.operacao.n + ' bomba(s)'),
+          it('Altura de operação', UI.num(res.operacao.H, 2) + ' mca'),
+          it('Potência de eixo no ponto de operação', UI.num(res.operacao.bhpCv, 2) + ' cv'),
+          it('Desvio da vazão de projeto', UI.num(res.operacao.desvioQ, 1) + ' %')))),
+        h('p', { class: 'nota' },
+          'A curva da bomba foi ajustada por mínimos quadrados na forma H = a₀ + a₁Q + a₂Q² e cruzada com a ' +
+          'curva do sistema. Com mais de uma bomba em paralelo, a vazão de cada uma é a vazão total dividida ' +
+          'pelo número de conjuntos, na mesma altura.')) : null,
+
+      res.envoltoria ? h('div', {},
+        h('h2', {}, (st.projeto.obs ? '7' : '6') + '. Envoltórias de pressão do transitório'),
+        h('div', { class: 'rolagem' }, h('table', {}, h('tbody', {},
+          it('Pontos de perfil lançados', String(res.envoltoria.pontos.length)),
+          it('Sobrepressão adotada na elevatória', UI.num(res.envoltoria.dh, 2) + ' mca'),
+          it('Maior pressão', UI.num(res.envoltoria.criticoMax.pMax, 2) + ' mca em ' +
+             UI.num(res.envoltoria.criticoMax.x, 0) + ' m' +
+             (res.envoltoria.criticoMax.pn ? '  (admissível do tubo: ' + UI.num(res.envoltoria.criticoMax.pn, 0) + ' mca)' : '')),
+          it('Menor pressão', UI.num(res.envoltoria.criticoMin.pMin, 2) + ' mca em ' +
+             UI.num(res.envoltoria.criticoMin.x, 0) + ' m'),
+          it('Pontos reprovados', String(res.envoltoria.pontos.filter(function (p) { return p.classe === 'ruim'; }).length) +
+             ' de ' + res.envoltoria.pontos.length)))),
+        h('p', { class: 'nota' },
+          'Traçado de anteprojeto: a sobrepressão vale integralmente na elevatória e decai linearmente até zero ' +
+          'no ponto de chegada. Sem dispositivos de proteção e sem integração das equações do transitório.')) : null,
+
+      h('h2', {}, 'Ressalvas'),
       h('ul', { class: 'nota', style: 'font-size:12.5px' },
         h('li', {}, 'Trata-se de PRÉ-dimensionamento: define ordem de grandeza de diâmetro, altura manométrica e potência. ' +
           'O projeto executivo exige a curva da bomba, o ponto de operação real, a verificação do NPSH requerido e a análise do transitório.'),
@@ -491,7 +631,13 @@
         h('li', {}, 'Os coeficientes de rugosidade são faixas de literatura para a idade/condição escolhida. Onde houver medição de campo, ' +
           'o coeficiente medido prevalece.'),
         h('li', {}, 'Dimensões de tubo marcadas como "conferir catálogo" foram estimadas por fórmula normativa e devem ser confirmadas ' +
-          'com o fornecedor antes do detalhamento.')));
+          'com o fornecedor antes do detalhamento.'),
+        st.golpe.avaliar ? h('li', {}, 'A avaliação do transitório é preliminar e considera a tubulação sem dispositivos de proteção. ' +
+          'Não integra as equações do transitório pelo método das características, não representa reflexões em mudanças de ' +
+          'diâmetro e de material e não modela separação de coluna. Se a sobrepressão exceder a classe do tubo, o passo ' +
+          'seguinte é dimensionar a proteção com estudo específico.') : null,
+        st.economia.ativo ? h('li', {}, 'A comparação de custo usa uma lei de potência para o preço do tubo e a parcela de energia ' +
+          'associada à perda de carga de cada trecho. Serve para localizar o diâmetro econômico, não para orçar.') : null));
   };
 
   PDA.Res = Res;

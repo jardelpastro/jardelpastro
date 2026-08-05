@@ -117,6 +117,40 @@
     })
   });
 
+  /* Flangeados por classe de pressão (PN 10, 16, 25 e 40).
+     A espessura de parede segue a classe K do tubo; a classe de pressão do
+     conjunto é limitada pelo flange, conforme EN 1092-2 / ABNT NBR 7675.
+     PFA por DN e PN conforme a faixa de fornecimento do fabricante. */
+  var FD_FLG_PN = {
+    /* PN : { dnMax, classeK, obs } */
+    10: { dns: [80, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1200],
+          k: function (dn) { return dn <= 600 ? FD_K9[dn] : fdK12(dn); } },
+    16: { dns: [80, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1200],
+          k: function (dn) { return dn <= 600 ? FD_K9[dn] : fdK12(dn); } },
+    25: { dns: [80, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1200],
+          k: function (dn) { return fdK12(dn); } },
+    40: { dns: [80, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600],
+          k: function (dn) { return fdK12(dn); } }
+  };
+
+  Object.keys(FD_FLG_PN).forEach(function (pn) {
+    var cfg = FD_FLG_PN[pn];
+    lista.push({
+      id: 'fd_flg_pn' + pn,
+      nome: 'Ferro Fundido Dúctil — Flangeado PN ' + pn + ' (Saint-Gobain)',
+      familia: 'Ferro fundido dúctil', material: 'fd_cimento', designacao: 'DN',
+      revMm: 0, fonteIds: ['nbr7675', 'nbr8682', 'en1092'],
+      nota: 'Tubo flangeado de ferro fundido dúctil, classe de pressão PN ' + pn +
+            ' (= ' + (Number(pn) * 10) + ' mca). Espessura de parede da classe ' +
+            (Number(pn) >= 25 ? 'K12' : 'K9 até DN 600 e K12 acima') +
+            '. O PN do conjunto é limitado pelo flange (EN 1092-2). ' +
+            'Confirmar a PFA e a disponibilidade do DN no catálogo do fabricante.',
+      itens: cfg.dns.map(function (dn) {
+        return { rot: 'DN ' + dn, dn: dn, de: FD_DE[dn], e: cfg.k(dn), pn: Number(pn), verificar: true };
+      })
+    });
+  });
+
   /* ================= PEAD ================= */
 
   /* Espessuras mínimas por SDR (mm), transcritas das tabelas de fabricante
@@ -165,6 +199,18 @@
     { onde: 'PVC DEFoFo (aba "PVC DEFoFo Amanco")', era: 'e = 4,8 / 10,9 / 12,3 / 13,8 / 15,3 mm para DN 100 a 300',
       agora: 'e = 4,8 / 6,8 / 8,9 / 11,0 / 13,1 mm (série SDR 25)',
       motivo: 'As espessuras da aba Amanco de DN 150 a 300 repetiam as do PEAD PN 5 (DE 355 a 500). Isso reduzia muito o DI e superestimava a perda de carga — o DN 150 saía com DI de 148 mm em vez de 156 mm.' },
+    { onde: 'Coeficiente ψ de ancoragem do transitório (1ª versão deste programa)',
+      era: 'ψ fixo em 1,0, apresentado como o caso mais conservador',
+      agora: 'quatro casos: juntas de dilatação (ψ = 1), ancorado a montante (1 − ν/2), ancorado em todo o comprimento (1 − ν²) e manual',
+      motivo: 'ψ multiplica D/(eE) no denominador da celeridade: quanto maior o ψ, MENOR a celeridade. O caso desfavorável é o tubo ancorado em todo o comprimento, não o com juntas de dilatação.' },
+    { onde: 'Verificação de pressão (1ª versão deste programa)',
+      era: 'pressão comparada apenas com o PN do tubo — um ponto com −21,95 mca saía como "Adequado"',
+      agora: 'a classificação testa também os limites físicos: pressão negativa nunca é adequada, e abaixo de −10 mca há vaporização',
+      motivo: 'Pressão negativa significa que a linha piezométrica passa abaixo da tubulação. A causa raiz do caso relatado era a cota de chegada divergindo da cota final do último trecho — hoje os dois campos são um único número, e um verificador acusa qualquer divergência.' },
+    { onde: 'Curva do sistema com mais de uma bomba (2ª versão deste programa)',
+      era: 'vazão por bomba escalada e depois multiplicada por n, dobrando a vazão total',
+      agora: 'vazão por bomba = vazão total / n',
+      motivo: 'Encontrado pelos testes: para a mesma vazão total, a altura do sistema tem de ser a mesma com uma ou com duas bombas, porque as perdas são da tubulação.' },
     { onde: 'Célula F15 da aba "Pré-dimensionamento" (planilha Hazen-Williams)',
       era: '=IF(A14="", "", ...B14...D14...A14)', agora: 'referências da própria linha 15',
       motivo: 'A 5ª linha da tabela de diâmetros calculava a perda unitária com os dados da 4ª linha, repetindo o resultado do diâmetro anterior.' },

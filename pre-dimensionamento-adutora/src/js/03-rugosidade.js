@@ -151,20 +151,22 @@
     }
   };
 
-  /* ---------------- módulo de elasticidade (para celeridade) ---------------- */
+  /* ---------------- elasticidade e Poisson (para a celeridade) ----------------
+     E em GPa e coeficiente de Poisson ν, valores usuais de projeto.
+     Fonte: STREETER & WYLIE, "Fluid Transients"; PORTO, "Hidráulica Básica",
+     cap. 9; catálogos de fabricantes. */
   R.elasticidade = {
-    /* E em GPa, ordem de grandeza usual de projeto */
-    aco:      { E: 210, rot: 'Aço' },
-    fd:       { E: 170, rot: 'Ferro fundido dúctil' },
-    fofo:     { E: 100, rot: 'Ferro fundido cinzento' },
-    pvc:      { E: 3.0, rot: 'PVC rígido' },
-    pvc_o:    { E: 4.0, rot: 'PVC-O' },
-    pead:     { E: 1.0, rot: 'PEAD (curto prazo ≈ 1,0 GPa)' },
-    prfv:     { E: 30,  rot: 'PRFV / GRP' },
-    concreto: { E: 30,  rot: 'Concreto' },
-    fibrocim: { E: 24,  rot: 'Fibrocimento' },
-    inox:     { E: 200, rot: 'Aço inoxidável' },
-    cobre:    { E: 120, rot: 'Cobre' }
+    aco:      { E: 210, nu: 0.30, rot: 'Aço' },
+    fd:       { E: 170, nu: 0.28, rot: 'Ferro fundido dúctil' },
+    fofo:     { E: 100, nu: 0.26, rot: 'Ferro fundido cinzento' },
+    pvc:      { E: 3.0, nu: 0.40, rot: 'PVC rígido' },
+    pvc_o:    { E: 4.0, nu: 0.40, rot: 'PVC-O' },
+    pead:     { E: 1.0, nu: 0.45, rot: 'PEAD (curto prazo ≈ 1,0 GPa)' },
+    prfv:     { E: 30,  nu: 0.30, rot: 'PRFV / GRP' },
+    concreto: { E: 30,  nu: 0.18, rot: 'Concreto' },
+    fibrocim: { E: 24,  nu: 0.25, rot: 'Fibrocimento' },
+    inox:     { E: 200, nu: 0.30, rot: 'Aço inoxidável' },
+    cobre:    { E: 120, nu: 0.34, rot: 'Cobre' }
   };
 
   /* ---------------- fontes ---------------- */
@@ -193,6 +195,11 @@
       titulo: 'ABNT NBR 7675 — Tubos e conexões de ferro fundido dúctil',
       detalhe: 'Define classes de espessura (K) pela expressão e = K·(0,5 + 0,001·DN) mm, com espessuras mínimas por DN, e os diâmetros externos padronizados (compatíveis com ISO 2531 / EN 545).',
       tipo: 'Norma ABNT'
+    },
+    en1092: {
+      titulo: 'EN 1092-2 / ABNT NBR 7675 — Flanges de ferro fundido dúctil',
+      detalhe: 'Classes de pressão PN 10, 16, 25 e 40 para flanges de ferro fundido dúctil. A classe de pressão do conjunto flangeado é limitada pelo flange, e não apenas pela espessura de parede do tubo. A PFA (pressão de serviço admissível) por DN deve ser confirmada no catálogo do fabricante.',
+      tipo: 'Norma internacional / ABNT'
     },
     nbr8682: {
       titulo: 'ABNT NBR 8682 — Revestimento interno de argamassa de cimento em tubos de ferro fundido dúctil',

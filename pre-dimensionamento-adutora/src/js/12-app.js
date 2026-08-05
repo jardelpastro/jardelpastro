@@ -10,16 +10,21 @@
   var timer = null, foco = null;
 
   App.abas = [
+    { id: 'resumo', rot: 'Resumo' },
     { id: 'projeto', rot: 'Projeto' },
     { id: 'bombas', rot: 'Bombas e níveis' },
     { id: 'succao', rot: 'Sucção' },
     { id: 'barrilete', rot: 'Barriletes' },
     { id: 'adutoras', rot: 'Adutora / Recalque' },
+    { id: 'perfil', rot: 'Perfil da linha' },
+    { sep: true },
     { id: 'resultados', rot: 'Resultados' },
+    { sep: true },
     { id: 'catalogos', rot: 'Catálogos' },
-    { id: 'fontes', rot: 'Fontes e critérios' }
+    { id: 'parametros', rot: 'Parâmetros de cálculo' },
+    { id: 'fontes', rot: 'Fontes' }
   ];
-  App.aba = 'projeto';
+  App.aba = 'resumo';
 
   /* ================================================================
      Início
@@ -27,7 +32,8 @@
 
   App.iniciar = function () {
     h = UI.h;
-    PDA.F.init(); PDA.Res.init(); PDA.K.init();
+    PDA.F.init(); PDA.Res.init(); PDA.K.init(); PDA.Q.init(); PDA.Pf.init();
+    App.montarMarca();
 
     App.cats = PDA.E.carregarCatalogos();
     App.st = PDA.E.carregarLocal() || PDA.E.padrao();
@@ -38,6 +44,13 @@
 
     App.ligarEventos();
     App.render();
+  };
+
+  App.montarMarca = function () {
+    var alvo = document.getElementById('marca');
+    if (!alvo) return;
+    UI.limpar(alvo);
+    alvo.appendChild(PDA.M.marca(38));
   };
 
   /* ================================================================
@@ -59,12 +72,23 @@
 
     /* navegação */
     var nav = document.getElementById('abas');
+    var nAvisos = 0;
+    try { nAvisos = PDA.Res.coletarAvisos(st, ctx, res).length; } catch (e) { nAvisos = 0; }
+    var nDados = (res.avisosDados || []).length;
     UI.limpar(nav);
     App.abas.forEach(function (a) {
+      if (a.sep) { nav.appendChild(h('div', { class: 'sep' })); return; }
+      var marcador = null;
+      if (a.id === 'resultados' && nAvisos) {
+        marcador = h('span', { class: 'marcador', title: nAvisos + ' ponto(s) a verificar' }, String(nAvisos));
+      }
+      if (a.id === 'resumo' && nDados) {
+        marcador = h('span', { class: 'marcador', title: nDados + ' incoerência(s) de dados' }, '!');
+      }
       nav.appendChild(h('button', {
         type: 'button', 'aria-selected': App.aba === a.id ? 'true' : 'false',
-        onclick: function () { App.aba = a.id; PDA.E.salvarConfig({ tema: document.documentElement.getAttribute('data-tema'), aba: a.id }); App.render(); }
-      }, a.rot));
+        onclick: function () { App.irPara(a.id); }
+      }, a.rot, marcador));
     });
 
     var main = document.getElementById('conteudo');
@@ -80,25 +104,35 @@
       return;
     }
 
-    if (App.aba !== 'catalogos' && App.aba !== 'fontes') {
+    if (App.aba !== 'catalogos' && App.aba !== 'fontes' && App.aba !== 'parametros' && App.aba !== 'resumo') {
       main.appendChild(PDA.Res.faixa(st, ctx, res));
     }
 
     var conteudo;
     switch (App.aba) {
-      case 'projeto':    conteudo = PDA.F.abaProjeto(st, ctx); break;
+      case 'resumo':     conteudo = PDA.F.abaResumo(st, ctx, res); break;
+      case 'projeto':    conteudo = PDA.F.abaProjeto(st, ctx, res); break;
       case 'bombas':     conteudo = PDA.F.abaBombas(st, ctx, res); break;
       case 'succao':     conteudo = PDA.F.abaSuccao(st, ctx); break;
       case 'barrilete':  conteudo = PDA.F.abaBarrilete(st, ctx); break;
-      case 'adutoras':   conteudo = PDA.F.abaAdutoras(st, ctx); break;
+      case 'adutoras':   conteudo = PDA.F.abaAdutoras(st, ctx, res); break;
+      case 'perfil':     conteudo = PDA.Pf.aba(st, ctx, res); break;
       case 'resultados': conteudo = PDA.Res.aba(st, ctx, res); break;
       case 'catalogos':  conteudo = PDA.K.aba(st, ctx); break;
+      case 'parametros': conteudo = PDA.F.abaParametros(st, ctx); break;
       case 'fontes':     conteudo = PDA.K.abaFontes(st, ctx); break;
     }
     UI.add(main, conteudo);
 
     PDA.E.salvarLocal(st);
     App.restaurarFoco();
+  };
+
+  App.irPara = function (aba) {
+    App.aba = aba;
+    PDA.E.salvarConfig({ tema: document.documentElement.getAttribute('data-tema'), aba: aba });
+    App.render();
+    window.scrollTo(0, 0);
   };
 
   App.agendar = function (ms) {
@@ -185,6 +219,10 @@
       if (c) c.itemRot = '';
     }
 
+    /* cota de chegada e cota final do último trecho são o mesmo número:
+       editar um mantém o outro em dia */
+    App.sincronizarCotas(bind);
+
     /* nº de bombas coerente */
     if (bind === 'bombas.operando' || bind === 'bombas.instaladas') {
       var b = App.st.bombas;
@@ -195,6 +233,45 @@
     var estrutural = el.getAttribute('data-estrutural') || tipo === 'bool' ||
                      el.tagName === 'SELECT' || ehChange;
     App.agendar(estrutural ? 0 : 320);
+  };
+
+  /* Mantém uma única verdade para as cotas de partida e de chegada.
+     Chamado depois de cada edição de campo. */
+  App.sincronizarCotas = function (bind) {
+    var st = App.st;
+    var ativas = st.adutoras.filter(function (a) { return a.ativo !== false; });
+    var ultima = ativas[ativas.length - 1];
+    var primeira = ativas[0];
+
+    if (bind === 'cotas.nivelChegada' && ultima && ultima.usarCotas) {
+      ultima.cotaFim = st.cotas.nivelChegada;
+      return;
+    }
+    if (/^adutoras\.\d+\.cotaFim$/.test(bind) && ultima &&
+        UI.get(st, bind.replace('.cotaFim', '')) === ultima) {
+      st.cotas.nivelChegada = ultima.cotaFim;
+      return;
+    }
+    if ((bind === 'cotas.cotaPartida' || bind === 'cotas.nivelSuccaoMin') && primeira && primeira.usarCotas) {
+      primeira.cotaIni = PDA.C.cotaPartida(st);
+      return;
+    }
+    if (/^adutoras\.\d+\.cotaIni$/.test(bind) && primeira &&
+        UI.get(st, bind.replace('.cotaIni', '')) === primeira) {
+      st.cotas.cotaPartida = primeira.cotaIni;
+      return;
+    }
+    /* ao ligar as cotas de um trecho, já nasce coerente */
+    if (/^adutoras\.\d+\.usarCotas$/.test(bind)) {
+      if (ultima && ultima.usarCotas &&
+          (ultima.cotaFim === null || ultima.cotaFim === undefined || Number(ultima.cotaFim) === 0)) {
+        ultima.cotaFim = st.cotas.nivelChegada;
+      }
+      if (primeira && primeira.usarCotas &&
+          (primeira.cotaIni === null || primeira.cotaIni === undefined || Number(primeira.cotaIni) === 0)) {
+        primeira.cotaIni = PDA.C.cotaPartida(st);
+      }
+    }
   };
 
   App.aoClicar = function (e) {
@@ -253,6 +330,60 @@
 
       case 'editarMotores': App.modalMotores(); return;
       case 'imprimir': window.print(); return;
+
+      case 'irAba': App.irPara(el.getAttribute('data-aba')); return;
+
+      /* coerência de cotas */
+      case 'sincCotaChegada': {
+        var at = st.adutoras.filter(function (a) { return a.ativo !== false; });
+        var ul = at[at.length - 1];
+        if (ul) st.cotas.nivelChegada = Number(ul.cotaFim) || 0;
+        App.render(); UI.toast('Cota de chegada ajustada.'); return;
+      }
+      case 'sincCotaTrecho': {
+        var at2 = st.adutoras.filter(function (a) { return a.ativo !== false; });
+        var ul2 = at2[at2.length - 1];
+        if (ul2) ul2.cotaFim = Number(st.cotas.nivelChegada) || 0;
+        App.render(); UI.toast('Cota final do trecho ajustada.'); return;
+      }
+      case 'sincCotaPartida': {
+        var at3 = st.adutoras.filter(function (a) { return a.ativo !== false; });
+        if (at3[0]) at3[0].cotaIni = PDA.C.cotaPartida(st);
+        App.render(); UI.toast('Cota inicial do trecho ajustada.'); return;
+      }
+      case 'trocarNiveis': {
+        var t = st.cotas.nivelSuccaoMin;
+        st.cotas.nivelSuccaoMin = st.cotas.nivelSuccaoMax;
+        st.cotas.nivelSuccaoMax = t;
+        App.render(); UI.toast('Níveis trocados.'); return;
+      }
+
+      /* perfil da linha */
+      case 'colarPerfil': PDA.Pf.modalColar(st); return;
+      case 'addPontoPerfil': {
+        var pp = st.perfil.pontos;
+        var ultX = pp.length ? Number(pp[pp.length - 1].est) || 0 : 0;
+        var ultC = pp.length ? Number(pp[pp.length - 1].cota) || 0 : 0;
+        pp.push({ est: st.perfil.modo === 'individual' ? 0 : ultX, cota: ultC, rot: '' });
+        App.render(); return;
+      }
+      case 'delPontoPerfil': st.perfil.pontos.splice(Number(i), 1); App.render(); return;
+      case 'limparPerfil':
+        UI.confirmar('Limpar perfil', 'Remover todos os pontos do perfil da linha?',
+          function () { st.perfil.pontos = []; App.render(); });
+        return;
+
+      /* curva da bomba */
+      case 'colarCurva': PDA.Pf.modalColarCurva(st); return;
+      case 'addPontoCurva': {
+        if (!st.curvaBomba.pontos) st.curvaBomba.pontos = [];
+        st.curvaBomba.pontos.push({ q: 0, H: 0 });
+        App.render(); return;
+      }
+      case 'delPontoCurva': st.curvaBomba.pontos.splice(Number(i), 1); App.render(); return;
+
+      /* marca */
+      case 'logo': App.modalLogo(); return;
 
       case 'novoCatalogo': PDA.K.modalCatalogo(st, { cats: App.cats }, null, null); return;
       case 'duplicarCatalogo':
@@ -537,6 +668,55 @@
     return st;
   };
 
+  App.modalLogo = function () {
+    var atual = PDA.M.logoGravada();
+    var previa = h('div', { style: 'margin:11px 0;min-height:52px;display:flex;align-items:center;gap:11px' });
+    function mostrar() {
+      UI.limpar(previa);
+      previa.appendChild(PDA.M.marca(42));
+    }
+    mostrar();
+
+    var entrada = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/svg+xml,image/webp' });
+    entrada.addEventListener('change', function () {
+      var f = entrada.files && entrada.files[0];
+      if (!f) return;
+      if (f.size > 900 * 1024) {
+        UI.toast('Arquivo muito grande (máx. 900 kB). Reduza a imagem e tente de novo.');
+        return;
+      }
+      var fr = new FileReader();
+      fr.onload = function () {
+        if (!PDA.M.gravarLogo(String(fr.result))) {
+          UI.toast('Não foi possível gravar a logo neste navegador.');
+          return;
+        }
+        App.montarMarca();
+        mostrar();
+        UI.toast('Logo carregada.');
+      };
+      fr.readAsDataURL(f);
+    });
+
+    UI.modal('Logo do cabeçalho', [
+      h('p', { class: 'nota' },
+        'O símbolo que aparece hoje é um desenho vetorial feito para acompanhar as cores da marca. ' +
+        'Carregue aqui o arquivo oficial (PNG com fundo transparente, JPG ou SVG) e ele substitui o desenho — ' +
+        'no cabeçalho e na impressão do memorial. Fica gravado neste navegador; em outro computador, ' +
+        'é preciso carregar de novo.'),
+      previa,
+      entrada,
+      h('p', { class: 'nota', style: 'margin-top:9px' },
+        'Prefira uma imagem com cerca de 400 px de largura e fundo transparente. Limite de 900 kB.'),
+      atual ? h('div', { style: 'margin-top:11px' },
+        h('button', {
+          class: 'btn perigo', type: 'button', onclick: function () {
+            PDA.M.removerLogo(); App.montarMarca(); mostrar(); UI.toast('Logo removida.');
+          }
+        }, 'Remover a logo carregada e voltar ao desenho')) : null
+    ]);
+  };
+
   App.modalAjuda = function () {
     UI.modal('Como usar', [
       h('div', { class: 'nota', style: 'font-size:13px;line-height:1.65' },
@@ -545,11 +725,20 @@
           'uma pasta de rede ou o desktop e dê dois cliques.'),
         UI.sub('Sequência de trabalho'),
         h('ol', {},
-          h('li', {}, h('b', {}, 'Projeto'), ' — fluido, temperatura, fórmula de perda de carga, vazão e as faixas de velocidade e perda unitária que vão colorir as tabelas.'),
-          h('li', {}, h('b', {}, 'Bombas e níveis'), ' — quantos conjuntos, quantos operam, rendimentos, níveis de sucção e cota de chegada.'),
+          h('li', {}, h('b', {}, 'Resumo'), ' — comece aqui. Os campos com borda destacada são o essencial: vazão, fluido, cota de partida, cota de chegada e número de bombas. Logo abaixo já aparecem a altura geométrica, a altura manométrica e o panorama do sistema.'),
+          h('li', {}, h('b', {}, 'Projeto'), ' — identificação da obra e condições do fluido (temperatura, altitude). Traz também a lista de conferência do preenchimento.'),
+          h('li', {}, h('b', {}, 'Bombas e níveis'), ' — quantos conjuntos, quantos operam, rendimentos, o desenho das cotas, o NPSH disponível e, se quiser, a curva da bomba para achar o ponto de operação real.'),
           h('li', {}, h('b', {}, 'Sucção e Barriletes'), ' — as peças de cada trecho. O barrilete comum aceita um trecho por etapa de reunião das bombas, e a vazão de cada um acompanha quantas bombas ele coleta.'),
-          h('li', {}, h('b', {}, 'Adutora / Recalque'), ' — um ou mais trechos em série. Quando a linha se ramifica, reduza a fração de vazão do trecho e escolha um diâmetro menor.'),
-          h('li', {}, h('b', {}, 'Resultados'), ' — composição das perdas, cenários por número de bombas, perfil, transitório e memorial pronto para imprimir.')),
+          h('li', {}, h('b', {}, 'Adutora / Recalque'), ' — um ou mais trechos em série. Quando a linha se ramifica, reduza a fração de vazão do trecho e escolha um diâmetro menor. É aqui também que entram os dados do transitório.'),
+          h('li', {}, h('b', {}, 'Perfil da linha'), ' — cole as estacas e as cotas da sua planilha para ver as envoltórias de pressão máxima e mínima ao longo de toda a linha.'),
+          h('li', {}, h('b', {}, 'Resultados'), ' — composição das perdas, cenários por número de bombas, linha piezométrica, transitório e memorial pronto para imprimir.'),
+          h('li', {}, h('b', {}, 'Parâmetros de cálculo'), ' — fórmula de perda de carga, faixas que definem as cores, custos da análise econômica e linha de motores. Tudo já vem com valor padrão; só entre aqui quando precisar mudar um critério.')),
+        UI.sub('As cotas'),
+        h('p', {}, 'Todos os campos de cota pedem ', h('b', {}, 'altitude absoluta'), ', na mesma referência de nível ' +
+          'do seu levantamento — não profundidade nem altura em relação ao fundo do poço. ' +
+          'O desenho esquemático em Resumo e em Bombas e níveis mostra onde cada uma entra. ' +
+          'A cota de chegada e a cota final do último trecho da adutora são o mesmo número: ao editar uma, ' +
+          'o programa ajusta a outra.'),
         UI.sub('Escolha do diâmetro'),
         h('p', {}, 'Cada trecho traz uma tabela com todos os diâmetros do catálogo. As cores seguem os critérios da aba Projeto: ' +
           'verde dentro da faixa recomendada, âmbar fora dela mas dentro do limite, vermelho reprovado. ' +
@@ -563,6 +752,12 @@
         h('p', {}, 'A aba Catálogos permite consultar as dimensões de todos os tubos da base, cadastrar catálogos novos ' +
           '(colando a tabela do fabricante), duplicar um catálogo da base para ajustar, e exportar/importar em arquivo ' +
           'para levar de um computador a outro.'),
+        UI.sub('Sinais de atenção'),
+        h('p', {}, 'Um ', h('b', {}, '!'), ' ao lado de um resultado marca algo que costuma passar batido: ' +
+          'perdas de carga acima de 60 % da altura manométrica, altura manométrica muito maior que a geométrica, ' +
+          'motor com folga excessiva, NPSH apertado, pressão negativa ou acima da classe do tubo. ' +
+          'Passe o mouse para ver o motivo. O número em âmbar sobre a aba Resultados conta quantos pontos ' +
+          'estão fora de faixa; sobre a aba Resumo, avisa que há incoerência nos dados de entrada.'),
         UI.sub('Salvar o trabalho'),
         h('p', {}, 'O projeto é guardado automaticamente no navegador deste computador. Para levar para outra máquina ' +
           'ou anexar ao processo, use ', h('b', {}, 'Salvar'), ' (gera um arquivo .json) e ', h('b', {}, 'Abrir'), '. ' +

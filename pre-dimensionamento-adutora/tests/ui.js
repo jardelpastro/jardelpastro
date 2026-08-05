@@ -29,8 +29,15 @@ function titulo(t) { console.log('\n' + t); }
   await page.waitForSelector('#abas button');
 
   titulo('1. Carregamento');
-  ok('abas montadas', (await page.locator('#abas button').count()) === 8);
-  ok('conteúdo da aba Projeto renderizado', (await page.locator('#conteudo .cartao').count()) > 3);
+  ok('abas montadas', (await page.locator('#abas button').count()) === 11,
+     String(await page.locator('#abas button').count()));
+  ok('marca no cabeçalho', (await page.locator('#marca .marca-bloco').count()) === 1);
+  ok('aba inicial é o Resumo',
+     (await page.locator('#abas button[aria-selected="true"]').innerText()) === 'Resumo');
+  ok('resumo traz os campos essenciais destacados',
+     (await page.locator('#conteudo label.campo.chave').count()) >= 5,
+     String(await page.locator('#conteudo label.campo.chave').count()));
+  ok('esquema de cotas desenhado', (await page.locator('#conteudo svg.esquema').count()) >= 1);
   ok('sem erro de console no carregamento', erros.length === 0, erros.join(' | '));
 
   titulo('2. Navegação por todas as abas');
@@ -51,6 +58,8 @@ function titulo(t) { console.log('\n' + t); }
   await page.locator('.modal button', { hasText: 'Adutora de água tratada' }).click();
   await page.waitForTimeout(320);
   ok('carregou sem erro', erros.length === 0, erros.join(' | '));
+  await page.locator('#abas button', { hasText: 'Resultados' }).click();
+  await page.waitForTimeout(300);
   const faixa = await page.locator('.faixa-resumo').first().innerText();
   ok('vazão total 400,0 L/s na faixa de resumo', /400,0/.test(faixa), faixa.replace(/\n/g, ' | '));
   ok('mostra Hm', /Hm/i.test(faixa));
@@ -100,8 +109,8 @@ function titulo(t) { console.log('\n' + t); }
      `${antes} -> ${depois} (clicado: ${alvo.trim()})`);
 
   titulo('6. Edição de campo numérico com vírgula');
-  await page.locator('#abas button', { hasText: 'Projeto' }).click();
-  await page.waitForTimeout(160);
+  await page.locator('#abas button', { hasText: 'Resumo' }).click();
+  await page.waitForTimeout(200);
   const campoQ = page.locator('input[data-bind="vazao.valor"]');
   await campoQ.fill('123,5');
   await page.waitForTimeout(420);
@@ -119,6 +128,8 @@ function titulo(t) { console.log('\n' + t); }
   ok('123,5 m³/h convertidos para m³/s', Math.abs(qSI - 123.5 / 3600) < 1e-12, String(qSI));
 
   titulo('8. Troca de fórmula');
+  await page.locator('#abas button', { hasText: 'Parâmetros' }).click();
+  await page.waitForTimeout(240);
   await page.selectOption('select[data-bind="calculo.metodo"]', 'colebrook');
   await page.waitForTimeout(300);
   const temEps = await page.locator('input[data-bind="adutoras.0.epsOverride"]').count();
@@ -246,8 +257,8 @@ function titulo(t) { console.log('\n' + t); }
   await page.waitForTimeout(220);
 
   titulo('15. Critérios editáveis mudam as cores');
-  await page.locator('#abas button', { hasText: 'Projeto' }).click();
-  await page.waitForTimeout(220);
+  await page.locator('#abas button', { hasText: 'Parâmetros' }).click();
+  await page.waitForTimeout(260);
   const c0 = await page.evaluate(() => {
     const P = window.PDA, ctx = P.C.contexto(P.App.st, P.App.cats);
     const v = P.C.varrer(P.App.st, ctx, P.App.st.adutoras[0], 'adutoras.0', ctx.nOp);
@@ -340,8 +351,8 @@ function titulo(t) { console.log('\n' + t); }
      (await page.locator('input[data-bind="adutoras.0.pnMcaOverride"]').count()) === 1);
   await page.locator('#abas button', { hasText: 'Resultados' }).click();
   await page.waitForTimeout(320);
-  ok('sem PN a tabela informa que não está cadastrado',
-     /PN não cadastrado/.test(await page.locator('#conteudo').innerText()));
+  ok('sem PN a tabela informa que não está informado',
+     /PN não informado/.test(await page.locator('#conteudo').innerText()));
   await page.locator('#abas button', { hasText: 'Adutora' }).click();
   await page.waitForTimeout(260);
   await page.locator('input[data-bind="adutoras.0.pnMcaOverride"]').fill('250');
@@ -430,7 +441,263 @@ function titulo(t) { console.log('\n' + t); }
   await page.waitForSelector('#abas button');
   await page.waitForTimeout(250);
   ok('recomeça limpo após limpar o navegador',
-     (await page.locator('#conteudo .cartao').count()) > 3 && erros.filter(e => !/localStorage/.test(e)).length === 0);
+     (await page.locator('#conteudo .cartao').count()) >= 2 &&
+     erros.filter(e => !/localStorage/.test(e)).length === 0,
+     String(await page.locator('#conteudo .cartao').count()));
+
+  titulo('24b. Aba Resumo com entrada rápida e panorama');
+  await page.locator('#abas button', { hasText: 'Resumo' }).click();
+  await page.waitForTimeout(300);
+  await page.locator('[data-acao="exemplo"]').click();
+  await page.waitForSelector('.modal');
+  await page.locator('.modal button', { hasText: 'Linha de recalque de esgoto' }).click();
+  await page.waitForTimeout(400);
+  await page.locator('#abas button', { hasText: 'Resumo' }).click();
+  await page.waitForTimeout(320);
+  const txtResumo = await page.locator('#conteudo').innerText();
+  ok('panorama lista os trechos', /Panorama do sistema/.test(txtResumo));
+  ok('panorama mostra altura manométrica', /ALTURA MANOMÉTRICA/i.test(txtResumo));
+  ok('panorama mostra o motor', /MOTOR POR BOMBA/i.test(txtResumo));
+  ok('campos essenciais destacados', (await page.locator('#conteudo label.campo.chave').count()) >= 5);
+  ok('esquema de cotas presente', (await page.locator('#conteudo svg.esquema').count()) >= 1);
+
+  titulo('24c. Cotas sincronizadas entre o resumo e o trecho');
+  await page.locator('input[data-bind="cotas.nivelChegada"]').fill('160');
+  await page.waitForTimeout(450);
+  const sinc = await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    const at = st.adutoras.filter(a => a.ativo !== false);
+    return { chegada: st.cotas.nivelChegada, trecho: at[at.length - 1].cotaFim };
+  });
+  ok('editar a cota de chegada ajusta a cota final do trecho',
+     sinc.chegada === 160 && sinc.trecho === 160, JSON.stringify(sinc));
+  await page.locator('#abas button', { hasText: 'Adutora' }).click();
+  await page.waitForTimeout(300);
+  await page.locator('input[data-bind="adutoras.0.cotaFim"]').fill('155');
+  await page.waitForTimeout(450);
+  const sinc2 = await page.evaluate(() => window.PDA.App.st.cotas.nivelChegada);
+  ok('editar a cota final do trecho ajusta a cota de chegada', sinc2 === 155, String(sinc2));
+
+  titulo('24d. Incoerência de cota é detectada e corrigível');
+  await page.evaluate(() => { window.PDA.App.st.cotas.nivelChegada = 130; window.PDA.App.render(); });
+  await page.waitForTimeout(320);
+  await page.locator('#abas button', { hasText: 'Resumo' }).click();
+  await page.waitForTimeout(320);
+  ok('aviso de incoerência exibido', /Dados incoerentes/.test(await page.locator('#conteudo').innerText()));
+  ok('marcador de alerta na aba Resumo',
+     (await page.locator('#abas button .marcador').count()) >= 1);
+  await page.locator('button[data-acao="sincCotaChegada"]').click();
+  await page.waitForTimeout(380);
+  ok('correção com um clique resolve',
+     !/Dados incoerentes/.test(await page.locator('#conteudo').innerText()));
+
+  titulo('24e. Pressão negativa é reprovada');
+  await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    st.cotas.nivelChegada = 300;                 /* bomba insuficiente de propósito */
+    const at = st.adutoras.filter(a => a.ativo !== false);
+    at[at.length - 1].cotaFim = 300;
+    at[at.length - 1].pnMcaOverride = 250;
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(400);
+  const negOk = await page.evaluate(() => {
+    const P = window.PDA, r = P.C.resumo(P.App.st, P.App.cats);
+    const p = r.piezometrica[r.piezometrica.length - 1];
+    return { pressao: p.pressao, classe: p.classe };
+  });
+  ok('pressão calculada', typeof negOk.pressao === 'number');
+  if (negOk.pressao < 0) {
+    ok('pressão negativa não é classificada como adequada', negOk.classe === 'ruim', negOk.classe);
+  } else {
+    ok('cenário não gerou pressão negativa (verificação no núcleo)', true);
+  }
+
+  titulo('24f. Perfil da linha e envoltórias');
+  await page.locator('#abas button', { hasText: 'Perfil' }).click();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    st.cotas.nivelChegada = 149;
+    const at = st.adutoras.filter(a => a.ativo !== false);
+    at[at.length - 1].cotaFim = 149;
+    at[at.length - 1].pnMcaOverride = 250;
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(320);
+  await page.locator('input[data-bind="perfil.ativo"]').check();
+  await page.waitForTimeout(320);
+  await page.locator('[data-acao="colarPerfil"]').click();
+  await page.waitForSelector('.modal');
+  await page.locator('.modal textarea').fill(
+    '0\t126,0\n1200\t138,5\n2400\t162,0\tponto alto\n3600\t144,0\n5000\t140,0\n6670\t149,0');
+  await page.locator('.modal button', { hasText: 'Interpretar' }).click();
+  await page.waitForTimeout(180);
+  ok('6 pontos interpretados', /6 ponto/.test(await page.locator('.modal').innerText()));
+  await page.locator('.modal button', { hasText: 'Substituir o perfil' }).click();
+  await page.waitForTimeout(450);
+  const perf = await page.evaluate(() => {
+    const P = window.PDA;
+    return { n: P.App.st.perfil.pontos.length,
+             cotas: P.App.st.perfil.pontos.map(p => p.cota),
+             rot: P.App.st.perfil.pontos[2].rot,
+             env: !!P.C.resumo(P.App.st, P.App.cats).envoltoria };
+  });
+  ok('perfil gravado com 6 pontos', perf.n === 6, String(perf.n));
+  ok('vírgula decimal preservada no perfil',
+     JSON.stringify(perf.cotas) === JSON.stringify([126, 138.5, 162, 144, 140, 149]),
+     JSON.stringify(perf.cotas));
+  ok('identificação do ponto lida', perf.rot === 'ponto alto', perf.rot);
+  ok('envoltória calculada', perf.env);
+  ok('gráfico do perfil desenhado', (await page.locator('#conteudo svg.perfil').count()) >= 1);
+  const txtEnv = await page.locator('#conteudo').innerText();
+  ok('tabela de envoltórias presente', /p máxima|p mínima/i.test(txtEnv));
+  ok('explica como as envoltórias foram traçadas', /decai linearmente/.test(txtEnv));
+  ok('diz que não considera dispositivo de proteção', /não considera dispositivo de proteção nenhum/.test(txtEnv));
+  ok('ponto alto aparece na tabela', /ponto alto/.test(txtEnv));
+
+  titulo('24g. Curva da bomba e ponto de operação');
+  await page.locator('#abas button', { hasText: 'Bombas' }).click();
+  await page.waitForTimeout(320);
+  await page.locator('input[data-bind="curvaBomba.ativo"]').check();
+  await page.waitForTimeout(320);
+  await page.locator('[data-acao="colarCurva"]').click();
+  await page.waitForSelector('.modal');
+  await page.locator('.modal textarea').fill('0\t62,0\n100\t58,0\n200\t48,0\n260\t38,0');
+  await page.locator('.modal button', { hasText: 'Interpretar' }).click();
+  await page.waitForTimeout(180);
+  await page.locator('.modal button', { hasText: 'Substituir a curva' }).click();
+  await page.waitForTimeout(600);
+  const curva = await page.evaluate(() => {
+    const P = window.PDA, r = P.C.resumo(P.App.st, P.App.cats);
+    return { n: P.App.st.curvaBomba.pontos.length, ajuste: !!r.curvaBomba,
+             op: r.operacao && !r.operacao.erro ? { q: r.operacao.qTotal, H: r.operacao.H } : null,
+             erro: r.operacao ? r.operacao.erro : null,
+             porN: r.operacaoPorN ? r.operacaoPorN.length : 0 };
+  });
+  ok('4 pontos de curva gravados', curva.n === 4, String(curva.n));
+  ok('curva ajustada', curva.ajuste);
+  ok('ponto de operação obtido ou justificado', !!curva.op || !!curva.erro,
+     curva.erro || JSON.stringify(curva.op));
+  if (curva.op) {
+    ok('gráfico das curvas desenhado', (await page.locator('#conteudo svg.perfil').count()) >= 1);
+    ok('tabela de operação em paralelo', curva.porN >= 1, String(curva.porN));
+  }
+
+  titulo('24h. Peça com DN diferente do trecho');
+  await page.locator('#abas button', { hasText: 'Adutora' }).click();
+  await page.waitForTimeout(320);
+  await page.locator('select[data-acao-change="addPeca"][data-base="adutoras.0"]').selectOption('reducao_conc');
+  await page.waitForTimeout(320);
+  const iRed = await page.evaluate(() => window.PDA.App.st.adutoras[0].pecas.length - 1);
+  const selDN = page.locator(`select[data-bind="adutoras.0.pecas.${iRed}.dnLocal"]`);
+  ok('seletor de DN da peça existe', (await selDN.count()) === 1);
+  const opcoes = await selDN.locator('option').allTextContents();
+  ok('as opções mostram o DI de cada DN', opcoes.some(o => /DI \d+ mm/.test(o)), opcoes[1]);
+  await selDN.selectOption({ index: 3 });
+  await page.waitForTimeout(400);
+  const peca = await page.evaluate(i => {
+    const P = window.PDA, r = P.C.resumo(P.App.st, P.App.cats);
+    const pc = r.projeto.adutoras[0].pecas[i];
+    return { dn: P.App.st.adutoras[0].pecas[i].dnLocal, di: pc.diMm,
+             diTrecho: r.projeto.adutoras[0].tubo.diMm };
+  }, iRed);
+  ok('DN escolhido gravado', !!peca.dn, peca.dn);
+  ok('DI da peça buscado no catálogo e diferente do trecho',
+     peca.di > 0 && Math.abs(peca.di - peca.diTrecho) > 0.5,
+     peca.di + ' vs trecho ' + peca.diTrecho);
+  await page.locator(`[data-acao="removerPeca"][data-base="adutoras.0"][data-i="${iRed}"]`).click();
+  await page.waitForTimeout(280);
+
+  titulo('24i. Casos de ancoragem do transitório');
+  const anc = await page.locator('select[data-bind="golpe.ancoragem"]');
+  ok('seletor de ancoragem presente', (await anc.count()) === 1);
+  ok('quatro casos oferecidos', (await anc.locator('option').count()) === 4,
+     String(await anc.locator('option').count()));
+  const psiJ = await page.evaluate(() => window.PDA.C.resumo(window.PDA.App.st, window.PDA.App.cats).golpe[0].psi);
+  await anc.selectOption('ancorado');
+  await page.waitForTimeout(400);
+  const gAnc = await page.evaluate(() => {
+    const g = window.PDA.C.resumo(window.PDA.App.st, window.PDA.App.cats).golpe[0];
+    return { psi: g.psi, dh: g.dh, a: g.celeridade };
+  });
+  ok('psi muda com o caso de ancoragem', gAnc.psi !== psiJ, psiJ + ' -> ' + gAnc.psi);
+  ok('tubo ancorado é o caso mais desfavorável (psi < 1)', gAnc.psi < 1, String(gAnc.psi));
+  await anc.selectOption('juntas');
+  await page.waitForTimeout(350);
+
+  titulo('24j. Análise econômica de diâmetro');
+  await page.locator('#abas button', { hasText: 'Parâmetros' }).click();
+  await page.waitForTimeout(320);
+  await page.locator('input[data-bind="economia.ativo"]').check();
+  await page.waitForTimeout(350);
+  ok('campos de custo aparecem', (await page.locator('input[data-bind="economia.tarifa"]').count()) === 1);
+  await page.locator('#abas button', { hasText: 'Adutora' }).click();
+  await page.waitForTimeout(400);
+  const txtEco = await page.locator('#conteudo').innerText();
+  ok('colunas de custo na tabela de diâmetros', /Total \(mil R\$\/ano\)/.test(txtEco));
+  ok('ótimo econômico marcado com $', /\$/.test(txtEco));
+  const otimo = await page.evaluate(() => {
+    const P = window.PDA, ctx = P.C.contexto(P.App.st, P.App.cats);
+    const v = P.C.varrer(P.App.st, ctx, P.App.st.adutoras[0], 'adutoras.0', ctx.nOp);
+    return v.linhas.filter(l => l.otimoEconomico).length;
+  });
+  ok('exatamente um ótimo econômico', otimo === 1, String(otimo));
+
+  titulo('24k. Logo carregável');
+  await page.locator('[data-acao="logo"]').click();
+  await page.waitForSelector('.modal');
+  ok('modal de logo explica a substituição',
+     /arquivo oficial/.test(await page.locator('.modal').innerText()));
+  ok('aceita arquivo de imagem', (await page.locator('.modal input[type="file"]').count()) === 1);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+  const logoPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
+  await page.evaluate(d => { window.PDA.M.gravarLogo(d); window.PDA.App.montarMarca(); }, logoPng);
+  await page.waitForTimeout(200);
+  ok('logo carregada substitui o desenho', (await page.locator('#marca img.marca-img').count()) === 1);
+  await page.evaluate(() => { window.PDA.M.removerLogo(); window.PDA.App.montarMarca(); });
+  await page.waitForTimeout(180);
+  ok('removida, volta o desenho', (await page.locator('#marca .marca-simbolo svg').count()) === 1);
+
+  titulo('24l. Sinais de atenção nos resultados');
+  await page.locator('#abas button', { hasText: 'Resultados' }).click();
+  await page.waitForTimeout(400);
+  const nSinais = await page.locator('#conteudo .sinal, .faixa-resumo .sinal').count();
+  ok('faixa de resumo renderizada', (await page.locator('.faixa-resumo').count()) >= 1);
+  const al = await page.evaluate(() => {
+    const P = window.PDA, ctx = P.C.contexto(P.App.st, P.App.cats);
+    const r = P.C.resumo(P.App.st, P.App.cats);
+    const a = P.Res.alertas(P.App.st, ctx, r);
+    return Object.keys(a).filter(k => a[k]).length;
+  });
+  ok('função de alertas responde', typeof al === 'number');
+  /* força um caso que deve alertar: perdas dominando a altura manométrica */
+  await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    st.adutoras[0].itemRot = 'DN 200';
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(420);
+  const al2 = await page.evaluate(() => {
+    const P = window.PDA, ctx = P.C.contexto(P.App.st, P.App.cats);
+    const a = P.Res.alertas(P.App.st, ctx, P.C.resumo(P.App.st, P.App.cats));
+    return { perdas: !!a.perdas, hm: !!a.hm };
+  });
+  ok('diâmetro apertado dispara alerta de perdas ou de Hm', al2.perdas || al2.hm,
+     JSON.stringify(al2));
+
+  titulo('24m. Memorial cobre os módulos novos');
+  await page.locator('#abas button', { hasText: 'Resultados' }).click();
+  await page.waitForTimeout(500);
+  const mem = await page.locator('.memorial').innerText();
+  ok('memorial traz o ponto de operação', /Ponto de operação com a curva da bomba/.test(mem));
+  ok('memorial traz a curva ajustada', /H = .*·Q²/.test(mem));
+  ok('memorial traz as envoltórias', /Envoltórias de pressão do transitório/.test(mem));
+  ok('memorial ressalva o limite do transitório',
+     /sem dispositivos de proteção/i.test(mem));
+  ok('memorial ressalva o limite da análise econômica',
+     /não para orçar/i.test(mem));
 
   titulo('25. Impressão');
   await page.locator('#abas button', { hasText: 'Resultados' }).click();
