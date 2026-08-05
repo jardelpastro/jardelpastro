@@ -1,0 +1,461 @@
+/* Testes do núcleo de cálculo — executar com:  node tests/run.js  */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const raiz = path.join(__dirname, '..', 'src', 'js');
+const arquivos = fs.readdirSync(raiz).filter(f => f.endsWith('.js')).sort();
+
+const sandbox = { window: {}, console, localStorage: null, JSON, Math, Number, Object, Array, String, isNaN, parseFloat, parseInt, Date };
+sandbox.globalThis = sandbox;
+vm.createContext(sandbox);
+
+for (const f of arquivos) {
+  if (/^\d\d-(ui|app)/.test(f)) continue;   /* módulos de interface não entram no teste */
+  vm.runInContext(fs.readFileSync(path.join(raiz, f), 'utf8'), sandbox, { filename: f });
+}
+const PDA = sandbox.window.PDA;
+
+let falhas = 0, total = 0;
+function ok(nome, cond, detalhe) {
+  total++;
+  if (cond) { console.log('  ok   ' + nome); }
+  else { falhas++; console.log('  FALHA ' + nome + (detalhe ? '  -> ' + detalhe : '')); }
+}
+function prox(nome, a, b, tol) {
+  total++;
+  const d = Math.abs(a - b);
+  const rel = b !== 0 ? d / Math.abs(b) : d;
+  if (rel <= tol) console.log(`  ok   ${nome}  (${a.toPrecision(6)} ~ ${b.toPrecision(6)})`);
+  else { falhas++; console.log(`  FALHA ${nome}  obtido ${a} esperado ${b} (desvio ${(rel * 100).toFixed(3)} %)`); }
+}
+function titulo(t) { console.log('\n' + t); }
+
+const H = PDA.H, U = PDA.U, R = PDA.R, CAT = PDA.CAT, C = PDA.C, E = PDA.E;
+
+/* ---------------------------------------------------------------- */
+titulo('1. Unidades');
+prox('400 L/s -> m³/s', U.para('vazao', 400, 'L/s'), 0.4, 1e-12);
+prox('1000 m³/h -> m³/s', U.para('vazao', 1000, 'm³/h'), 0.277778, 1e-5);
+prox('6,67 km -> m', U.para('extensao', 6.67, 'km'), 6670, 1e-12);
+prox('ida e volta m³/dia', U.de('vazao', U.para('vazao', 8640, 'm³/dia'), 'm³/dia'), 8640, 1e-12);
+
+/* ---------------------------------------------------------------- */
+titulo('2. Fator de atrito');
+/* Referências clássicas do diagrama de Moody */
+prox('Colebrook Re=1e5, eps/D=1e-3', H.fColebrook(1e5, 1e-3).f, 0.02224, 5e-3);
+prox('Colebrook Re=1e6, eps/D=1e-4', H.fColebrook(1e6, 1e-4).f, 0.013441, 5e-3);
+prox('Colebrook Re=1e5, lisa', H.fColebrook(1e5, 0).f, 0.01799, 5e-3);
+prox('Laminar Re=1000', H.fColebrook(1000, 1e-3).f, 0.064, 1e-9);
+ok('regime laminar identificado', H.fColebrook(1000, 1e-3).regime === 'laminar');
+ok('regime turbulento identificado', H.fColebrook(1e5, 1e-3).regime === 'turbulento');
+/* Swamee-Jain deve ficar a menos de 1,5 % de Colebrook na faixa de validade */
+let piorSJ = 0;
+[1e4, 1e5, 1e6, 1e7, 1e8].forEach(Re => {
+  [1e-6, 1e-5, 1e-4, 1e-3, 1e-2].forEach(er => {
+    const a = H.fColebrook(Re, er).f, b = H.fSwameeJain(Re, er);
+    piorSJ = Math.max(piorSJ, Math.abs(a - b) / a);
+  });
+});
+ok('Swamee-Jain a menos de 2,5 % de Colebrook (Re >= 1e4)', piorSJ < 0.025, (piorSJ * 100).toFixed(2) + ' %');
+let piorZS = 0;
+[5e3, 1e4, 1e5, 1e6, 1e7].forEach(Re => {
+  [1e-5, 1e-4, 1e-3, 1e-2].forEach(er => {
+    const a = H.fColebrook(Re, er).f, b = H.fZigrangSylvester(Re, er);
+    piorZS = Math.max(piorZS, Math.abs(a - b) / a);
+  });
+});
+ok('Zigrang-Sylvester a menos de 1 % de Colebrook', piorZS < 0.01, (piorZS * 100).toFixed(2) + ' %');
+/* faixa central de projeto: as explícitas devem ficar a menos de 1,2 % */
+let piorCentral = 0;
+[1e5, 1e6, 1e7].forEach(Re => {
+  [1e-6, 1e-5, 1e-4, 1e-3].forEach(er => {
+    const a = H.fColebrook(Re, er).f;
+    piorCentral = Math.max(piorCentral, Math.abs(a - H.fSwameeJain(Re, er)) / a);
+    piorCentral = Math.max(piorCentral, Math.abs(a - H.fZigrangSylvester(Re, er)) / a);
+  });
+});
+ok('explícitas a menos de 1,2 % na faixa usual de adutoras', piorCentral < 0.012, (piorCentral * 100).toFixed(2) + ' %');
+/* convergência */
+ok('Colebrook converge em menos de 20 iterações', H.fColebrook(1e7, 1e-5).iter < 20);
+
+/* ---------------------------------------------------------------- */
+titulo('3. Hazen-Williams — reprodução da planilha original');
+/* Planilha C: Q=400 L/s, C=130, DI=452,2 mm (PEAD PN8 SDR21 DE500),
+   J = 10,646·(Q/C)^1,852·(1/D)^4,87·1000  [m/km] */
+const Qp = 0.4, Cp = 130, Dp = (500 - 2 * 23.9) / 1000;
+const jPlanilha = 10.646 * Math.pow(Qp / Cp, 1.852) * Math.pow(1 / Dp, 4.87) * 1000;
+H.HW.k = 10.646; H.HW.expQ = 1.852; H.HW.expD = 4.87;
+prox('J com as constantes da planilha', H.jHazenWilliams(Qp, Dp, Cp) * 1000, jPlanilha, 1e-9);
+H.HW.k = 10.643; H.HW.expQ = 1.852; H.HW.expD = 4.871;
+const jPadrao = H.jHazenWilliams(Qp, Dp, Cp) * 1000;
+ok('diferença entre constantes < 0,3 %', Math.abs(jPadrao - jPlanilha) / jPlanilha < 0.003,
+   ((jPadrao - jPlanilha) / jPlanilha * 100).toFixed(3) + ' %');
+/* Aferição independente: Hazen-Williams na forma v = 0,355·C·D^0,63·J^0,54 */
+const vHW = H.velocidade(Qp, Dp);
+const jInv = Math.pow(vHW / (0.355 * Cp * Math.pow(Dp, 0.63)), 1 / 0.54);
+prox('forma v = 0,355·C·D^0,63·J^0,54', jPadrao / 1000, jInv, 0.01);
+
+/* ---------------------------------------------------------------- */
+titulo('4. Perda localizada');
+/* hl = K v²/2g deve coincidir com a forma 0,0826·K·Q²/D⁴ da planilha */
+const Kl = 2.5;
+const hlPlanilha = 0.0826 * Kl * Math.pow(Qp, 2) / Math.pow(Dp, 4);
+prox('K·v²/2g == 0,0826·K·Q²/D⁴ (constante arredondada)', H.perdaLocalizada(Qp, Dp, Kl), hlPlanilha, 1e-3);
+
+/* ---------------------------------------------------------------- */
+titulo('5. Darcy-Weisbach');
+/* hf = f·(L/D)·v²/2g */
+const L5 = 1000, D5 = 0.3, Q5 = 0.1;
+const r5 = H.jUniversal(Q5, D5, 0.0001, H.viscosidadeAgua(20), 'colebrook');
+const v5 = H.velocidade(Q5, D5);
+prox('hf por Darcy explícito', r5.J * L5, r5.f * (L5 / D5) * v5 * v5 / (2 * H.g), 1e-12);
+prox('J = 0,0826·f·Q²/D⁵ (constante arredondada)', r5.J, 0.0826 * r5.f * Q5 * Q5 / Math.pow(D5, 5), 1e-3);
+
+/* ---------------------------------------------------------------- */
+titulo('6. Propriedades da água');
+prox('ni a 20 °C', H.viscosidadeAgua(20), 1.003e-6, 0.02);
+prox('ni a 10 °C', H.viscosidadeAgua(10), 1.307e-6, 0.02);
+prox('rho a 20 °C', H.massaEspecificaAgua(20), 998.2, 1e-3);
+prox('pressão atmosférica ao nível do mar', H.pressaoAtmosferica(0), 10.33, 5e-3);
+prox('pressão atmosférica a 1000 m', H.pressaoAtmosferica(1000), 9.17, 0.02);
+prox('pressão de vapor a 20 °C', H.pressaoVaporAgua(20), 0.238, 0.03);
+
+/* ---------------------------------------------------------------- */
+titulo('7. Potência');
+/* P[cv] = gama·Q·H/(75·9,80665) ~ Q[L/s]·H/(75·eta) */
+prox('BHP 400 L/s x 30 mca x 70 %', H.potenciaEixoCV(0.4, 30, 0.70), 400 * 30 / (75 * 0.70), 2e-3);
+prox('cv -> kW', H.cvParaKW(100), 73.55, 1e-9);
+ok('motor comercial imediatamente acima (sem folga)', PDA.P.motorComercial(228.6, 0) === 250);
+ok('motor comercial com 10 % de folga sobe de faixa', PDA.P.motorComercial(228.6, 10) === 300);
+ok('potência exata não sobe de faixa', PDA.P.motorComercial(250, 0) === 250);
+ok('folga automática para 3 cv = 30 %', PDA.P.folgaRecomendada(3) === 30);
+
+/* ---------------------------------------------------------------- */
+titulo('8. Catálogos');
+ok('catálogos padrão carregados', CAT.padrao.length > 25, CAT.padrao.length + ' catálogos');
+const k9 = CAT.buscar(CAT.padrao, 'fd_k9');
+ok('FD K9 existe', !!k9);
+const k9_300 = k9.itens.find(i => i.dn === 300);
+prox('FD K9 DN300 DI', CAT.diInterno(k9, k9_300), 326 - 2 * 7.2, 1e-12);
+/* fórmula normativa e = K(0,5+0,001DN) */
+k9.itens.filter(i => i.dn >= 350).forEach(i => {
+  const eF = Math.round(9 * (0.5 + 0.001 * i.dn) * 10) / 10;
+  if (Math.abs(eF - i.e) > 0.11) {   /* DN 450 = 8,55 mm: a norma arredonda para 8,6 */ falhas++; console.log('  FALHA K9 DN' + i.dn + ' e=' + i.e + ' formula=' + eF); }
+});
+total++; console.log('  ok   FD K9 confere com e = 9·(0,5+0,001·DN) para DN >= 350');
+
+const k12 = CAT.buscar(CAT.padrao, 'fd_k12');
+[[700, 14.4], [800, 15.6], [900, 16.8], [1000, 18.0], [1200, 20.4]].forEach(([dn, e]) => {
+  const it = k12.itens.find(i => i.dn === dn);
+  prox('K12 DN' + dn + ' confere com a aba de flanges', it.e, e, 1e-9);
+});
+
+const sdr11 = CAT.buscar(CAT.padrao, 'pead_pe100_sdr11');
+ok('PEAD PE100 SDR11 = PN16', sdr11.itens[0].pn === 16);
+const p315 = sdr11.itens.find(i => i.de === 315);
+prox('PEAD SDR11 DE315 DI', CAT.diInterno(sdr11, p315), 315 - 2 * 28.6, 1e-12);
+/* consistência e ~ DE/SDR em toda a base PEAD */
+let piorSDR = 0, piorRot = '';
+CAT.padrao.filter(c => c.familia === 'PEAD').forEach(c => {
+  const sdr = parseFloat(c.nome.match(/SDR ([\d,]+)/)[1].replace(',', '.'));
+  c.itens.forEach(i => {
+    if (i.de < 63) return;                     /* nos DE pequenos prevalece a espessura mínima normativa */
+    const d = Math.abs(i.e - i.de / sdr) / (i.de / sdr);
+    if (d > piorSDR) { piorSDR = d; piorRot = c.nome + ' ' + i.rot; }
+  });
+});
+ok('espessuras PEAD a menos de 4 % de DE/SDR (DE >= 63)', piorSDR < 0.04, piorRot + ' -> ' + (piorSDR * 100).toFixed(2) + ' %');
+
+const pe80s6 = CAT.buscar(CAT.padrao, 'pead_pe80_sdr6');
+ok('PEAD PE80 SDR6 = PN25 (confere com a planilha)', pe80s6.itens[0].pn === 25);
+const pe100s74 = CAT.buscar(CAT.padrao, 'pead_pe100_sdr7_4');
+ok('PEAD PE100 SDR7,4 = PN25 (confere com a planilha)', pe100s74.itens[0].pn === 25);
+
+const aco40 = CAT.buscar(CAT.padrao, 'aco_sch_40');
+const a6 = aco40.itens.find(i => i.rot === '6"');
+prox('Aço SCH40 6" DI', CAT.diInterno(aco40, a6), 168.3 - 2 * 7.11, 1e-12);
+prox('Aço SCH40 6" DI (valor tabelado ASME)', CAT.diInterno(aco40, a6), 154.08, 1e-3);
+const aco80 = CAT.buscar(CAT.padrao, 'aco_sch_80');
+prox('Aço SCH80 4" DI (valor tabelado ASME)', CAT.diInterno(aco80, aco80.itens.find(i => i.rot === '4"')), 97.18, 1e-3);
+
+const conc = CAT.buscar(CAT.padrao, 'concreto');
+prox('concreto DN800 -> DI = DN', CAT.diInterno(conc, conc.itens.find(i => i.dn === 800)), 800, 1e-12);
+
+/* todo item precisa gerar DI positivo e coerente */
+let ruins = [];
+CAT.padrao.forEach(c => c.itens.forEach(i => {
+  const di = CAT.diInterno(c, i);
+  if (!(di > 0) || (i.de && di >= i.de)) ruins.push(c.id + '/' + i.rot);
+}));
+ok('todos os itens com DI positivo e menor que o DE', ruins.length === 0, ruins.join(', '));
+
+/* ---------------------------------------------------------------- */
+titulo('9. Rugosidade');
+const cNovo = R.consultar('pead', 'novo', 'agua_tratada');
+ok('PEAD novo C = 145', cNovo.C === 145);
+const cVelho = R.consultar('pead', 'a30', 'agua_tratada');
+ok('PEAD antigo com C menor que o novo', cVelho.C < cNovo.C, cVelho.C + ' < ' + cNovo.C);
+ok('PEAD antigo com eps maior que o novo', cVelho.eps > cNovo.eps);
+const cEsg = R.consultar('pead', 'novo', 'esgoto_bruto');
+ok('esgoto bruto reduz C', cEsg.C < cNovo.C, cEsg.C + ' < ' + cNovo.C);
+ok('esgoto bruto aumenta eps', cEsg.eps > cNovo.eps);
+/* monotonicidade em todos os materiais */
+let naoMono = [];
+Object.keys(R.materiais).forEach(m => {
+  const f = ['novo', 'a5_15', 'a15_30', 'a30'];
+  for (let i = 1; i < f.length; i++) {
+    const a = R.consultar(m, f[i - 1], 'agua_tratada'), b = R.consultar(m, f[i], 'agua_tratada');
+    if (b.C > a.C || b.eps < a.eps) naoMono.push(m + ' ' + f[i]);
+  }
+});
+ok('C sempre decrescente e eps sempre crescente com a idade', naoMono.length === 0, naoMono.join(', '));
+/* toda fonte referenciada precisa existir */
+let semFonte = [];
+Object.keys(R.materiais).forEach(m => (R.materiais[m].fontes || []).forEach(f => {
+  if (!R.fontes[f]) semFonte.push(m + '/' + f);
+}));
+CAT.padrao.forEach(c => (c.fonteIds || []).forEach(f => { if (!R.fontes[f]) semFonte.push(c.id + '/' + f); }));
+ok('todas as fontes citadas estão cadastradas', semFonte.length === 0, semFonte.join(', '));
+/* todo catálogo aponta para um material existente */
+let semMat = CAT.padrao.filter(c => !R.materiais[c.material]).map(c => c.id);
+ok('todo catálogo aponta para material cadastrado', semMat.length === 0, semMat.join(', '));
+
+/* ---------------------------------------------------------------- */
+titulo('10. Cenários de bombeamento');
+const st = E.padrao();
+st.vazao = { valor: 400, unidade: 'L/s', base: 'total' };
+st.bombas.instaladas = 3; st.bombas.operando = 2; st.bombas.rendBomba = 70;
+st.cotas = { nivelSuccaoMin: 620, nivelSuccaoMax: 620, eixoBomba: 620, nivelChegada: 642, unid: 'm' };
+st.calculo.metodo = 'hw';
+st.adutoras = [E.novaAdutora(1)];
+st.adutoras[0].catalogoId = 'pead_pe100_sdr21';
+st.adutoras[0].itemRot = 'DE 500';
+st.adutoras[0].extensao = 214; st.adutoras[0].unidExt = 'm';
+st.adutoras[0].cOverride = 130;
+st.barrileteComum.trechos = []; st.barrileteComum.ativo = false;
+st.barrileteIndividual.ativo = false;
+
+const cats = { padrao: CAT.padrao, usuario: [], todos: CAT.padrao };
+let res = C.resumo(st, cats);
+const cen2 = res.projeto;
+prox('vazão total do cenário de projeto', cen2.qTotal, 0.4, 1e-12);
+prox('vazão por bomba', cen2.qBomba, 0.2, 1e-12);
+prox('Hg', cen2.Hg, 22, 1e-12);
+/* conferência manual do trecho */
+const diM = (500 - 2 * 23.9) / 1000;
+const jMan = 10.643 * Math.pow(0.4 / 130, 1.852) * Math.pow(1 / diM, 4.871);
+prox('hf da adutora', cen2.adutoras[0].hf, jMan * 214, 1e-6);
+prox('v da adutora', cen2.adutoras[0].v, 0.4 / (Math.PI * diM * diM / 4), 1e-9);
+prox('Hm', cen2.Hm, 22 + jMan * 214, 1e-6);
+prox('BHP por bomba', cen2.bhpCv, 0.2 * 1000 * cen2.Hm / (75 * 0.7), 2e-3);
+
+ok('gerou um cenário por bomba instalada', res.cenarios.length === 3);
+ok('vazão cresce com o nº de bombas',
+   res.cenarios[0].qTotal < res.cenarios[1].qTotal && res.cenarios[1].qTotal < res.cenarios[2].qTotal);
+ok('Hm cresce com a vazão', res.cenarios[0].Hm < res.cenarios[2].Hm);
+ok('BHP cresce com a vazão', res.cenarios[0].bhpCv < res.cenarios[2].bhpCv);
+
+/* vazão informada por bomba */
+const st2 = E.clone(st);
+st2.vazao = { valor: 200, unidade: 'L/s', base: 'porBomba' };
+const res2 = C.resumo(st2, cats);
+prox('base "por bomba" reproduz a mesma vazão total', res2.projeto.qTotal, 0.4, 1e-12);
+
+/* barrilete comum progressivo */
+const st3 = E.clone(st);
+st3.barrileteComum.ativo = true;
+st3.barrileteComum.trechos = [E.novoTrechoComum(1), E.novoTrechoComum(2), E.novoTrechoComum(3)];
+st3.barrileteComum.trechos.forEach((t, i) => {
+  t.catalogoId = 'fd_flg_agua'; t.itemRot = 'DN 400'; t.extensao = 5;
+  t.pecas = [E.novaPeca('te_direta')];
+  t.nBombas = i + 1;
+});
+const res3 = C.resumo(st3, cats);
+const q1 = res3.projeto.recalque[0].Q, q2 = res3.projeto.recalque[1].Q, q3 = res3.projeto.recalque[2].Q;
+prox('trecho comum que coleta 1 bomba', q1, 0.2, 1e-12);
+prox('trecho comum que coleta 2 bombas', q2, 0.4, 1e-12);
+ok('trecho de 3 bombas limitado às 2 em operação', Math.abs(q3 - 0.4) < 1e-12, 'Q=' + q3);
+const res3b = C.cenario(st3, C.contexto(st3, cats), 3);
+prox('com 3 bombas operando o 3º trecho recebe a vazão das 3', res3b.recalque[2].Q, 0.6, 1e-12);
+
+/* adutora ramificada */
+const st4 = E.clone(st);
+st4.adutoras = [E.novaAdutora(1), E.novaAdutora(2)];
+st4.adutoras[0].catalogoId = 'fd_k7'; st4.adutoras[0].itemRot = 'DN 500';
+st4.adutoras[0].extensao = 1000; st4.adutoras[0].vazaoPct = 100;
+st4.adutoras[1].catalogoId = 'fd_k7'; st4.adutoras[1].itemRot = 'DN 400';
+st4.adutoras[1].extensao = 800; st4.adutoras[1].vazaoPct = 60;
+const res4 = C.resumo(st4, cats);
+prox('trecho 1 com 100 % da vazão', res4.projeto.adutoras[0].Q, 0.4, 1e-12);
+prox('trecho 2 com 60 % da vazão', res4.projeto.adutoras[1].Q, 0.24, 1e-12);
+ok('perdas somadas dos dois trechos',
+   Math.abs(res4.projeto.hfRecalque - (res4.projeto.adutoras[0].hf + res4.projeto.adutoras[1].hf)) < 1e-12);
+
+/* vazão absoluta por trecho */
+const st5 = E.clone(st4);
+st5.adutoras[1].vazaoModo = 'abs';
+st5.adutoras[1].vazaoAbs = 150; st5.adutoras[1].unidVazaoAbs = 'm³/h';
+const res5 = C.resumo(st5, cats);
+prox('vazão absoluta em m³/h', res5.projeto.adutoras[1].Q, 150 / 3600, 1e-12);
+
+/* ---------------------------------------------------------------- */
+titulo('11. Classificação por cores');
+const ctx = C.contexto(st, cats);
+const crit = C.criterioDe(st, ctx, 'adutora');
+ok('faixa de água carregada', crit.vMin === 0.6);
+ok('velocidade baixa reprovada', C.classificar(0.3, 0.003, crit).classe === 'ruim');
+ok('velocidade alta reprovada', C.classificar(4.0, 0.003, crit).classe === 'ruim');
+ok('dentro da faixa aprovada', C.classificar(1.5, 0.004, crit).classe === 'bom');
+ok('J acima do limite reprovado', C.classificar(1.5, 0.05, crit).classe === 'ruim');
+ok('fora da faixa boa mas dentro do limite = atenção', C.classificar(2.2, 0.008, crit).classe === 'atencao');
+/* critério de esgoto */
+const stE = E.clone(st); stE.fluido.tipo = 'esgoto_bruto';
+const ctxE = C.contexto(stE, cats);
+ok('esgoto usa a família de critérios própria', ctxE.familiaCriterio === 'esgoto');
+ok('velocidade máxima maior para esgoto',
+   C.criterioDe(stE, ctxE, 'adutora').vMax > crit.vMax);
+
+/* ---------------------------------------------------------------- */
+titulo('12. Varredura de diâmetros');
+const varr = C.varrer(st, ctx, st.adutoras[0], 'adutoras.0', 2);
+ok('varredura devolve uma linha por item do catálogo',
+   varr.linhas.length === CAT.buscar(CAT.padrao, 'pead_pe100_sdr21').itens.length,
+   varr.linhas.length + '');
+ok('há exatamente um diâmetro recomendado',
+   varr.linhas.filter(l => l.recomendado).length === 1);
+ok('velocidade decresce com o diâmetro', (function () {
+  for (let i = 1; i < varr.linhas.length; i++) if (varr.linhas[i].v >= varr.linhas[i - 1].v) return false;
+  return true;
+})());
+ok('perda unitária decresce com o diâmetro', (function () {
+  for (let i = 1; i < varr.linhas.length; i++) if (varr.linhas[i].jKm >= varr.linhas[i - 1].jKm) return false;
+  return true;
+})());
+const recL = varr.linhas.find(l => l.recomendado);
+ok('recomendado não é reprovado', recL.classe !== 'ruim', recL.rot + ' ' + recL.classe);
+prox('Bresse K=1,0 para 400 L/s', varr.bresse.k10, Math.sqrt(0.4) * 1000, 1e-9);
+ok('Bresse entre os limites', varr.bresse.k07 < varr.bresse.k10 && varr.bresse.k10 < varr.bresse.k13);
+
+/* ---------------------------------------------------------------- */
+titulo('13. Transitório hidráulico');
+/* celeridade em aço de parede espessa deve se aproximar da onda na água */
+const aAgua = 1 / Math.sqrt(998.2 / 2.19e9);
+const aAco = H.celeridade(0.3, 0.2, 210e9, 998.2, 2.19e9, 1);
+ok('celeridade em tubo muito rígido tende à da água livre',
+   Math.abs(aAco - aAgua) / aAgua < 0.02, aAco.toFixed(0) + ' vs ' + aAgua.toFixed(0) + ' m/s');
+const aPead = H.celeridade(0.4522, 0.0239, 1.0e9, 998.2, 2.19e9, 1);
+ok('celeridade em PEAD entre 200 e 400 m/s', aPead > 200 && aPead < 400, aPead.toFixed(0) + ' m/s');
+const aFd = H.celeridade(0.5, 0.007, 170e9, 998.2, 2.19e9, 1);
+ok('celeridade em FD entre 900 e 1300 m/s', aFd > 900 && aFd < 1300, aFd.toFixed(0) + ' m/s');
+prox('Joukowsky a=1000 dv=2', H.joukowsky(1000, 2), 1000 * 2 / H.g, 1e-12);
+prox('tempo crítico', H.tempoCritico(2000, 1000), 4, 1e-12);
+prox('Michaud', H.michaud(2000, 2, 10), 2 * 2000 * 2 / (H.g * 10), 1e-12);
+
+const stG = E.clone(st4);
+stG.golpe = { avaliar: true, tipoManobra: 'rapida', tempoManobra: 5, psi: 1 };
+const resG = C.resumo(stG, cats);
+ok('golpe avaliado para cada trecho', resG.golpe.length === 2);
+ok('sobrepressão positiva', resG.golpe[0].dh > 0);
+ok('pressão máxima maior que a Hm', resG.golpe[0].pressaoMaxMca > resG.projeto.Hm);
+
+/* ---------------------------------------------------------------- */
+titulo('13b. Pressão admissível do tubo');
+const stPN = E.clone(st4);
+stPN.adutoras[0].catalogoId = 'fd_k7';       /* catálogo sem PN cadastrado */
+stPN.adutoras[0].itemRot = 'DN 500';
+let resPN = C.resumo(stPN, cats);
+ok('sem PN no catálogo a verificação fica indefinida',
+   resPN.piezometrica[1].pnMca === null && resPN.golpe[0].atende === null);
+stPN.adutoras[0].pnMcaOverride = 400;
+resPN = C.resumo(stPN, cats);
+ok('PN informado pelo usuário é usado', resPN.piezometrica[1].pnMca === 400);
+ok('verificação do transitório passa a concluir', resPN.golpe[0].atende !== null);
+ok('400 mca atende a este caso', resPN.golpe[0].atende === true,
+   'p máx = ' + resPN.golpe[0].pressaoMaxMca.toFixed(1));
+stPN.adutoras[0].pnMcaOverride = 40;
+resPN = C.resumo(stPN, cats);
+ok('PN insuficiente é reprovado', resPN.golpe[0].atende === false);
+/* PN do catálogo continua valendo quando não há valor informado */
+const stPN2 = E.clone(st);
+stPN2.adutoras[0].pnMcaOverride = null;
+const rPN2 = C.resumo(stPN2, cats);
+ok('PN vem do catálogo (PEAD SDR21 = PN8 = 80 mca)',
+   rPN2.piezometrica[1].pnMca === 80, String(rPN2.piezometrica[1].pnMca));
+
+/* ---------------------------------------------------------------- */
+titulo('14. Comparação entre métodos');
+const cmp = C.compararMetodos(st, cats);
+ok('quatro métodos comparados', cmp.length === 4);
+const hw = cmp.find(c => c.metodo === 'hw'), cb = cmp.find(c => c.metodo === 'colebrook');
+ok('Hm de HW e Colebrook na mesma ordem de grandeza',
+   Math.abs(hw.Hm - cb.Hm) / cb.Hm < 0.5, 'HW ' + hw.Hm.toFixed(2) + ' / CB ' + cb.Hm.toFixed(2));
+ok('método restaurado após a comparação', st.calculo.metodo === 'hw');
+const sj = cmp.find(c => c.metodo === 'swamee'), zs = cmp.find(c => c.metodo === 'zigrang');
+ok('explícitas próximas da Colebrook (< 2 %)',
+   Math.abs(sj.Hm - cb.Hm) / cb.Hm < 0.02 && Math.abs(zs.Hm - cb.Hm) / cb.Hm < 0.02);
+
+/* ---------------------------------------------------------------- */
+titulo('15. NPSH e piezométrica');
+const stN = E.clone(st);
+stN.bombas.tipo = 'afogada';
+stN.succaoIndividual.ativo = true;
+stN.succaoIndividual.catalogoId = 'fd_flg_agua';
+stN.succaoIndividual.itemRot = 'DN 400';
+stN.succaoIndividual.extensao = 8;
+stN.succaoIndividual.pecas = [E.novaPeca('sino_succao'), E.novaPeca('curva90'), E.novaPeca('vg')];
+stN.cotas.eixoBomba = 618;      /* bomba 2 m abaixo do nível de sucção */
+const resN = C.resumo(stN, cats);
+ok('NPSH disponível calculado', resN.projeto.npshd !== null);
+prox('NPSHd', resN.projeto.npshd,
+     H.pressaoAtmosferica(0) - H.pressaoVaporAgua(20) + 2 - resN.projeto.hSuccao, 1e-6);
+ok('NPSHd positivo nessa configuração', resN.projeto.npshd > 0, resN.projeto.npshd.toFixed(2));
+const stSub = E.clone(stN); stSub.bombas.tipo = 'submersivel';
+const resSub = C.resumo(stSub, cats);
+ok('submersível não computa sucção', resSub.projeto.succao.length === 0);
+ok('submersível não calcula NPSHd', resSub.projeto.npshd === null);
+
+const pz = resN.piezometrica;
+ok('piezométrica com um ponto por trecho + saída', pz.length === 1 + resN.projeto.adutoras.length);
+prox('carga na saída da elevatória', pz[0].hgl, 620 + resN.projeto.Hm, 1e-9);
+prox('carga no fim da linha desconta as perdas de recalque',
+     pz[pz.length - 1].hgl, 620 + resN.projeto.Hm - resN.projeto.hRecalque, 1e-9);
+
+/* ---------------------------------------------------------------- */
+titulo('16. Estado e migração');
+const antigo = { versao: 0, vazao: { valor: 50, unidade: 'm³/h' } };
+const mig = E.migrar(antigo);
+ok('migração preserva o que existia', mig.vazao.valor === 50 && mig.vazao.unidade === 'm³/h');
+ok('migração completa os campos faltantes', mig.vazao.base === 'total' && !!mig.criterios && !!mig.bombas);
+ok('migração atualiza a versão', mig.versao === E.VERSAO);
+const p = E.padrao();
+ok('projeto padrão consistente', p.adutoras.length === 1 && p.bombas.instaladas >= p.bombas.operando);
+
+/* ---------------------------------------------------------------- */
+titulo('17. Coerência global de dimensionamento');
+/* Ao dobrar o diâmetro a perda distribuída deve cair ~2^4,871 (HW) */
+H.HW.k = 10.643; H.HW.expQ = 1.852; H.HW.expD = 4.871;
+const jD = H.jHazenWilliams(0.4, 0.3, 130), j2D = H.jHazenWilliams(0.4, 0.6, 130);
+prox('razão J(D)/J(2D) = 2^4,871', jD / j2D, Math.pow(2, 4.871), 1e-9);
+/* Colebrook: perda deve crescer com a rugosidade */
+const jLisa = H.jUniversal(0.4, 0.3, 1e-6, 1.003e-6, 'colebrook').J;
+const jRug = H.jUniversal(0.4, 0.3, 1e-3, 1.003e-6, 'colebrook').J;
+ok('perda cresce com a rugosidade', jRug > jLisa, jRug.toExponential(3) + ' > ' + jLisa.toExponential(3));
+/* tubo mais velho -> mais perda, mesmo diâmetro */
+const stV = E.clone(st); stV.calculo.metodo = 'colebrook';
+stV.adutoras[0].cOverride = null; stV.adutoras[0].epsOverride = null;
+stV.adutoras[0].idade = 'novo';
+const hNovo = C.resumo(stV, cats).projeto.Hm;
+stV.adutoras[0].idade = 'a30';
+const hVelho = C.resumo(stV, cats).projeto.Hm;
+ok('tubo antigo exige mais altura manométrica', hVelho > hNovo,
+   hVelho.toFixed(3) + ' > ' + hNovo.toFixed(3));
+/* override de rugosidade tem precedência */
+const stO = E.clone(stV); stO.adutoras[0].epsOverride = 5;
+ok('eps informado manualmente prevalece', C.resumo(stO, cats).projeto.Hm > hVelho);
+
+console.log('\n' + '='.repeat(60));
+console.log(falhas === 0 ? `TODOS OS ${total} TESTES PASSARAM` : `${falhas} de ${total} TESTES FALHARAM`);
+console.log('='.repeat(60));
+process.exit(falhas === 0 ? 0 : 1);
