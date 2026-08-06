@@ -743,6 +743,163 @@ ok('PN do catálogo de flanges habilita a verificação',
    C.resumo(stFlg, cats).piezometrica[1].pnMca === 160,
    String(C.resumo(stFlg, cats).piezometrica[1].pnMca));
 
+/* ---------------------------------------------------------------- */
+titulo('27. NPSH disponível: o que entra e o que não entra');
+
+function stNPSH() {
+  var x = E.padrao();
+  x.calculo.metodo = 'colebrook';
+  x.vazao = { valor: 685, unidade: 'L/s', base: 'total' };
+  x.bombas.instaladas = 5; x.bombas.operando = 4; x.bombas.rendBomba = 80;
+  x.cotas = { nivelSuccaoMin: 126, nivelSuccaoMax: 128, eixoBomba: 124,
+              cotaPartida: null, nivelChegada: 149, unid: 'm' };
+  x.succaoIndividual.ativo = true;
+  x.succaoIndividual.tipo = 'succao';
+  x.succaoIndividual.catalogoId = 'fd_esgoto_je';
+  x.succaoIndividual.itemRot = 'DN 400';
+  x.succaoIndividual.extensao = 7;
+  x.succaoIndividual.pecas = [E.novaPeca('sino_succao'), E.novaPeca('curva90'), E.novaPeca('vg')];
+  x.barrileteIndividual.ativo = false;
+  x.barrileteComum.ativo = false; x.barrileteComum.trechos = [];
+  x.adutoras = [E.novaAdutora(1)];
+  x.adutoras[0].catalogoId = 'fd_k7'; x.adutoras[0].itemRot = 'DN 800';
+  x.adutoras[0].extensao = 6.67; x.adutoras[0].unidExt = 'km';
+  return x;
+}
+
+var baseN = C.resumo(stNPSH(), cats).projeto;
+/* conferência da fórmula, parcela por parcela */
+var ctxN = C.contexto(stNPSH(), cats);
+prox('NPSHd = patm − pv + z − hf,sucção', baseN.npshd,
+     ctxN.patm - ctxN.pvapor + (126 - 124) - baseN.hSuccao, 1e-12);
+ok('NPSHd usa só as perdas de sucção, não as de recalque',
+   Math.abs(baseN.npshd - (ctxN.patm - ctxN.pvapor + 2 - baseN.hSuccao)) < 1e-12 &&
+   baseN.hRecalque > 0, 'hRecalque = ' + UI0(baseN.hRecalque));
+
+/* barrilete de recalque individual não pode mexer no NPSH */
+var stB1 = stNPSH();
+stB1.barrileteIndividual.ativo = true;
+stB1.barrileteIndividual.catalogoId = 'fd_esgoto_je';
+stB1.barrileteIndividual.itemRot = 'DN 400';
+stB1.barrileteIndividual.extensao = 10;
+stB1.barrileteIndividual.pecas = [E.novaPeca('vr'), E.novaPeca('vg_volante'), E.novaPeca('curva90')];
+var rB1 = C.resumo(stB1, cats).projeto;
+prox('barrilete individual de recalque não altera o NPSH', rB1.npshd, baseN.npshd, 1e-12);
+ok('mas altera a altura manométrica', rB1.Hm > baseN.Hm, UI0(baseN.Hm) + ' -> ' + UI0(rB1.Hm));
+
+/* barrilete comum de recalque também não */
+var stB2 = stNPSH();
+stB2.barrileteComum.ativo = true;
+stB2.barrileteComum.trechos = [1, 2, 3, 4].map(function (n) {
+  var t = E.novoTrechoComum(n, 'barrilete');
+  t.catalogoId = 'fd_esgoto_je'; t.itemRot = 'DN 600'; t.extensao = 5;
+  t.pecas = [E.novaPeca('te_direta')];
+  return t;
+});
+var rB2 = C.resumo(stB2, cats).projeto;
+prox('barrilete comum de recalque não altera o NPSH', rB2.npshd, baseN.npshd, 1e-12);
+ok('os 4 trechos comuns entram no recalque', rB2.recalque.length === 4);
+
+/* a sucção, sim, altera o NPSH */
+var stSuc = stNPSH();
+stSuc.succaoComum.ativo = true;
+stSuc.succaoComum.trechos = [E.novoTrechoComum(4, 'succao')];
+stSuc.succaoComum.trechos[0].catalogoId = 'fd_esgoto_je';
+stSuc.succaoComum.trechos[0].itemRot = 'DN 700';
+stSuc.succaoComum.trechos[0].extensao = 8;
+stSuc.succaoComum.trechos[0].pecas = [E.novaPeca('curva90'), E.novaPeca('te_direta')];
+var rSuc = C.resumo(stSuc, cats).projeto;
+ok('barrilete de sucção comum reduz o NPSH', rSuc.npshd < baseN.npshd,
+   UI0(baseN.npshd) + ' -> ' + UI0(rSuc.npshd));
+prox('a redução é exatamente a perda acrescentada na sucção',
+     baseN.npshd - rSuc.npshd, rSuc.hSuccao - baseN.hSuccao, 1e-12);
+
+/* bomba mais baixa melhora o NPSH; mais alta piora */
+var stEixoBaixo = stNPSH(); stEixoBaixo.cotas.eixoBomba = 120;
+ok('baixar o eixo da bomba melhora o NPSH',
+   C.resumo(stEixoBaixo, cats).projeto.npshd > baseN.npshd);
+var stEixoAlto = stNPSH(); stEixoAlto.cotas.eixoBomba = 135;
+var rEixoAlto = C.resumo(stEixoAlto, cats).projeto;
+ok('eixo acima do nível de sucção piora o NPSH', rEixoAlto.npshd < baseN.npshd);
+prox('e a carga na sucção fica negativa', rEixoAlto.zSuccao, 126 - 135, 1e-12);
+
+/* altitude e temperatura */
+var stAlt = stNPSH(); stAlt.fluido.altitude = 1500;
+ok('altitude maior reduz o NPSH', C.resumo(stAlt, cats).projeto.npshd < baseN.npshd);
+var stTemp = stNPSH(); stTemp.fluido.temperatura = 60;
+ok('temperatura maior reduz o NPSH (pressão de vapor)',
+   C.resumo(stTemp, cats).projeto.npshd < baseN.npshd);
+
+/* mais bombas em operação não mexem na sucção individual */
+var ctxM = C.contexto(stNPSH(), cats);
+var cen1 = C.cenario(stNPSH(), ctxM, 1);
+var cen4 = C.cenario(stNPSH(), ctxM, 4);
+prox('sucção individual tem a mesma vazão em qualquer cenário',
+     cen1.succao[0].Q, cen4.succao[0].Q, 1e-12);
+prox('e portanto o mesmo NPSH', cen1.npshd, cen4.npshd, 1e-12);
+
+/* ---------------------------------------------------------------- */
+titulo('28. Trecho sem diâmetro fica fora do cálculo');
+var stSD = stNPSH();
+stSD.barrileteComum.ativo = true;
+stSD.barrileteComum.trechos = [E.novoTrechoComum(1, 'barrilete'), E.novoTrechoComum(2, 'barrilete')];
+stSD.barrileteComum.trechos.forEach(function (t) { t.extensao = 5; t.itemRot = ''; });
+var rSD = C.resumo(stSD, cats);
+ok('o trecho sem diâmetro é marcado', rSD.projeto.recalque[0].semDiametro === true);
+prox('e não acrescenta perda nenhuma', rSD.projeto.hRecalque, baseN.hRecalque, 1e-12);
+prox('nem altera a altura manométrica', rSD.projeto.Hm, baseN.Hm, 1e-12);
+ok('o DI não cai no menor item do catálogo', rSD.projeto.recalque[0].tubo.diMm === 0,
+   String(rSD.projeto.recalque[0].tubo.diMm));
+ok('a incoerência é acusada como grave',
+   rSD.avisosDados.some(function (a) { return a.id === 'semDiametro' && a.grave; }));
+ok('o aviso nomeia os trechos',
+   /Trecho 1/.test(rSD.avisosDados.filter(function (a) { return a.id === 'semDiametro'; })[0].txt));
+
+/* o mesmo na sucção: sem diâmetro, o NPSH não despenca */
+var stSD2 = stNPSH();
+stSD2.succaoComum.ativo = true;
+stSD2.succaoComum.trechos = [E.novoTrechoComum(4, 'succao')];
+stSD2.succaoComum.trechos[0].extensao = 8;
+stSD2.succaoComum.trechos[0].itemRot = '';
+var rSD2 = C.resumo(stSD2, cats);
+prox('sucção sem diâmetro não derruba o NPSH', rSD2.projeto.npshd, baseN.npshd, 1e-12);
+ok('e o aviso aparece',
+   rSD2.avisosDados.some(function (a) { return a.id === 'semDiametro'; }));
+
+/* escolhido o diâmetro, o trecho volta a contar */
+stSD2.succaoComum.trechos[0].catalogoId = 'fd_esgoto_je';
+stSD2.succaoComum.trechos[0].itemRot = 'DN 700';
+var rSD3 = C.resumo(stSD2, cats);
+ok('com o diâmetro escolhido o trecho volta ao cálculo',
+   rSD3.projeto.npshd < baseN.npshd &&
+   !rSD3.avisosDados.some(function (a) { return a.id === 'semDiametro'; }));
+
+/* trecho desativado não gera aviso */
+stSD.barrileteComum.trechos.forEach(function (t) { t.ativo = false; });
+ok('trecho desativado não é cobrado',
+   !C.resumo(stSD, cats).avisosDados.some(function (a) { return a.id === 'semDiametro'; }));
+
+/* ---------------------------------------------------------------- */
+titulo('29. Trecho novo herda o tubo do anterior');
+var modelo = { catalogoId: 'fd_esgoto_je', itemRot: 'DN 600', idade: 'a5_15',
+               materialOverride: '', cOverride: null, epsOverride: 0.3,
+               unidExt: 'km', pnMcaOverride: 250, pnAuto: false };
+var herdado = E.novoTrechoComum(2, 'barrilete', modelo);
+ok('herda catálogo e diâmetro', herdado.catalogoId === 'fd_esgoto_je' && herdado.itemRot === 'DN 600');
+ok('herda idade e rugosidade', herdado.idade === 'a5_15' && herdado.epsOverride === 0.3);
+ok('herda unidade e PN', herdado.unidExt === 'km' && herdado.pnMcaOverride === 250);
+ok('mas mantém o que é próprio do trecho', herdado.nBombas === 2 && herdado.extensao === 0 &&
+   herdado.pecas.length === 0);
+var adHerd = E.novaAdutora(2, modelo);
+ok('adutora nova também herda', adHerd.catalogoId === 'fd_esgoto_je' && adHerd.itemRot === 'DN 600');
+ok('e continua sendo do tipo adutora', adHerd.tipo === 'adutora');
+ok('sucção comum nasce com o tipo certo', E.novoTrechoComum(1, 'succao').tipo === 'succao');
+/* o tipo define o critério aplicado */
+var stTipo = stNPSH();
+var ctxT = C.contexto(stTipo, cats);
+ok('trecho de sucção usa o critério de sucção',
+   C.criterioDe(stTipo, ctxT, 'succao').vMax !== C.criterioDe(stTipo, ctxT, 'barrilete').vMax);
+
 console.log('\n' + '='.repeat(60));
 console.log(falhas === 0 ? `TODOS OS ${total} TESTES PASSARAM` : `${falhas} de ${total} TESTES FALHARAM`);
 console.log('='.repeat(60));

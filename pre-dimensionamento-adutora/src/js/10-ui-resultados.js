@@ -106,6 +106,16 @@
 
   Res.aba = function (st, ctx, res) {
     var out = [];
+    if (Res.naoIniciado(st, ctx, res)) {
+      out.push(h('div', { class: 'aviso info' },
+        h('b', {}, 'O projeto ainda não tem dados suficientes'),
+        'Informe a vazão, as cotas de partida e de chegada na aba Resumo, e escolha o diâmetro de ao menos ' +
+        'um trecho de adutora. Os resultados aparecem aqui assim que houver o que calcular.',
+        h('div', { class: 'linha naoimprime', style: 'margin-top:9px' },
+          h('button', { class: 'btn primario', type: 'button', 'data-acao': 'irAba', 'data-aba': 'resumo' },
+            'Ir para o Resumo'),
+          h('button', { class: 'btn', type: 'button', 'data-acao': 'exemplo' }, 'Abrir um exemplo'))));
+    }
     (res.avisosDados || []).forEach(function (a) { out.push(PDA.F.blocoAviso(a)); });
     var avisos = Res.coletarAvisos(st, ctx, res);
     if (avisos.length) {
@@ -123,9 +133,19 @@
     return out;
   };
 
+  /* Um projeto recém-aberto ainda não tem o que verificar: cobrar altura
+     manométrica e diâmetro nesse momento é ruído, não ajuda. */
+  Res.naoIniciado = function (st, ctx, res) {
+    if (!(ctx.qTotal > 0)) return true;
+    var temDiametro = res.projeto.adutoras.some(function (r) { return r.tubo && r.tubo.item; });
+    return !temDiametro && Math.abs(res.projeto.Hg) < 1e-9;
+  };
+
   Res.coletarAvisos = function (st, ctx, res) {
     var av = [], c = res.projeto, vistos = {};
     function push(t) { if (!vistos[t]) { vistos[t] = 1; av.push(t); } }
+
+    if (Res.naoIniciado(st, ctx, res)) return av;
 
     c.avisos.forEach(push);
 
@@ -202,7 +222,9 @@
         .concat(arr.map(function (r) {
           return h('tr', {},
             h('td', { class: 'esq' }, r.rot),
-            h('td', { class: 'esq' }, r.tubo ? r.tubo.cat.nome.split('—')[0].trim() + ' ' + r.tubo.item.rot : '—'),
+            h('td', { class: 'esq' }, r.tubo && r.tubo.item
+              ? r.tubo.cat.nome.split('—')[0].trim() + ' ' + r.tubo.item.rot
+              : h('span', { class: 'sinal', title: 'Trecho ativo sem diâmetro escolhido: está fora do cálculo.' }, 'sem diâmetro !')),
             h('td', {}, r.tubo ? UI.num(r.tubo.diMm, 1) : '—'),
             h('td', {}, UI.num(r.Q * 1000, 1)),
             h('td', {}, UI.num(r.L, 1)),
@@ -523,7 +545,7 @@
     ];
 
     var trechos = c.succao.concat(c.recalque, c.adutoras).map(function (r) {
-      if (!r.tubo) return null;
+      if (!r.tubo || !r.tubo.item) return null;
       return h('tr', {},
         h('td', { class: 'esq' }, r.rot),
         h('td', { class: 'esq' }, r.tubo.cat.nome + ' · ' + r.tubo.item.rot),

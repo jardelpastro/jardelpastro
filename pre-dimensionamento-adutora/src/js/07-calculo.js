@@ -48,7 +48,19 @@
     var rot = itemRotForcado || conj.itemRot;
     var item = null, i;
     for (i = 0; i < cat.itens.length; i++) if (cat.itens[i].rot === rot) item = cat.itens[i];
-    if (!item) item = cat.itens[0];
+
+    /* Sem diâmetro escolhido o trecho fica FORA do cálculo. Adotar em
+       silêncio o primeiro item do catálogo — o menor DN — produziria
+       velocidades absurdas e uma perda de carga fantasma. */
+    if (!item) {
+      return {
+        cat: cat, item: null, semDiametro: true,
+        diMm: 0, diM: 0, eMm: null,
+        material: conj.materialOverride || cat.material,
+        C: 0, epsMm: 0, epsM: 0, cOverride: false, epsOverride: false,
+        consulta: R.consultar(conj.materialOverride || cat.material, conj.idade, ctx.fluido)
+      };
+    }
 
     var diMm = PDA.CAT.diInterno(cat, item);
     var matId = conj.materialOverride || cat.material;
@@ -104,7 +116,7 @@
       return { mca: Number(conj.pnMcaOverride), origem: 'informado',
                nota: 'Valor informado no campo PN / PFA do trecho.' };
     }
-    if (tubo && tubo.item && tubo.item.pn) {
+    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) {
       return { mca: Number(tubo.item.pn) * 10, origem: 'catalogo',
                nota: 'PN ' + tubo.item.pn + ' bar do catálogo "' + tubo.cat.nome + '".' };
     }
@@ -148,7 +160,12 @@
       conj: conj, tubo: tubo, Q: Q, v: 0, J: 0, hf: 0, hl: 0, htotal: 0,
       L: 0, somaK: 0, pecas: [], Re: 0, f: null, regime: null, erro: null
     };
-    if (!tubo || !(tubo.diM > 0)) { out.erro = 'Diâmetro não definido'; return out; }
+    if (!tubo || tubo.semDiametro || !(tubo.diM > 0)) {
+      out.erro = 'Diâmetro não escolhido — trecho fora do cálculo';
+      out.semDiametro = true;
+      out.L = U.para('extensao', conj.extensao || 0, conj.unidExt || 'm');
+      return out;
+    }
 
     out.L = U.para('extensao', conj.extensao || 0, conj.unidExt || 'm');
 
@@ -556,6 +573,26 @@
         txt: 'A cota do eixo da bomba (' + eixo.toFixed(2) + ' m) está a mais de 50 m do nível de sucção mínimo (' +
              Number(st.cotas.nivelSuccaoMin).toFixed(2) + ' m). Confirme que os dois campos estão na mesma ' +
              'referência de nível — os quatro campos de cota pedem ALTITUDE ABSOLUTA, não profundidade.',
+        acoes: []
+      });
+    }
+
+    /* Trechos ativos sem diâmetro escolhido. Só vale a pena cobrar quando o
+       trecho já foi lançado — tem extensão ou peças; um trecho recém-criado,
+       ainda em branco, não é incoerência. */
+    var semD = [];
+    res.projeto.succao.concat(res.projeto.recalque, res.projeto.adutoras).forEach(function (r) {
+      var lancado = r.L > 0 || (r.conj.pecas && r.conj.pecas.length > 0);
+      if (r.semDiametro && lancado) semD.push(r.rot);
+    });
+    if (semD.length) {
+      av.push({
+        id: 'semDiametro', grave: true,
+        txt: (semD.length === 1 ? 'O trecho "' + semD[0] + '" está' : 'Os trechos ' +
+              semD.map(function (x) { return '"' + x + '"'; }).join(', ') + ' estão') +
+             ' ativo(s) mas sem diâmetro escolhido, e por isso fora do cálculo: as perdas de carga desse(s) ' +
+             'trecho(s) não entram na altura manométrica nem no NPSH. Escolha o diâmetro na tabela de ' +
+             'comparação, ou desmarque o trecho.',
         acoes: []
       });
     }

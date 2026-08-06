@@ -37,6 +37,7 @@
 
     App.cats = PDA.E.carregarCatalogos();
     App.st = PDA.E.carregarLocal() || PDA.E.padrao();
+    App.corrigirTipos();
 
     var cfg = PDA.E.carregarConfig();
     if (cfg.tema) document.documentElement.setAttribute('data-tema', cfg.tema);
@@ -379,7 +380,9 @@
 
     if (acao.indexOf('addTrecho:') === 0) {
       var ch = acao.split(':')[1];
-      st[ch].trechos.push(PDA.E.novoTrechoComum(st[ch].trechos.length + 1));
+      var tr = st[ch].trechos;
+      var tipo = ch === 'succaoComum' ? 'succao' : 'barrilete';
+      tr.push(PDA.E.novoTrechoComum(tr.length + 1, tipo, tr[tr.length - 1]));
       App.render(); return;
     }
     if (acao.indexOf('delTrecho:') === 0) {
@@ -404,7 +407,8 @@
         App.render(); return;
 
       case 'addAdutora':
-        st.adutoras.push(PDA.E.novaAdutora(st.adutoras.length + 1));
+        st.adutoras.push(PDA.E.novaAdutora(st.adutoras.length + 1,
+          st.adutoras[st.adutoras.length - 1]));
         App.render(); return;
 
       case 'duplicarAdutora':
@@ -526,6 +530,7 @@
         if (!reg) { UI.toast('Projeto não encontrado.'); return; }
         App.st = PDA.E.migrar(PDA.E.clone(reg.st));
         App.st.id = reg.id;
+        App.corrigirTipos();
         UI.fecharModal();
         App.irPara('resumo');
         UI.toast('Projeto "' + reg.nome + '" aberto.');
@@ -536,6 +541,7 @@
         if (!reg2) return;
         App.st = PDA.E.migrar(PDA.E.clone(reg2.st));
         App.st.id = null;
+        App.corrigirTipos();
         App.st.projeto.nome = (App.st.projeto.nome || 'Projeto') + ' (cópia)';
         UI.fecharModal();
         App.irPara('resumo');
@@ -572,7 +578,7 @@
     var ctx;
     try { ctx = PDA.C.contexto(App.st, App.cats); } catch (e) { return; }
     var tubo = PDA.C.resolverTubo(conj, ctx);
-    if (tubo && tubo.item && tubo.item.pn && conj.itemRot) {
+    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn && conj.itemRot) {
       conj.pnMcaOverride = Number(tubo.item.pn) * 10;
     } else {
       conj.pnMcaOverride = null;
@@ -580,6 +586,16 @@
   };
 
   /* Aplica o preenchimento automático a todos os trechos de adutora */
+  /* projetos gravados antes desta versão podem ter os trechos de sucção
+     comum marcados como barrilete, o que aplicava o critério errado */
+  App.corrigirTipos = function () {
+    (App.st.succaoComum.trechos || []).forEach(function (t) { t.tipo = 'succao'; });
+    (App.st.barrileteComum.trechos || []).forEach(function (t) { t.tipo = 'barrilete'; });
+    App.st.succaoIndividual.tipo = 'succao';
+    App.st.barrileteIndividual.tipo = 'barrilete';
+    (App.st.adutoras || []).forEach(function (a) { a.tipo = 'adutora'; });
+  };
+
   App.autoPreencherPNTodos = function () {
     App.st.adutoras.forEach(function (a, i) { App.autoPreencherPN('adutoras.' + i); });
   };
@@ -712,6 +728,7 @@
     var proj = dados.projeto || (dados.versao !== undefined && dados.vazao ? dados : null);
     if (!proj) { UI.toast('Este arquivo não contém um projeto.'); return; }
     App.st = PDA.E.migrar(proj);
+    App.corrigirTipos();
     App.autoPreencherPNTodos();
     if (dados.catalogosUsuario && dados.catalogosUsuario.length) {
       var atuais = App.cats.usuario.slice();

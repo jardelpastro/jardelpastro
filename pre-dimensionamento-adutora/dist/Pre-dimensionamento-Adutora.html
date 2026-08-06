@@ -337,6 +337,11 @@ tr.arrastavel .alca {
   display: inline-block; cursor: grab; color: var(--texto-3); font-size: 14px;
   padding: 0 3px; user-select: none; line-height: 1;
 }
+/* dentro dos campos o gesto é seleção de texto, nunca arraste */
+tr.arrastavel input, tr.arrastavel select, tr.arrastavel textarea,
+.conjunto.arrastavel input, .conjunto.arrastavel select, .conjunto.arrastavel textarea {
+  -webkit-user-drag: none; user-select: text;
+}
 tr.arrastavel .alca:active { cursor: grabbing; }
 tr.arrastavel:hover .alca { color: var(--teal); }
 tr.arrastando { opacity: .45; }
@@ -1552,6 +1557,14 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       era: 'pressão comparada apenas com o PN do tubo — um ponto com −21,95 mca saía como "Adequado"',
       agora: 'a classificação testa também os limites físicos: pressão negativa nunca é adequada, e abaixo de −10 mca há vaporização',
       motivo: 'Pressão negativa significa que a linha piezométrica passa abaixo da tubulação. A causa raiz do caso relatado era a cota de chegada divergindo da cota final do último trecho — hoje os dois campos são um único número, e um verificador acusa qualquer divergência.' },
+    { onde: 'Trecho ativo sem diâmetro escolhido (3ª versão deste programa)',
+      era: 'o cálculo caía no primeiro item do catálogo — o menor DN',
+      agora: 'o trecho fica fora do cálculo, com aviso em vermelho no cartão e no Resumo',
+      motivo: 'Num barrilete de sucção com 685 L/s isso significava DN 80, velocidade de 118 m/s e NPSH de −1334 mca. O NPSH em si estava correto — usa só as perdas de sucção —, o número absurdo vinha do diâmetro fantasma. Agora um trecho novo também herda o tubo do anterior.' },
+    { onde: 'Trechos do barrilete de sucção comum (3ª versão deste programa)',
+      era: 'criados com o tipo "barrilete"',
+      agora: 'criados com o tipo "sucção"',
+      motivo: 'Eram coloridos pela faixa de velocidade do barrilete (até 3,5 m/s em água) em vez da faixa de sucção (até 2,0 m/s), que é a que preserva o NPSH.' },
     { onde: 'Curva do sistema com mais de uma bomba (2ª versão deste programa)',
       era: 'vazão por bomba escalada e depois multiplicada por n, dobrando a vazão total',
       agora: 'vazão por bomba = vazão total / n',
@@ -1968,14 +1981,32 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
              dnLocal: '', diLocalMm: null };
   };
 
-  E.novoTrechoComum = function (n) {
-    var c = novoConjunto('Trecho ' + n, 'fd_flg_agua', '', 'barrilete');
+  /* modelo: trecho anterior de onde herdar catálogo, diâmetro e material —
+     evita que um trecho novo nasça sem diâmetro e fique fora do cálculo */
+  E.novoTrechoComum = function (n, tipo, modelo) {
+    var c = novoConjunto('Trecho ' + n, 'fd_flg_agua', '', tipo || 'barrilete');
     c.nBombas = n;               /* nº de bombas que o trecho coleta */
+    if (modelo) E.herdarTubo(c, modelo);
     return c;
   };
 
-  E.novaAdutora = function (i) {
+  /* copia do modelo o que define o tubo, mantendo o que é próprio do trecho */
+  E.herdarTubo = function (alvo, modelo) {
+    alvo.catalogoId = modelo.catalogoId;
+    alvo.itemRot = modelo.itemRot;
+    alvo.idade = modelo.idade;
+    alvo.materialOverride = modelo.materialOverride;
+    alvo.cOverride = modelo.cOverride;
+    alvo.epsOverride = modelo.epsOverride;
+    alvo.unidExt = modelo.unidExt;
+    alvo.pnMcaOverride = modelo.pnMcaOverride;
+    alvo.pnAuto = modelo.pnAuto;
+    return alvo;
+  };
+
+  E.novaAdutora = function (i, modelo) {
     var a = novoConjunto('Trecho ' + i, 'fd_k7', '', 'adutora');
+    if (modelo) E.herdarTubo(a, modelo);
     a.extensao = 0;
     a.cotaIni = 0;
     a.cotaFim = 0;
@@ -2042,14 +2073,19 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       selecao: {}   /* { conjuntoKey: itemRot } escolhas manuais de diâmetro */
     };
 
+    /* Um projeto em branco começa sem trechos de barrilete lançados: o
+       usuário liga o que existir na instalação. Assim nada é presumido e a
+       tela não abre com pendências. */
     st.succaoIndividual.ativo = false;
+    st.barrileteIndividual.ativo = false;
     st.barrileteIndividual.pecas = [
       E.novaPeca('vr'), E.novaPeca('vg'), E.novaPeca('curva90'), E.novaPeca('junta_montagem')
     ];
     st.barrileteIndividual.pecas[2].qtd = 2;
     st.barrileteIndividual.pecas[3].qtd = 2;
 
-    st.barrileteComum.trechos = [E.novoTrechoComum(1)];
+    st.barrileteComum.ativo = false;
+    st.barrileteComum.trechos = [E.novoTrechoComum(1, 'barrilete')];
     st.barrileteComum.trechos[0].pecas = [E.novaPeca('te_direta'), E.novaPeca('medidor_vazao')];
 
     return st;
@@ -2233,7 +2269,19 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
     var rot = itemRotForcado || conj.itemRot;
     var item = null, i;
     for (i = 0; i < cat.itens.length; i++) if (cat.itens[i].rot === rot) item = cat.itens[i];
-    if (!item) item = cat.itens[0];
+
+    /* Sem diâmetro escolhido o trecho fica FORA do cálculo. Adotar em
+       silêncio o primeiro item do catálogo — o menor DN — produziria
+       velocidades absurdas e uma perda de carga fantasma. */
+    if (!item) {
+      return {
+        cat: cat, item: null, semDiametro: true,
+        diMm: 0, diM: 0, eMm: null,
+        material: conj.materialOverride || cat.material,
+        C: 0, epsMm: 0, epsM: 0, cOverride: false, epsOverride: false,
+        consulta: R.consultar(conj.materialOverride || cat.material, conj.idade, ctx.fluido)
+      };
+    }
 
     var diMm = PDA.CAT.diInterno(cat, item);
     var matId = conj.materialOverride || cat.material;
@@ -2289,7 +2337,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       return { mca: Number(conj.pnMcaOverride), origem: 'informado',
                nota: 'Valor informado no campo PN / PFA do trecho.' };
     }
-    if (tubo && tubo.item && tubo.item.pn) {
+    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) {
       return { mca: Number(tubo.item.pn) * 10, origem: 'catalogo',
                nota: 'PN ' + tubo.item.pn + ' bar do catálogo "' + tubo.cat.nome + '".' };
     }
@@ -2333,7 +2381,12 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       conj: conj, tubo: tubo, Q: Q, v: 0, J: 0, hf: 0, hl: 0, htotal: 0,
       L: 0, somaK: 0, pecas: [], Re: 0, f: null, regime: null, erro: null
     };
-    if (!tubo || !(tubo.diM > 0)) { out.erro = 'Diâmetro não definido'; return out; }
+    if (!tubo || tubo.semDiametro || !(tubo.diM > 0)) {
+      out.erro = 'Diâmetro não escolhido — trecho fora do cálculo';
+      out.semDiametro = true;
+      out.L = U.para('extensao', conj.extensao || 0, conj.unidExt || 'm');
+      return out;
+    }
 
     out.L = U.para('extensao', conj.extensao || 0, conj.unidExt || 'm');
 
@@ -2745,6 +2798,26 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       });
     }
 
+    /* Trechos ativos sem diâmetro escolhido. Só vale a pena cobrar quando o
+       trecho já foi lançado — tem extensão ou peças; um trecho recém-criado,
+       ainda em branco, não é incoerência. */
+    var semD = [];
+    res.projeto.succao.concat(res.projeto.recalque, res.projeto.adutoras).forEach(function (r) {
+      var lancado = r.L > 0 || (r.conj.pecas && r.conj.pecas.length > 0);
+      if (r.semDiametro && lancado) semD.push(r.rot);
+    });
+    if (semD.length) {
+      av.push({
+        id: 'semDiametro', grave: true,
+        txt: (semD.length === 1 ? 'O trecho "' + semD[0] + '" está' : 'Os trechos ' +
+              semD.map(function (x) { return '"' + x + '"'; }).join(', ') + ' estão') +
+             ' ativo(s) mas sem diâmetro escolhido, e por isso fora do cálculo: as perdas de carga desse(s) ' +
+             'trecho(s) não entram na altura manométrica nem no NPSH. Escolha o diâmetro na tabela de ' +
+             'comparação, ou desmarque o trecho.',
+        acoes: []
+      });
+    }
+
     if (st.perfil.ativo && st.perfil.pontos.length > 1) {
       var lPerfil = C.perfilPontos(st).ultimoX;
       var lTrechos = 0;
@@ -3152,6 +3225,10 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       }
     }
     for (i = 2; i < arguments.length; i++) add(el, arguments[i]);
+    /* campos de digitação nunca iniciam o arraste da linha que os contém */
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+      el.setAttribute('draggable', 'false');
+    }
     return el;
   }
 
@@ -3307,13 +3384,25 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
 
   var arrasteAtual = null;
 
+  /* A linha só fica arrastável enquanto o ponteiro está sobre a alça. Assim,
+     segurar o clique dentro de um campo seleciona texto, como se espera de um
+     campo de digitação, em vez de iniciar o arraste da linha. */
   UI.linhaArrastavel = function (tr, caminhoArray, i) {
-    tr.setAttribute('draggable', 'true');
+    tr.setAttribute('draggable', 'false');
     tr.setAttribute('data-arr', caminhoArray);
     tr.setAttribute('data-pos', i);
     tr.classList.add('arrastavel');
 
+    var alca = tr.querySelector('.alca');
+    if (alca) {
+      alca.addEventListener('mousedown', function () { tr.setAttribute('draggable', 'true'); });
+      alca.addEventListener('touchstart', function () { tr.setAttribute('draggable', 'true'); },
+                            { passive: true });
+    }
+    document.addEventListener('mouseup', function () { tr.setAttribute('draggable', 'false'); });
+
     tr.addEventListener('dragstart', function (e) {
+      if (tr.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
       arrasteAtual = { arr: caminhoArray, de: i };
       tr.classList.add('arrastando');
       if (e.dataTransfer) {
@@ -3323,6 +3412,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
     });
     tr.addEventListener('dragend', function () {
       tr.classList.remove('arrastando');
+      tr.setAttribute('draggable', 'false');
       limparAlvos();
       arrasteAtual = null;
     });
@@ -3353,8 +3443,11 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
   /* mesma reordenação, para blocos (cartões de trecho) em vez de linhas */
   UI.blocoArrastavel = function (el, caminhoArray, i) {
     el.classList.add('arrastavel');
+    el.setAttribute('draggable', 'false');
     el.setAttribute('data-arr', caminhoArray);
+    document.addEventListener('mouseup', function () { el.setAttribute('draggable', 'false'); });
     el.addEventListener('dragstart', function (e) {
+      if (el.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
       arrasteAtual = { arr: caminhoArray, de: i };
       el.classList.add('arrastando');
       if (e.dataTransfer) {
@@ -3363,7 +3456,9 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       }
     });
     el.addEventListener('dragend', function () {
-      el.classList.remove('arrastando'); limparAlvos(); arrasteAtual = null;
+      el.classList.remove('arrastando');
+      el.setAttribute('draggable', 'false');
+      limparAlvos(); arrasteAtual = null;
     });
     el.addEventListener('dragover', function (e) {
       if (!arrasteAtual || arrasteAtual.arr !== caminhoArray) return;
@@ -3387,7 +3482,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       h('span', {
         class: 'alca naoimprime', title: 'Arraste para reordenar',
         onmousedown: function () { el.setAttribute('draggable', 'true'); },
-        onmouseup: function () { el.setAttribute('draggable', 'false'); }
+        ontouchstart: function () { el.setAttribute('draggable', 'true'); }
       }, '⠿'),
       h('button', { class: 'btn mini icone naoimprime', type: 'button', title: 'Mover para cima',
                     disabled: i === 0,
@@ -3974,6 +4069,13 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
   F.infoTubo = function (st, ctx, conj) {
     var t = PDA.C.resolverTubo(conj, ctx);
     if (!t) return h('p', { class: 'nota' }, 'Selecione um catálogo.');
+    if (t.semDiametro) {
+      return h('div', { class: 'aviso erro', style: 'margin:0 0 4px' },
+        h('b', {}, 'Diâmetro não escolhido — este trecho está fora do cálculo'),
+        'Enquanto não houver um diâmetro, as perdas de carga deste trecho não entram na altura manométrica ' +
+        'nem no NPSH. Escolha na lista acima ou clique numa linha da tabela de comparação, no fim do cartão. ' +
+        'Se o trecho não existe, desmarque a caixa no título.');
+    }
     var flags = [];
     if (t.item.calc) flags.push(h('span', { class: 'tag cinza', title: 'Espessura obtida por fórmula normativa, não transcrita de tabela de fabricante.' }, 'e calculada'));
     if (t.item.verificar) flags.push(h('span', { class: 'tag atencao', title: 'Confirme esta dimensão no catálogo do fornecedor antes de fechar o projeto.' }, 'conferir catálogo'));
@@ -4030,7 +4132,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
         class: p.dnLocal ? 'editado' : '',
         title: 'DN da peça, quando diferente do tubo do trecho. O DI correspondente é buscado no catálogo.'
       }, [h('option', { value: '', selected: !p.dnLocal },
-            'igual ao trecho' + (tubo.item ? ' — ' + tubo.item.rot : ''))].concat(
+            'igual ao trecho' + (tubo.item && !tubo.semDiametro ? ' — ' + tubo.item.rot : ''))].concat(
         tubo.cat.itens.map(function (it) {
           return h('option', { value: it.rot, selected: it.rot === p.dnLocal },
             it.rot + ' — DI ' + UI.num(PDA.CAT.diInterno(tubo.cat, it), 0) + ' mm');
@@ -4318,9 +4420,14 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
 
   F.abaResumo = function (st, ctx, res) {
     var cen = res.projeto;
+    var deCota = ['cotaChegada', 'cotaPartida', 'niveis', 'eixoDistante'];
     var alertaCota = null;
     (res.avisosDados || []).forEach(function (a) {
-      if (!alertaCota && (a.id === 'cotaChegada' || a.id === 'cotaPartida' || a.id === 'niveis' || a.id === 'eixoDistante')) alertaCota = a;
+      if (!alertaCota && deCota.indexOf(a.id) >= 0) alertaCota = a;
+    });
+    /* o Resumo mostra TODAS as pendências de dados, não só as de cota */
+    var outrosAvisos = (res.avisosDados || []).filter(function (a) {
+      return a !== alertaCota;
     });
 
     var entrada = UI.cartao('Dados essenciais',
@@ -4361,6 +4468,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
           chip('Altura manométrica', UI.num(cen.Hm, 2), 'mca', 'forte')),
 
         alertaCota ? F.blocoAviso(alertaCota) : null,
+        outrosAvisos.map(function (a) { return F.blocoAviso(a); }),
 
         PDA.Q.caixa('Como o programa entende as cotas',
           PDA.Q.niveisCotas(st, ctx, cen),
@@ -5559,6 +5667,16 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
 
   Res.aba = function (st, ctx, res) {
     var out = [];
+    if (Res.naoIniciado(st, ctx, res)) {
+      out.push(h('div', { class: 'aviso info' },
+        h('b', {}, 'O projeto ainda não tem dados suficientes'),
+        'Informe a vazão, as cotas de partida e de chegada na aba Resumo, e escolha o diâmetro de ao menos ' +
+        'um trecho de adutora. Os resultados aparecem aqui assim que houver o que calcular.',
+        h('div', { class: 'linha naoimprime', style: 'margin-top:9px' },
+          h('button', { class: 'btn primario', type: 'button', 'data-acao': 'irAba', 'data-aba': 'resumo' },
+            'Ir para o Resumo'),
+          h('button', { class: 'btn', type: 'button', 'data-acao': 'exemplo' }, 'Abrir um exemplo'))));
+    }
     (res.avisosDados || []).forEach(function (a) { out.push(PDA.F.blocoAviso(a)); });
     var avisos = Res.coletarAvisos(st, ctx, res);
     if (avisos.length) {
@@ -5576,9 +5694,19 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
     return out;
   };
 
+  /* Um projeto recém-aberto ainda não tem o que verificar: cobrar altura
+     manométrica e diâmetro nesse momento é ruído, não ajuda. */
+  Res.naoIniciado = function (st, ctx, res) {
+    if (!(ctx.qTotal > 0)) return true;
+    var temDiametro = res.projeto.adutoras.some(function (r) { return r.tubo && r.tubo.item; });
+    return !temDiametro && Math.abs(res.projeto.Hg) < 1e-9;
+  };
+
   Res.coletarAvisos = function (st, ctx, res) {
     var av = [], c = res.projeto, vistos = {};
     function push(t) { if (!vistos[t]) { vistos[t] = 1; av.push(t); } }
+
+    if (Res.naoIniciado(st, ctx, res)) return av;
 
     c.avisos.forEach(push);
 
@@ -5655,7 +5783,9 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
         .concat(arr.map(function (r) {
           return h('tr', {},
             h('td', { class: 'esq' }, r.rot),
-            h('td', { class: 'esq' }, r.tubo ? r.tubo.cat.nome.split('—')[0].trim() + ' ' + r.tubo.item.rot : '—'),
+            h('td', { class: 'esq' }, r.tubo && r.tubo.item
+              ? r.tubo.cat.nome.split('—')[0].trim() + ' ' + r.tubo.item.rot
+              : h('span', { class: 'sinal', title: 'Trecho ativo sem diâmetro escolhido: está fora do cálculo.' }, 'sem diâmetro !')),
             h('td', {}, r.tubo ? UI.num(r.tubo.diMm, 1) : '—'),
             h('td', {}, UI.num(r.Q * 1000, 1)),
             h('td', {}, UI.num(r.L, 1)),
@@ -5976,7 +6106,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
     ];
 
     var trechos = c.succao.concat(c.recalque, c.adutoras).map(function (r) {
-      if (!r.tubo) return null;
+      if (!r.tubo || !r.tubo.item) return null;
       return h('tr', {},
         h('td', { class: 'esq' }, r.rot),
         h('td', { class: 'esq' }, r.tubo.cat.nome + ' · ' + r.tubo.item.rot),
@@ -6673,6 +6803,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
 
     App.cats = PDA.E.carregarCatalogos();
     App.st = PDA.E.carregarLocal() || PDA.E.padrao();
+    App.corrigirTipos();
 
     var cfg = PDA.E.carregarConfig();
     if (cfg.tema) document.documentElement.setAttribute('data-tema', cfg.tema);
@@ -7015,7 +7146,9 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
 
     if (acao.indexOf('addTrecho:') === 0) {
       var ch = acao.split(':')[1];
-      st[ch].trechos.push(PDA.E.novoTrechoComum(st[ch].trechos.length + 1));
+      var tr = st[ch].trechos;
+      var tipo = ch === 'succaoComum' ? 'succao' : 'barrilete';
+      tr.push(PDA.E.novoTrechoComum(tr.length + 1, tipo, tr[tr.length - 1]));
       App.render(); return;
     }
     if (acao.indexOf('delTrecho:') === 0) {
@@ -7040,7 +7173,8 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
         App.render(); return;
 
       case 'addAdutora':
-        st.adutoras.push(PDA.E.novaAdutora(st.adutoras.length + 1));
+        st.adutoras.push(PDA.E.novaAdutora(st.adutoras.length + 1,
+          st.adutoras[st.adutoras.length - 1]));
         App.render(); return;
 
       case 'duplicarAdutora':
@@ -7162,6 +7296,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
         if (!reg) { UI.toast('Projeto não encontrado.'); return; }
         App.st = PDA.E.migrar(PDA.E.clone(reg.st));
         App.st.id = reg.id;
+        App.corrigirTipos();
         UI.fecharModal();
         App.irPara('resumo');
         UI.toast('Projeto "' + reg.nome + '" aberto.');
@@ -7172,6 +7307,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
         if (!reg2) return;
         App.st = PDA.E.migrar(PDA.E.clone(reg2.st));
         App.st.id = null;
+        App.corrigirTipos();
         App.st.projeto.nome = (App.st.projeto.nome || 'Projeto') + ' (cópia)';
         UI.fecharModal();
         App.irPara('resumo');
@@ -7208,7 +7344,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
     var ctx;
     try { ctx = PDA.C.contexto(App.st, App.cats); } catch (e) { return; }
     var tubo = PDA.C.resolverTubo(conj, ctx);
-    if (tubo && tubo.item && tubo.item.pn && conj.itemRot) {
+    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn && conj.itemRot) {
       conj.pnMcaOverride = Number(tubo.item.pn) * 10;
     } else {
       conj.pnMcaOverride = null;
@@ -7216,6 +7352,16 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
   };
 
   /* Aplica o preenchimento automático a todos os trechos de adutora */
+  /* projetos gravados antes desta versão podem ter os trechos de sucção
+     comum marcados como barrilete, o que aplicava o critério errado */
+  App.corrigirTipos = function () {
+    (App.st.succaoComum.trechos || []).forEach(function (t) { t.tipo = 'succao'; });
+    (App.st.barrileteComum.trechos || []).forEach(function (t) { t.tipo = 'barrilete'; });
+    App.st.succaoIndividual.tipo = 'succao';
+    App.st.barrileteIndividual.tipo = 'barrilete';
+    (App.st.adutoras || []).forEach(function (a) { a.tipo = 'adutora'; });
+  };
+
   App.autoPreencherPNTodos = function () {
     App.st.adutoras.forEach(function (a, i) { App.autoPreencherPN('adutoras.' + i); });
   };
@@ -7348,6 +7494,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
     var proj = dados.projeto || (dados.versao !== undefined && dados.vazao ? dados : null);
     if (!proj) { UI.toast('Este arquivo não contém um projeto.'); return; }
     App.st = PDA.E.migrar(proj);
+    App.corrigirTipos();
     App.autoPreencherPNTodos();
     if (dados.catalogosUsuario && dados.catalogosUsuario.length) {
       var atuais = App.cats.usuario.slice();

@@ -207,6 +207,37 @@ propriedade verifica que, para a mesma vazão total, a altura do sistema é a me
 com uma ou com duas bombas — porque as perdas são da tubulação, não do número de
 conjuntos.
 
+### 3.9 Trecho sem diâmetro caía no menor DN do catálogo
+
+Defeito da terceira versão deste programa, encontrado ao investigar um relato de
+NPSH negativo depois de acrescentar um barrilete.
+
+Um trecho ativo sem diâmetro escolhido não era ignorado: a rotina que resolve o
+tubo caía no **primeiro item do catálogo** — o menor DN. Num barrilete de sucção
+com 685 L/s, isso significava DN 80 (DI 86 mm), velocidade de 118 m/s e perda de
+carga de 1346 m, derrubando o NPSH disponível para −1334 mca.
+
+O NPSH em si estava certo: usa apenas as perdas de sucção, e barriletes de
+recalque nunca o alteraram. O que produzia o número absurdo era o diâmetro
+fantasma.
+
+Corrigido: um trecho ativo sem diâmetro fica **fora do cálculo** — não soma perda
+nenhuma —, o cartão do trecho avisa em vermelho e a pendência aparece no Resumo e
+no contador da aba. A cobrança só acontece quando o trecho já foi lançado (tem
+extensão ou peças), para um trecho recém-criado em branco não gerar alarme.
+
+Três medidas evitam que a situação se repita: um trecho novo herda catálogo,
+diâmetro, idade e rugosidade do trecho anterior; o projeto em branco começa com
+os barriletes desligados; e a aba Resultados fica em silêncio enquanto o projeto
+não tiver vazão e diâmetro.
+
+### 3.10 Critério de velocidade nos trechos de sucção comum
+
+Os trechos criados no barrilete de sucção comum nasciam com o tipo `barrilete`, e
+por isso eram coloridos pela faixa de velocidade do barrilete (até 3,5 m/s em
+água) em vez da faixa de sucção (até 2,0 m/s), que é a que preserva o NPSH.
+Corrigido, com ajuste automático dos projetos já gravados ao serem abertos.
+
 ## 4. Itens que dependem de conferência do fornecedor
 
 Marcados no programa com a etiqueta **"conferir catálogo"** e listados no painel

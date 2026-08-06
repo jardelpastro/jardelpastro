@@ -41,14 +41,32 @@
              dnLocal: '', diLocalMm: null };
   };
 
-  E.novoTrechoComum = function (n) {
-    var c = novoConjunto('Trecho ' + n, 'fd_flg_agua', '', 'barrilete');
+  /* modelo: trecho anterior de onde herdar catálogo, diâmetro e material —
+     evita que um trecho novo nasça sem diâmetro e fique fora do cálculo */
+  E.novoTrechoComum = function (n, tipo, modelo) {
+    var c = novoConjunto('Trecho ' + n, 'fd_flg_agua', '', tipo || 'barrilete');
     c.nBombas = n;               /* nº de bombas que o trecho coleta */
+    if (modelo) E.herdarTubo(c, modelo);
     return c;
   };
 
-  E.novaAdutora = function (i) {
+  /* copia do modelo o que define o tubo, mantendo o que é próprio do trecho */
+  E.herdarTubo = function (alvo, modelo) {
+    alvo.catalogoId = modelo.catalogoId;
+    alvo.itemRot = modelo.itemRot;
+    alvo.idade = modelo.idade;
+    alvo.materialOverride = modelo.materialOverride;
+    alvo.cOverride = modelo.cOverride;
+    alvo.epsOverride = modelo.epsOverride;
+    alvo.unidExt = modelo.unidExt;
+    alvo.pnMcaOverride = modelo.pnMcaOverride;
+    alvo.pnAuto = modelo.pnAuto;
+    return alvo;
+  };
+
+  E.novaAdutora = function (i, modelo) {
     var a = novoConjunto('Trecho ' + i, 'fd_k7', '', 'adutora');
+    if (modelo) E.herdarTubo(a, modelo);
     a.extensao = 0;
     a.cotaIni = 0;
     a.cotaFim = 0;
@@ -115,14 +133,19 @@
       selecao: {}   /* { conjuntoKey: itemRot } escolhas manuais de diâmetro */
     };
 
+    /* Um projeto em branco começa sem trechos de barrilete lançados: o
+       usuário liga o que existir na instalação. Assim nada é presumido e a
+       tela não abre com pendências. */
     st.succaoIndividual.ativo = false;
+    st.barrileteIndividual.ativo = false;
     st.barrileteIndividual.pecas = [
       E.novaPeca('vr'), E.novaPeca('vg'), E.novaPeca('curva90'), E.novaPeca('junta_montagem')
     ];
     st.barrileteIndividual.pecas[2].qtd = 2;
     st.barrileteIndividual.pecas[3].qtd = 2;
 
-    st.barrileteComum.trechos = [E.novoTrechoComum(1)];
+    st.barrileteComum.ativo = false;
+    st.barrileteComum.trechos = [E.novoTrechoComum(1, 'barrilete')];
     st.barrileteComum.trechos[0].pecas = [E.novaPeca('te_direta'), E.novaPeca('medidor_vazao')];
 
     return st;

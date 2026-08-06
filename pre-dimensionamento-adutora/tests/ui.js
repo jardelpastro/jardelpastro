@@ -32,6 +32,9 @@ function titulo(t) { console.log('\n' + t); }
   ok('abas montadas', (await page.locator('#abas button').count()) === 11,
      String(await page.locator('#abas button').count()));
   ok('marca no cabeçalho', (await page.locator('#marca .marca-bloco').count()) === 1);
+  ok('projeto em branco abre sem pendências',
+     (await page.locator('#abas button .marcador').count()) === 0,
+     String(await page.locator('#abas button .marcador').count()));
   ok('aba inicial é o Resumo',
      (await page.locator('#abas button[aria-selected="true"]').innerText()) === 'Resumo');
   ok('resumo traz os campos essenciais destacados',
@@ -765,8 +768,10 @@ function titulo(t) { console.log('\n' + t); }
   ok('coluna de ordem presente',
      (await page.locator('#conteudo .col-mover').count()) >= 3);
   ok('alça de arraste presente', (await page.locator('#conteudo .col-mover .alca').count()) >= 3);
-  ok('linhas marcadas como arrastáveis',
-     (await page.locator('#conteudo tr.arrastavel[draggable="true"]').count()) >= 3);
+  ok('linhas preparadas para reordenação',
+     (await page.locator('#conteudo tr.arrastavel').count()) >= 3);
+  ok('linhas NÃO nascem arrastáveis (senão o clique no campo vira arraste)',
+     (await page.locator('#conteudo tr.arrastavel[draggable="true"]').count()) === 0);
   /* mover a primeira peça para baixo pelo botão */
   await page.locator('[data-acao="mover"][data-arr="adutoras.0.pecas"][data-i="0"][data-para="1"]').click();
   await page.waitForTimeout(400);
@@ -793,6 +798,44 @@ function titulo(t) { console.log('\n' + t); }
   ok('reordenar não muda a perda localizada', Math.abs(perdaAntes - perdaDepois) < 1e-12,
      perdaAntes.toFixed(6) + ' vs ' + perdaDepois.toFixed(6));
 
+  titulo('28b. Selecionar texto no campo não inicia arraste');
+  const linhaPeca = page.locator('#conteudo tr.arrastavel').first();
+  const campoQtd = linhaPeca.locator('input.num').first();
+  /* segurar o clique dentro do campo, como quem seleciona texto */
+  const cx = await campoQtd.boundingBox();
+  await page.mouse.move(cx.x + 8, cx.y + cx.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cx.x + cx.width - 8, cx.y + cx.height / 2, { steps: 6 });
+  ok('a linha continua não arrastável durante a seleção',
+     (await linhaPeca.getAttribute('draggable')) === 'false',
+     String(await linhaPeca.getAttribute('draggable')));
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  ok('o campo recebeu o foco em vez de arrastar',
+     (await page.evaluate(() => document.activeElement.tagName)) === 'INPUT');
+  ok('nenhuma linha ficou em estado de arraste',
+     (await page.locator('#conteudo tr.arrastando').count()) === 0);
+  /* já a alça libera o arraste */
+  const alca = linhaPeca.locator('.alca').first();
+  const ca = await alca.boundingBox();
+  await page.mouse.move(ca.x + ca.width / 2, ca.y + ca.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(120);
+  ok('segurar a alça torna a linha arrastável',
+     (await linhaPeca.getAttribute('draggable')) === 'true',
+     String(await linhaPeca.getAttribute('draggable')));
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  ok('soltar devolve a linha ao estado normal',
+     (await linhaPeca.getAttribute('draggable')) === 'false');
+  /* campos nunca são arrastáveis por si */
+  ok('campos marcados como não arrastáveis',
+     (await page.evaluate(() => {
+       const c = document.querySelectorAll('#conteudo input, #conteudo select');
+       for (let i = 0; i < c.length; i++) if (c[i].getAttribute('draggable') !== 'false') return false;
+       return c.length > 0;
+     })));
+
   titulo('29. Reordenar trechos');
   await page.locator('#abas button', { hasText: 'Barriletes' }).click();
   await page.waitForTimeout(400);
@@ -806,6 +849,65 @@ function titulo(t) { console.log('\n' + t); }
      JSON.stringify(trAntes) + ' -> ' + JSON.stringify(trDepois));
   await page.locator('[data-acao="mover"][data-arr="barrileteComum.trechos"][data-i="1"][data-para="0"]').click();
   await page.waitForTimeout(400);
+
+  titulo('29b. NPSH não é afetado por barrilete de recalque');
+  await page.locator('[data-acao="exemplo"]').click();
+  await page.waitForSelector('.modal');
+  await page.locator('.modal button', { hasText: 'Linha de recalque de esgoto' }).click();
+  await page.waitForTimeout(500);
+  const npshA = await page.evaluate(() =>
+    window.PDA.C.resumo(window.PDA.App.st, window.PDA.App.cats).projeto.npshd);
+  await page.locator('#abas button', { hasText: 'Barriletes' }).click();
+  await page.waitForTimeout(400);
+  await page.locator('[data-acao^="addTrecho:barrileteComum"]').click();
+  await page.waitForTimeout(500);
+  const dep = await page.evaluate(() => {
+    const P = window.PDA, r = P.C.resumo(P.App.st, P.App.cats).projeto;
+    const t = P.App.st.barrileteComum.trechos;
+    return { npsh: r.npshd, ultimoDN: t[t.length - 1].itemRot, hRec: r.hRecalque };
+  });
+  ok('o trecho novo herda o diâmetro do anterior', !!dep.ultimoDN, String(dep.ultimoDN));
+  ok('acrescentar barrilete de recalque não mexe no NPSH',
+     Math.abs(dep.npsh - npshA) < 1e-9, npshA.toFixed(3) + ' -> ' + dep.npsh.toFixed(3));
+
+  titulo('29c. Trecho sem diâmetro sai do cálculo e é acusado');
+  /* um trecho recém-criado, ainda em branco, não é cobrado */
+  const emBranco = await page.evaluate(() =>
+    window.PDA.C.resumo(window.PDA.App.st, window.PDA.App.cats)
+      .avisosDados.some(a => a.id === 'semDiametro'));
+  ok('trecho ainda em branco não gera pendência', !emBranco);
+  const semD = await page.evaluate(() => {
+    const P = window.PDA, st = P.App.st;
+    const t = st.barrileteComum.trechos;
+    t[t.length - 1].itemRot = '';
+    t[t.length - 1].extensao = 6;      /* trecho lançado, mas sem diâmetro */
+    P.App.render();
+    const r = P.C.resumo(st, P.App.cats);
+    return {
+      npsh: r.projeto.npshd, hRec: r.projeto.hRecalque,
+      di: r.projeto.recalque[r.projeto.recalque.length - 1].tubo.diMm,
+      aviso: r.avisosDados.some(a => a.id === 'semDiametro' && a.grave)
+    };
+  });
+  await page.waitForTimeout(400);
+  ok('o DI não cai no menor diâmetro do catálogo', semD.di === 0, String(semD.di));
+  ok('o NPSH continua íntegro', Math.abs(semD.npsh - npshA) < 1e-9, semD.npsh.toFixed(3));
+  ok('a incoerência é acusada como grave', semD.aviso);
+  ok('o cartão do trecho avisa que está fora do cálculo',
+     /fora do cálculo/.test(await page.locator('#conteudo').innerText()));
+  await page.locator('#abas button', { hasText: 'Resumo' }).click();
+  await page.waitForTimeout(400);
+  ok('o aviso aparece também no Resumo',
+     /sem diâmetro escolhido/.test(await page.locator('#conteudo').innerText()));
+  ok('a aba Resumo ganha o marcador de pendência',
+     (await page.locator('#abas button .marcador').count()) >= 1);
+  /* limpa para os testes seguintes */
+  await page.evaluate(() => {
+    const t = window.PDA.App.st.barrileteComum.trechos;
+    t.pop();
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(300);
 
   titulo('30. PN pré-preenchido');
   await page.locator('#abas button', { hasText: 'Adutora' }).click();

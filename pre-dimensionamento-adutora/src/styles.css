@@ -330,6 +330,11 @@ tr.arrastavel .alca {
   display: inline-block; cursor: grab; color: var(--texto-3); font-size: 14px;
   padding: 0 3px; user-select: none; line-height: 1;
 }
+/* dentro dos campos o gesto é seleção de texto, nunca arraste */
+tr.arrastavel input, tr.arrastavel select, tr.arrastavel textarea,
+.conjunto.arrastavel input, .conjunto.arrastavel select, .conjunto.arrastavel textarea {
+  -webkit-user-drag: none; user-select: text;
+}
 tr.arrastavel .alca:active { cursor: grabbing; }
 tr.arrastavel:hover .alca { color: var(--teal); }
 tr.arrastando { opacity: .45; }

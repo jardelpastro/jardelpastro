@@ -99,6 +99,13 @@
   F.infoTubo = function (st, ctx, conj) {
     var t = PDA.C.resolverTubo(conj, ctx);
     if (!t) return h('p', { class: 'nota' }, 'Selecione um catálogo.');
+    if (t.semDiametro) {
+      return h('div', { class: 'aviso erro', style: 'margin:0 0 4px' },
+        h('b', {}, 'Diâmetro não escolhido — este trecho está fora do cálculo'),
+        'Enquanto não houver um diâmetro, as perdas de carga deste trecho não entram na altura manométrica ' +
+        'nem no NPSH. Escolha na lista acima ou clique numa linha da tabela de comparação, no fim do cartão. ' +
+        'Se o trecho não existe, desmarque a caixa no título.');
+    }
     var flags = [];
     if (t.item.calc) flags.push(h('span', { class: 'tag cinza', title: 'Espessura obtida por fórmula normativa, não transcrita de tabela de fabricante.' }, 'e calculada'));
     if (t.item.verificar) flags.push(h('span', { class: 'tag atencao', title: 'Confirme esta dimensão no catálogo do fornecedor antes de fechar o projeto.' }, 'conferir catálogo'));
@@ -155,7 +162,7 @@
         class: p.dnLocal ? 'editado' : '',
         title: 'DN da peça, quando diferente do tubo do trecho. O DI correspondente é buscado no catálogo.'
       }, [h('option', { value: '', selected: !p.dnLocal },
-            'igual ao trecho' + (tubo.item ? ' — ' + tubo.item.rot : ''))].concat(
+            'igual ao trecho' + (tubo.item && !tubo.semDiametro ? ' — ' + tubo.item.rot : ''))].concat(
         tubo.cat.itens.map(function (it) {
           return h('option', { value: it.rot, selected: it.rot === p.dnLocal },
             it.rot + ' — DI ' + UI.num(PDA.CAT.diInterno(tubo.cat, it), 0) + ' mm');
@@ -443,9 +450,14 @@
 
   F.abaResumo = function (st, ctx, res) {
     var cen = res.projeto;
+    var deCota = ['cotaChegada', 'cotaPartida', 'niveis', 'eixoDistante'];
     var alertaCota = null;
     (res.avisosDados || []).forEach(function (a) {
-      if (!alertaCota && (a.id === 'cotaChegada' || a.id === 'cotaPartida' || a.id === 'niveis' || a.id === 'eixoDistante')) alertaCota = a;
+      if (!alertaCota && deCota.indexOf(a.id) >= 0) alertaCota = a;
+    });
+    /* o Resumo mostra TODAS as pendências de dados, não só as de cota */
+    var outrosAvisos = (res.avisosDados || []).filter(function (a) {
+      return a !== alertaCota;
     });
 
     var entrada = UI.cartao('Dados essenciais',
@@ -486,6 +498,7 @@
           chip('Altura manométrica', UI.num(cen.Hm, 2), 'mca', 'forte')),
 
         alertaCota ? F.blocoAviso(alertaCota) : null,
+        outrosAvisos.map(function (a) { return F.blocoAviso(a); }),
 
         PDA.Q.caixa('Como o programa entende as cotas',
           PDA.Q.niveisCotas(st, ctx, cen),

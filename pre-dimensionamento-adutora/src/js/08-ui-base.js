@@ -28,6 +28,10 @@
       }
     }
     for (i = 2; i < arguments.length; i++) add(el, arguments[i]);
+    /* campos de digitação nunca iniciam o arraste da linha que os contém */
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+      el.setAttribute('draggable', 'false');
+    }
     return el;
   }
 
@@ -183,13 +187,25 @@
 
   var arrasteAtual = null;
 
+  /* A linha só fica arrastável enquanto o ponteiro está sobre a alça. Assim,
+     segurar o clique dentro de um campo seleciona texto, como se espera de um
+     campo de digitação, em vez de iniciar o arraste da linha. */
   UI.linhaArrastavel = function (tr, caminhoArray, i) {
-    tr.setAttribute('draggable', 'true');
+    tr.setAttribute('draggable', 'false');
     tr.setAttribute('data-arr', caminhoArray);
     tr.setAttribute('data-pos', i);
     tr.classList.add('arrastavel');
 
+    var alca = tr.querySelector('.alca');
+    if (alca) {
+      alca.addEventListener('mousedown', function () { tr.setAttribute('draggable', 'true'); });
+      alca.addEventListener('touchstart', function () { tr.setAttribute('draggable', 'true'); },
+                            { passive: true });
+    }
+    document.addEventListener('mouseup', function () { tr.setAttribute('draggable', 'false'); });
+
     tr.addEventListener('dragstart', function (e) {
+      if (tr.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
       arrasteAtual = { arr: caminhoArray, de: i };
       tr.classList.add('arrastando');
       if (e.dataTransfer) {
@@ -199,6 +215,7 @@
     });
     tr.addEventListener('dragend', function () {
       tr.classList.remove('arrastando');
+      tr.setAttribute('draggable', 'false');
       limparAlvos();
       arrasteAtual = null;
     });
@@ -229,8 +246,11 @@
   /* mesma reordenação, para blocos (cartões de trecho) em vez de linhas */
   UI.blocoArrastavel = function (el, caminhoArray, i) {
     el.classList.add('arrastavel');
+    el.setAttribute('draggable', 'false');
     el.setAttribute('data-arr', caminhoArray);
+    document.addEventListener('mouseup', function () { el.setAttribute('draggable', 'false'); });
     el.addEventListener('dragstart', function (e) {
+      if (el.getAttribute('draggable') !== 'true') { e.preventDefault(); return; }
       arrasteAtual = { arr: caminhoArray, de: i };
       el.classList.add('arrastando');
       if (e.dataTransfer) {
@@ -239,7 +259,9 @@
       }
     });
     el.addEventListener('dragend', function () {
-      el.classList.remove('arrastando'); limparAlvos(); arrasteAtual = null;
+      el.classList.remove('arrastando');
+      el.setAttribute('draggable', 'false');
+      limparAlvos(); arrasteAtual = null;
     });
     el.addEventListener('dragover', function (e) {
       if (!arrasteAtual || arrasteAtual.arr !== caminhoArray) return;
@@ -263,7 +285,7 @@
       h('span', {
         class: 'alca naoimprime', title: 'Arraste para reordenar',
         onmousedown: function () { el.setAttribute('draggable', 'true'); },
-        onmouseup: function () { el.setAttribute('draggable', 'false'); }
+        ontouchstart: function () { el.setAttribute('draggable', 'true'); }
       }, '⠿'),
       h('button', { class: 'btn mini icone naoimprime', type: 'button', title: 'Mover para cima',
                     disabled: i === 0,

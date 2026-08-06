@@ -139,6 +139,11 @@ cartões, mesmas cores das tabelas, mesmos desenhos. Some o que é comando de te
 os campos viram texto e entra um cabeçalho com a logo e a identificação do
 projeto. A aba Resultados traz o memorial completo.
 
+**Trecho sem diâmetro fica fora do cálculo** — um trecho ativo em que o diâmetro
+ainda não foi escolhido não entra na altura manométrica nem no NPSH, e é
+sinalizado em vermelho no cartão e no Resumo. Trechos novos herdam catálogo,
+diâmetro, idade e rugosidade do trecho anterior, então o caso é raro.
+
 **Bombas de 1 a 50** — um cenário de cálculo para cada quantidade em operação
 simultânea, com vazão, altura manométrica, potência útil, potência de eixo,
 motor comercial (com folga automática por faixa de potência ou percentual fixo),
@@ -197,8 +202,8 @@ src/js/11-ui-catalogos.js   catálogos e fontes
 src/js/11b-ui-biblioteca.js biblioteca de projetos
 src/js/12-app.js            aplicação, ações, arquivos
 build.py                    gera dist/Pre-dimensionamento-Adutora.html
-tests/run.js                210 testes do núcleo de cálculo
-tests/ui.js                 219 testes de interface em navegador
+tests/run.js                243 testes do núcleo de cálculo
+tests/ui.js                 236 testes de interface em navegador
 docs/AUDITORIA-PLANILHAS.md auditoria das planilhas de origem
 ```
 
