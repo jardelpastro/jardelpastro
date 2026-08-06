@@ -32,7 +32,7 @@
 
   App.iniciar = function () {
     h = UI.h;
-    PDA.F.init(); PDA.Res.init(); PDA.K.init(); PDA.Q.init(); PDA.Pf.init();
+    PDA.F.init(); PDA.Res.init(); PDA.K.init(); PDA.Q.init(); PDA.Pf.init(); PDA.B.init();
     App.montarMarca();
 
     App.cats = PDA.E.carregarCatalogos();
@@ -59,6 +59,7 @@
 
   App.render = function () {
     App.salvarFoco();
+    var rolagem = window.pageYOffset || document.documentElement.scrollTop || 0;
 
     var st = App.st;
     var ctx, res, erro = null;
@@ -104,8 +105,16 @@
       return;
     }
 
-    if (App.aba !== 'catalogos' && App.aba !== 'fontes' && App.aba !== 'parametros' && App.aba !== 'resumo') {
-      main.appendChild(PDA.Res.faixa(st, ctx, res));
+    /* faixa de resumo fixa abaixo das abas, nas telas de lançamento */
+    var fixo = document.getElementById('fixo');
+    var interno = fixo.firstChild;
+    UI.limpar(interno);
+    var comFaixa = ['bombas', 'succao', 'barrilete', 'adutoras', 'perfil', 'resultados'].indexOf(App.aba) >= 0;
+    fixo.classList.toggle('ativa', comFaixa);
+    if (comFaixa) {
+      interno.appendChild(PDA.Res.faixa(st, ctx, res));
+      /* a versão fixa não sai no papel (é sticky); uma cópia entra no fluxo */
+      main.appendChild(h('div', { class: 'somenteimprime' }, PDA.Res.faixa(st, ctx, res)));
     }
 
     var conteudo;
@@ -123,16 +132,85 @@
       case 'fontes':     conteudo = PDA.K.abaFontes(st, ctx); break;
     }
     UI.add(main, conteudo);
+    App.marcarSelects();
+    App.montarCabecalhoImpressao(st, ctx, res);
+    App.medirTopo();
 
     PDA.E.salvarLocal(st);
     App.restaurarFoco();
+
+    /* devolve a rolagem: sem isso, esvaziar o conteúdo colapsa a página e o
+       navegador joga a tela para o topo a cada tecla digitada */
+    if (App.rolarTopo) { App.rolarTopo = false; window.scrollTo(0, 0); }
+    else if (rolagem > 0) { window.scrollTo(0, rolagem); }
+  };
+
+  /* No papel um <select> aparece cortado na largura da caixa. Ao lado de cada
+     um fica um texto com a opção escolhida, escondido na tela e impresso no
+     lugar do campo. */
+  App.marcarSelects = function () {
+    var sels = document.querySelectorAll('#conteudo select, #fixo select');
+    var i, s2, txt, prox, sp;
+    for (i = 0; i < sels.length; i++) {
+      s2 = sels[i];
+      txt = s2.options && s2.options[s2.selectedIndex] ? s2.options[s2.selectedIndex].text : '';
+      prox = s2.nextSibling;
+      if (prox && prox.nodeType === 1 && prox.className === 'valor-impresso') {
+        prox.textContent = txt;
+      } else {
+        sp = document.createElement('span');
+        sp.className = 'valor-impresso';
+        sp.textContent = txt;
+        if (s2.parentNode) s2.parentNode.insertBefore(sp, s2.nextSibling);
+      }
+    }
+  };
+
+  /* Cabeçalho que só aparece no papel: marca, identificação e a aba impressa */
+  App.montarCabecalhoImpressao = function (st, ctx, res) {
+    var alvo = document.getElementById('cabecalho-impressao');
+    if (!alvo) return;
+    UI.limpar(alvo);
+
+    var aba = App.abas.filter(function (a) { return a.id === App.aba; })[0];
+    var dados = [];
+    function d(rot, val) {
+      if (!val) return;
+      dados.push(h('span', {}, rot + ': ', h('b', {}, val)));
+    }
+    d('Local', st.projeto.local);
+    d('Responsável', st.projeto.responsavel);
+    d('Data', st.projeto.data);
+    d('Folha', aba ? aba.rot : '');
+    d('Impresso em', App.dataHoraBR());
+
+    alvo.appendChild(PDA.M.marca(46));
+    alvo.appendChild(h('div', { class: 'dados' },
+      h('h1', {}, st.projeto.nome || 'Pré-dimensionamento de adutora / linha de recalque'),
+      h('div', { class: 'linha-dados' }, dados)));
+  };
+
+  App.dataHoraBR = function () {
+    var dt = new Date();
+    function z(n) { return (n < 10 ? '0' : '') + n; }
+    return z(dt.getDate()) + '/' + z(dt.getMonth() + 1) + '/' + dt.getFullYear() +
+           ' ' + z(dt.getHours()) + ':' + z(dt.getMinutes());
+  };
+
+  /* altura de cabeçalho + abas, para a faixa fixa grudar no lugar certo */
+  App.medirTopo = function () {
+    var topo = document.querySelector('header.topo');
+    var nav = document.getElementById('abas');
+    if (!topo || !nav) return;
+    var alt = topo.offsetHeight + nav.offsetHeight;
+    document.documentElement.style.setProperty('--topo-h', alt + 'px');
   };
 
   App.irPara = function (aba) {
     App.aba = aba;
+    App.rolarTopo = true;
     PDA.E.salvarConfig({ tema: document.documentElement.getAttribute('data-tema'), aba: aba });
     App.render();
-    window.scrollTo(0, 0);
   };
 
   App.agendar = function (ms) {
@@ -178,9 +256,17 @@
     document.addEventListener('input', function (e) { App.aoDigitar(e, false); });
     document.addEventListener('change', function (e) { App.aoDigitar(e, true); });
     document.addEventListener('click', App.aoClicar);
+    window.addEventListener('resize', App.medirTopo);
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') UI.fecharModal();
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); App.baixarProjeto(); }
+      /* Enter num campo apenas confirma o valor; não recarrega a tela */
+      if (e.key === 'Enter' && e.target && e.target.getAttribute &&
+          e.target.getAttribute('data-bind') && e.target.tagName === 'INPUT') {
+        e.preventDefault();
+        e.target.blur();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); App.guardarNaBiblioteca(); }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); PDA.B.abrir(); }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { /* deixa a impressão nativa */ }
     });
   };
@@ -217,6 +303,15 @@
       var basePai = bind.replace(/\.?catalogoId$/, '');
       var c = basePai ? UI.get(App.st, basePai) : App.st;
       if (c) c.itemRot = '';
+    }
+
+    /* pressão admissível: acompanha o catálogo enquanto o usuário não digitar
+       um valor próprio */
+    if (/\.pnMcaOverride$/.test(bind)) {
+      var conjPN = UI.get(App.st, bind.replace('.pnMcaOverride', ''));
+      if (conjPN) conjPN.pnAuto = false;
+    } else if (/\.(catalogoId|itemRot)$/.test(bind)) {
+      App.autoPreencherPN(bind.replace(/\.(catalogoId|itemRot)$/, ''));
     }
 
     /* cota de chegada e cota final do último trecho são o mesmo número:
@@ -294,6 +389,12 @@
     }
 
     switch (acao) {
+      case 'mover': {
+        App.moverItem(el.getAttribute('data-arr'), Number(el.getAttribute('data-i')),
+                      Number(el.getAttribute('data-para')));
+        return;
+      }
+
       case 'removerPeca':
         UI.get(st, base).pecas.splice(Number(i), 1);
         App.render(); return;
@@ -329,7 +430,7 @@
         return;
 
       case 'editarMotores': App.modalMotores(); return;
-      case 'imprimir': window.print(); return;
+      case 'imprimir': App.imprimir(); return;
 
       case 'irAba': App.irPara(el.getAttribute('data-aba')); return;
 
@@ -409,9 +510,51 @@
         UI.confirmar('Novo projeto', 'Descartar os dados atuais e começar um projeto em branco?',
           function () { App.st = PDA.E.padrao(); App.aba = 'projeto'; App.render(); });
         return;
-      case 'abrirProjeto': App.abrirArquivo(App.carregarProjeto); return;
-      case 'salvarProjeto': App.baixarProjeto(); return;
-      case 'exemplo': App.modalExemplos(); return;
+      case 'abrirProjeto': PDA.B.abrir(); return;
+      case 'importarProjeto': UI.fecharModal(); App.abrirArquivo(App.carregarProjeto); return;
+      case 'salvarProjeto': App.guardarNaBiblioteca(); return;
+      case 'exportarProjeto': App.baixarProjeto(); return;
+      case 'exemplo': PDA.B.abrir(); return;
+      case 'exemploAgua':
+        UI.fecharModal(); App.st = App.exemploAgua(); App.autoPreencherPNTodos();
+        App.irPara('resumo'); return;
+      case 'exemploEsgoto':
+        UI.fecharModal(); App.st = App.exemploEsgoto(); App.autoPreencherPNTodos();
+        App.irPara('resumo'); return;
+      case 'abrirDaBiblioteca': {
+        var reg = PDA.E.doBiblioteca(el.getAttribute('data-id'));
+        if (!reg) { UI.toast('Projeto não encontrado.'); return; }
+        App.st = PDA.E.migrar(PDA.E.clone(reg.st));
+        App.st.id = reg.id;
+        UI.fecharModal();
+        App.irPara('resumo');
+        UI.toast('Projeto "' + reg.nome + '" aberto.');
+        return;
+      }
+      case 'duplicarDaBiblioteca': {
+        var reg2 = PDA.E.doBiblioteca(el.getAttribute('data-id'));
+        if (!reg2) return;
+        App.st = PDA.E.migrar(PDA.E.clone(reg2.st));
+        App.st.id = null;
+        App.st.projeto.nome = (App.st.projeto.nome || 'Projeto') + ' (cópia)';
+        UI.fecharModal();
+        App.irPara('resumo');
+        UI.toast('Cópia aberta. Use Salvar para guardá-la como um projeto novo.');
+        return;
+      }
+      case 'excluirDaBiblioteca': {
+        var id3 = el.getAttribute('data-id');
+        var reg3 = PDA.E.doBiblioteca(id3);
+        UI.confirmar('Excluir da biblioteca',
+          'Excluir "' + (reg3 ? reg3.nome : id3) + '" da biblioteca deste navegador? ' +
+          'O arquivo exportado, se houver, não é afetado.',
+          function () {
+            PDA.E.excluirDaBiblioteca(id3);
+            UI.toast('Projeto excluído.');
+            PDA.B.abrir();
+          });
+        return;
+      }
       case 'ajuda': App.modalAjuda(); return;
       case 'tema':
         var atual = document.documentElement.getAttribute('data-tema') === 'escuro' ? 'claro' : 'escuro';
@@ -419,6 +562,38 @@
         PDA.E.salvarConfig({ tema: atual, aba: App.aba });
         return;
     }
+  };
+
+  /* Preenche o PN do trecho com o do catálogo, quando houver. Só age
+     enquanto o usuário não tiver informado um valor próprio. */
+  App.autoPreencherPN = function (caminhoConj) {
+    var conj = UI.get(App.st, caminhoConj);
+    if (!conj || conj.pnAuto === false) return;
+    var ctx;
+    try { ctx = PDA.C.contexto(App.st, App.cats); } catch (e) { return; }
+    var tubo = PDA.C.resolverTubo(conj, ctx);
+    if (tubo && tubo.item && tubo.item.pn && conj.itemRot) {
+      conj.pnMcaOverride = Number(tubo.item.pn) * 10;
+    } else {
+      conj.pnMcaOverride = null;
+    }
+  };
+
+  /* Aplica o preenchimento automático a todos os trechos de adutora */
+  App.autoPreencherPNTodos = function () {
+    App.st.adutoras.forEach(function (a, i) { App.autoPreencherPN('adutoras.' + i); });
+  };
+
+  /* Move um item de posição dentro de um array do estado */
+  App.moverItem = function (caminho, de, para) {
+    var arr = UI.get(App.st, caminho);
+    if (!Array.isArray(arr)) return;
+    if (de < 0 || de >= arr.length) return;
+    para = Math.max(0, Math.min(arr.length - 1, para));
+    if (de === para) return;
+    var item = arr.splice(de, 1)[0];
+    arr.splice(para, 0, item);
+    App.render();
   };
 
   /* ================================================================
@@ -450,6 +625,59 @@
     var n = (st.projeto.nome || 'adutora').replace(/[^\wÀ-ÿ .-]+/g, '').trim().slice(0, 60) || 'adutora';
     return n + sufixo;
   }
+
+  /* Guarda o projeto atual na biblioteca do navegador */
+  App.guardarNaBiblioteca = function () {
+    var st = App.st;
+    if (!st.projeto.nome || st.projeto.nome === PDA.E.padrao().projeto.nome) {
+      App.pedirNome();
+      return;
+    }
+    var r = PDA.E.guardar(st, App.agora());
+    if (!r.ok) {
+      UI.modal('Não foi possível guardar', [
+        h('p', {}, 'O armazenamento do navegador está cheio. Exclua projetos antigos na biblioteca ' +
+                   'ou exporte este projeto em arquivo.'),
+        h('div', { class: 'linha', style: 'margin-top:10px' },
+          h('button', { class: 'btn primario', type: 'button', onclick: function () { UI.fecharModal(); App.baixarProjeto(); } }, 'Exportar em arquivo'),
+          h('button', { class: 'btn', type: 'button', onclick: function () { UI.fecharModal(); PDA.B.abrir(); } }, 'Abrir a biblioteca'))
+      ]);
+      return;
+    }
+    App.render();
+    UI.toast(r.novo ? 'Projeto guardado na biblioteca.' : 'Projeto atualizado na biblioteca.');
+  };
+
+  App.pedirNome = function () {
+    var inp = h('input', { type: 'text', value: App.st.projeto.nome || '', placeholder: 'Ex.: EEE Jardim Aeroporto — LR até a ETE' });
+    var loc = h('input', { type: 'text', value: App.st.projeto.local || '', placeholder: 'Cidade / obra' });
+    var resp = h('input', { type: 'text', value: App.st.projeto.responsavel || '', placeholder: 'Responsável técnico' });
+    UI.modal('Nome do projeto', [
+      h('p', { class: 'nota' },
+        'A biblioteca organiza os projetos por estes campos. Dê um nome antes de guardar — ' +
+        'os outros dois são opcionais e ajudam a achar depois.'),
+      h('div', { class: 'grade', style: 'margin-top:10px' },
+        h('label', { class: 'campo chave' }, h('span', { class: 'rot' }, 'Projeto / obra'), inp),
+        h('label', { class: 'campo' }, h('span', { class: 'rot' }, 'Local'), loc),
+        h('label', { class: 'campo' }, h('span', { class: 'rot' }, 'Responsável técnico'), resp))
+    ], [
+      h('button', { class: 'btn', type: 'button', onclick: UI.fecharModal }, 'Cancelar'),
+      h('button', {
+        class: 'btn primario', type: 'button', onclick: function () {
+          if (!inp.value.trim()) { UI.toast('Informe o nome do projeto.'); return; }
+          App.st.projeto.nome = inp.value.trim();
+          App.st.projeto.local = loc.value.trim();
+          App.st.projeto.responsavel = resp.value.trim();
+          UI.fecharModal();
+          App.guardarNaBiblioteca();
+        }
+      }, 'Guardar')
+    ]);
+    setTimeout(function () { inp.focus(); inp.select(); }, 30);
+  };
+
+  /* data/hora atual em ISO — isolada para poder ser fixada nos testes */
+  App.agora = function () { return new Date().toISOString(); };
 
   App.baixarProjeto = function () {
     App.baixar(nomeArquivo(App.st, '.adutora.json'),
@@ -484,6 +712,7 @@
     var proj = dados.projeto || (dados.versao !== undefined && dados.vazao ? dados : null);
     if (!proj) { UI.toast('Este arquivo não contém um projeto.'); return; }
     App.st = PDA.E.migrar(proj);
+    App.autoPreencherPNTodos();
     if (dados.catalogosUsuario && dados.catalogosUsuario.length) {
       var atuais = App.cats.usuario.slice();
       dados.catalogosUsuario.forEach(function (c) {
@@ -668,6 +897,12 @@
     return st;
   };
 
+  App.imprimir = function () {
+    App.montarCabecalhoImpressao(App.st, null, null);
+    UI.fecharModal();
+    window.print();
+  };
+
   App.modalLogo = function () {
     var atual = PDA.M.logoGravada();
     var previa = h('div', { style: 'margin:11px 0;min-height:52px;display:flex;align-items:center;gap:11px' });
@@ -758,10 +993,23 @@
           'motor com folga excessiva, NPSH apertado, pressão negativa ou acima da classe do tubo. ' +
           'Passe o mouse para ver o motivo. O número em âmbar sobre a aba Resultados conta quantos pontos ' +
           'estão fora de faixa; sobre a aba Resumo, avisa que há incoerência nos dados de entrada.'),
-        UI.sub('Salvar o trabalho'),
-        h('p', {}, 'O projeto é guardado automaticamente no navegador deste computador. Para levar para outra máquina ' +
-          'ou anexar ao processo, use ', h('b', {}, 'Salvar'), ' (gera um arquivo .json) e ', h('b', {}, 'Abrir'), '. ' +
-          'Atalho: Ctrl+S salva o arquivo.'),
+        UI.sub('Guardar e reabrir projetos'),
+        h('p', {}, h('b', {}, 'Salvar'), ' guarda o projeto na biblioteca deste navegador, identificado pelo nome, ' +
+          'local, responsável e data. ', h('b', {}, 'Abrir'), ' mostra a biblioteca: dá para filtrar e ordenar por ' +
+          'qualquer coluna clicando no título, abrir, duplicar ou excluir. Os exemplos ficam na mesma tela. ' +
+          'Atalhos: Ctrl+S guarda, Ctrl+O abre.'),
+        h('p', {}, h('b', {}, 'Exportar'), ' gera um arquivo .json para levar o projeto a outro computador ou anexar ' +
+          'ao processo; na biblioteca, "Abrir de arquivo" faz o caminho de volta. Além disso, o projeto em andamento ' +
+          'é guardado sozinho a cada alteração, então fechar o navegador não perde nada.'),
+        UI.sub('Ordem das peças e dos trechos'),
+        h('p', {}, 'Arraste pela alça ⠿ ou use as setas ↑ ↓ para reordenar peças, trechos de barrilete, trechos de ' +
+          'adutora e pontos de perfil. A ordem não muda o resultado do cálculo — a perda é a soma das parcelas — ' +
+          'mas deixa a lista na sequência física da instalação, o que ajuda na conferência e na lista de materiais.'),
+        UI.sub('Impressão'),
+        h('p', {}, 'O que sai no papel é a mesma tela que você está vendo, com as cores das tabelas e os desenhos, ' +
+          'mais um cabeçalho com a logo e a identificação do projeto. Os comandos somem e os campos viram texto. ' +
+          'Imprima a aba que interessa: a aba Resultados traz o memorial completo. Para as tabelas largas, ' +
+          'escolha orientação paisagem na janela de impressão.'),
         h('div', { class: 'aviso' },
           h('b', {}, 'Alcance do programa'),
           'Trata-se de pré-dimensionamento. Define ordem de grandeza de diâmetro, altura manométrica e potência, ' +

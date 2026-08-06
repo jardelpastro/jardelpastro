@@ -162,6 +162,9 @@
         })));
     }
 
+    var caminhoArr = base + '.pecas';
+    var total = (conj.pecas || []).length;
+
     var linhas = (conj.pecas || []).map(function (p, i) {
       var def = PDA.P.buscarPeca(PDA.P.pecas, p.pecaId);
       var K = (p.kOverride !== null && p.kOverride !== undefined && p.kOverride !== '') ? Number(p.kOverride) : (def ? def.K : 0);
@@ -171,7 +174,8 @@
       var perda = K * qtd * v * v / (2 * PDA.H.g);
       somaK += K * qtd; somaH += perda;
 
-      return h('tr', {},
+      return UI.linhaArrastavel(h('tr', {},
+        UI.celulaMover(caminhoArr, i, total),
         h('td', { class: 'esq' },
           h('select', { 'data-bind': base + '.pecas.' + i + '.pecaId', 'data-tipo': 'texto', 'data-estrutural': '1' },
             ordem.map(function (c) {
@@ -192,9 +196,10 @@
         h('td', {}, UI.num(K * qtd, 2)),
         h('td', {}, UI.num(v, 2)),
         h('td', {}, UI.num(perda, 3)),
-        h('td', { class: 'col-x' },
-          h('button', { class: 'btn mini icone perigo naoimprime', type: 'button',
-                        'data-acao': 'removerPeca', 'data-base': base, 'data-i': i, title: 'Remover' }, '×')));
+        h('td', { class: 'col-x naoimprime' },
+          h('button', { class: 'btn mini icone perigo', type: 'button',
+                        'data-acao': 'removerPeca', 'data-base': base, 'data-i': i, title: 'Remover' }, '×'))),
+        caminhoArr, i);
     });
 
     var seletorNovo = h('select', { style: 'max-width:250px', 'data-acao-change': 'addPeca', 'data-base': base },
@@ -210,6 +215,8 @@
         h('span', { class: 'nota' }, 'A peça entra no fim da lista.')),
       linhas.length ? h('div', { class: 'rolagem' }, h('table', { class: 'pecas-tab enxuta' },
         h('thead', {}, h('tr', {},
+          h('th', { class: 'naoimprime' }, 'Ordem',
+            UI.dica('Arraste a linha pela alça ⠿ para reordenar, ou use as setas. A ordem não altera o cálculo — a perda localizada é a soma das peças — mas deixa a lista na sequência física do barrilete, o que ajuda a conferir e a montar a lista de materiais.')),
           h('th', { class: 'esq' }, 'Peça'),
           h('th', {}, 'Qtd.'),
           h('th', {}, 'K', UI.dica('Coeficiente de perda localizada. O campo mostra o valor padrão como sugestão; digite outro para sobrepor apenas nesta peça.\n\n' + PDA.P.fontePecas.az)),
@@ -221,6 +228,7 @@
           h('th', {}, ''))),
         h('tbody', {}, linhas),
         h('tfoot', {}, h('tr', {},
+          h('td', { class: 'naoimprime' }, ''),
           h('td', { class: 'esq', colspan: 5 }, 'Total'),
           h('td', {}, UI.num(somaK, 2)),
           h('td', {}, ''),
@@ -314,7 +322,9 @@
 
   F.conjunto = function (st, ctx, conj, op) {
     var base = op.base;
+    var caixa = h('div', { class: 'conjunto' });
     var cabecalho = [
+      op.arr ? UI.alcaBloco(caixa, op.arr, op.i, op.total) : null,
       op.ativavel ? h('input', { type: 'checkbox', checked: conj.ativo !== false,
                                  'data-bind': base + '.ativo', 'data-tipo': 'bool', 'data-estrutural': '1',
                                  title: 'Considerar este trecho no cálculo' }) : null,
@@ -327,7 +337,9 @@
     ];
 
     if (conj.ativo === false) {
-      return h('div', { class: 'conjunto desativado' }, h('div', { class: 'cab-conj' }, cabecalho));
+      caixa.className = 'conjunto desativado';
+      caixa.appendChild(h('div', { class: 'cab-conj' }, cabecalho));
+      return op.arr ? UI.blocoArrastavel(caixa, op.arr, op.i) : caixa;
     }
 
     var campos = [
@@ -370,16 +382,23 @@
     if (op.adutora) {
       var tuboAtual = PDA.C.resolverTubo(conj, ctx);
       var pnCat = tuboAtual && tuboAtual.item && tuboAtual.item.pn ? Number(tuboAtual.item.pn) * 10 : null;
+      var pnInfo = PDA.C.pnInfo(conj, tuboAtual);
+      var pfaCorpo = PDA.C.pfaCorpoBar(tuboAtual);
       corpo.push(UI.sub('Pressão admissível e cotas do trecho'));
       corpo.push(h('div', { class: 'grade' },
         UI.campo(st, 'PN / PFA do tubo (mca)', base + '.pnMcaOverride', {
+          chave: pnInfo.mca === null,
           editado: conj.pnMcaOverride !== null && conj.pnMcaOverride !== '' && conj.pnMcaOverride !== undefined,
           placeholder: pnCat !== null ? UI.num(pnCat, 0) : 'informar',
           dica: 'Pressão de serviço admissível do tubo, em mca, usada para conferir a pressão em regime permanente e a sobrepressão do transitório.\n\n' +
-                (pnCat !== null
-                  ? 'O catálogo deste tubo informa PN ' + UI.numEdit(tuboAtual.item.pn) + ' bar (' + UI.num(pnCat, 0) + ' mca). Deixe em branco para usar esse valor.'
-                  : 'O catálogo deste tubo não traz a pressão admissível — é o caso das classes K do ferro fundido dúctil, em que a PFA depende da classe, do DN e do tipo de junta. Consulte o catálogo do fabricante e informe aqui. Para tubos flangeados, use os catálogos "Flangeado PN 10/16/25/40", que já trazem o PN.')
+                pnInfo.nota +
+                (pnCat !== null ? '\n\nO campo é preenchido automaticamente quando o catálogo traz o PN; troque o valor se o seu fornecedor indicar outro.' : '') +
+                (pfaCorpo ? '\n\nA resistência do CORPO deste tubo, pela expressão da EN 545 (PFA = 20·e·σ/(DE−e), com σ = ' +
+                  PDA.C.SIGMA_ADM[tuboAtual.material] + ' MPa), é de ' + UI.num(pfaCorpo, 0) + ' bar. ' +
+                  'Na prática a pressão admissível do conjunto é limitada pela JUNTA e costuma ser bem menor — ' +
+                  'por isso o programa não adota esse número sozinho.' : '')
         }),
+        F.seletorPFA(st, conj, base, tuboAtual, pfaCorpo),
         UI.check(st, 'Informar cotas deste trecho', base + '.usarCotas',
           { dica: 'Serve para traçar o perfil e verificar a pressão em cada nó. A cota final do ÚLTIMO trecho é a mesma "cota de chegada" da aba Bombas e níveis — o programa mantém as duas iguais automaticamente.' }),
         conj.usarCotas ? UI.campo(st, 'Cota inicial (m)', base + '.cotaIni',
@@ -393,9 +412,29 @@
     corpo.push(UI.sub('Comparação de diâmetros'));
     corpo.push(F.varredura(st, ctx, conj, op.chave, base));
 
-    return h('div', { class: 'conjunto' },
-      h('div', { class: 'cab-conj' }, cabecalho),
-      h('div', { class: 'corpo-conj' }, corpo));
+    caixa.appendChild(h('div', { class: 'cab-conj' }, cabecalho));
+    caixa.appendChild(h('div', { class: 'corpo-conj' }, corpo));
+    return op.arr ? UI.blocoArrastavel(caixa, op.arr, op.i) : caixa;
+  };
+
+  /* Escolha rápida da pressão admissível, quando o catálogo não traz PN */
+  F.seletorPFA = function (st, conj, base, tubo, pfaCorpo) {
+    if (tubo && tubo.item && tubo.item.pn) return null;   /* já vem do catálogo */
+    var opcoes = [{ v: '', rot: '— escolher um degrau —' }].concat(
+      PDA.C.DEGRAUS_PFA_BAR.map(function (b) {
+        return { v: String(b * 10), rot: 'PN ' + b + ' bar   (' + (b * 10) + ' mca)' };
+      }));
+    var atual = conj.pnMcaOverride === null || conj.pnMcaOverride === undefined ? '' : String(conj.pnMcaOverride);
+    return h('label', { class: 'campo' },
+      h('span', { class: 'rot' }, 'Preencher com um degrau normativo',
+        UI.dica('As classes K do ferro fundido dúctil não têm uma pressão admissível única: a PFA depende da classe, do DN e do tipo de junta, e o valor que governa costuma ser o da junta, não o da parede.\n\n' +
+                'Esta lista traz os degraus usuais de pressão da EN 545 para escolha rápida — ela NÃO diz qual deles se aplica ao seu DN. Confirme no catálogo do fabricante.\n\n' +
+                'Se o tubo for flangeado, prefira os catálogos "Flangeado PN 10/16/25/40": eles já trazem o PN e preenchem o campo sozinhos.' +
+                (pfaCorpo ? '\n\nReferência: a resistência do corpo deste tubo pela EN 545 é de ' + UI.num(pfaCorpo, 0) + ' bar — um limite superior, não a PFA do conjunto.' : ''))),
+      h('select', { 'data-bind': base + '.pnMcaOverride', 'data-tipo': 'num', 'data-estrutural': '1' },
+        opcoes.map(function (o) {
+          return h('option', { value: o.v, selected: o.v === atual }, o.rot);
+        })));
   };
 
   /* ================================================================
@@ -910,7 +949,9 @@
     var out = [];
     out.push(UI.cartao('Barrilete de recalque individual (por bomba)',
       'Da saída da bomba até a derivação comum — conduz a vazão de uma bomba', [
-        PDA.Q.caixa('Como os trechos se dividem', PDA.Q.barrilete(st, ctx), null),
+        PDA.Q.caixa('Como os trechos se dividem', PDA.Q.barrilete(st, ctx),
+          'Cada trecho do barrilete comum conduz a vazão das bombas que ele já reuniu: informe 1, 2, 3… ' +
+          'no campo "bombas que o trecho coleta" de cada um.'),
         UI.check(st, 'Considerar barrilete individual', 'barrileteIndividual.ativo'),
         st.barrileteIndividual.ativo
           ? F.conjunto(st, ctx, st.barrileteIndividual, {
@@ -943,7 +984,8 @@
         return F.conjunto(st, ctx, t, {
           base: chave + '.trechos.' + i, chave: chave + '.' + i,
           tituloEditavel: true, removivel: true, ativavel: true,
-          acaoRemover: acaoDel, i: i, nBombas: true
+          acaoRemover: acaoDel, i: i, nBombas: true,
+          arr: chave + '.trechos', total: bloco.trechos.length
         });
       }) : null
     ];
@@ -975,7 +1017,8 @@
           return F.conjunto(st, ctx, a, {
             base: 'adutoras.' + i, chave: 'adutoras.' + i,
             tituloEditavel: true, removivel: st.adutoras.length > 1, ativavel: true,
-            acaoRemover: 'delAdutora', i: i, adutora: true
+            acaoRemover: 'delAdutora', i: i, adutora: true,
+            arr: 'adutoras', total: st.adutoras.length
           });
         })
       ]),

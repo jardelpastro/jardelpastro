@@ -194,7 +194,7 @@
 
   Q.barrilete = function (st, ctx) {
     var nb = Math.min(4, Math.max(2, ctx.nInst));
-    var W = 660, HH = 60 + nb * 46;
+    var W = 660, HH = 42 + nb * 46;
     var s = svg(W, HH);
     var g = sv('g');
     var i, y, xB = 96, xInd = 250, xCom = 380, xSai = W - 70;
@@ -221,9 +221,6 @@
         'Q de ' + (i + 1)));
     }
     g.appendChild(sv('text', { x: xSai + 4, y: 47 }, '→ adutora'));
-    g.appendChild(sv('text', { x: 4, y: HH - 6 },
-      'Cada trecho do barrilete comum conduz a vazão das bombas que ele já reuniu: informe 1, 2, 3… no campo "bombas que o trecho coleta".'));
-
     s.appendChild(g);
     return s;
   };
@@ -233,7 +230,7 @@
      ================================================================ */
 
   Q.ramificacao = function (st, ctx) {
-    var W = 660, HH = 150;
+    var W = 660, HH = 138;
     var s = svg(W, HH);
     var g = sv('g');
     g.appendChild(sv('circle', { class: 'bomba', cx: 40, cy: 70, r: 12 }));
@@ -258,8 +255,6 @@
     g.appendChild(sv('rect', { class: 'agua', x: 471, y: 56, width: 48, height: 35 }));
     g.appendChild(sv('text', { class: 'rotulo', x: 495, y: 38, 'text-anchor': 'middle' }, 'chegada'));
 
-    g.appendChild(sv('text', { x: 4, y: HH - 6 },
-      'Os trechos são calculados em série, na ordem da lista. Reduza a fração de vazão do trecho a jusante da derivação e escolha um diâmetro menor.'));
     s.appendChild(g);
     return s;
   };

@@ -50,7 +50,8 @@
     res.projeto.adutoras.forEach(function (r) { lTrechos += r.L; });
 
     var linhas = pts.map(function (p, i) {
-      return h('tr', {},
+      return UI.linhaArrastavel(h('tr', {},
+        UI.celulaMover('perfil.pontos', i, pts.length),
         h('td', {}, h('input', { type: 'text', class: 'num', value: UI.numEdit(p.est),
                                  'data-bind': 'perfil.pontos.' + i + '.est', 'data-tipo': 'num', inputmode: 'decimal' })),
         h('td', {}, h('input', { type: 'text', class: 'num', value: UI.numEdit(p.cota),
@@ -58,9 +59,10 @@
         h('td', { class: 'esq' }, h('input', { type: 'text', value: p.rot || '', placeholder: 'opcional',
                                  'data-bind': 'perfil.pontos.' + i + '.rot', 'data-tipo': 'texto' })),
         h('td', {}, UI.num(calc.pontos[i] ? calc.pontos[i].x : 0, 1)),
-        h('td', { class: 'col-x' },
-          h('button', { class: 'btn mini icone perigo naoimprime', type: 'button',
-                        'data-acao': 'delPontoPerfil', 'data-i': i }, '×')));
+        h('td', { class: 'col-x naoimprime' },
+          h('button', { class: 'btn mini icone perigo', type: 'button',
+                        'data-acao': 'delPontoPerfil', 'data-i': i }, '×'))),
+        'perfil.pontos', i);
     });
 
     return h('div', {},
@@ -84,6 +86,7 @@
         ? h('div', { class: 'rolagem', style: 'max-height:340px;overflow-y:auto' },
             h('table', { class: 'enxuta pecas-tab' },
               h('thead', {}, h('tr', {},
+                h('th', { class: 'naoimprime' }, 'Ordem'),
                 h('th', {}, 'Distância (' + st.perfil.unidExt + ')'),
                 h('th', {}, 'Cota do terreno / GI (m)',
                   UI.dica('Cota da geratriz inferior da tubulação, ou do terreno se você preferir trabalhar com o eixo do tubo. O programa compara a linha piezométrica com esta cota para obter a pressão disponível.')),

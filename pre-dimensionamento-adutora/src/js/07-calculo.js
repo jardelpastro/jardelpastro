@@ -94,12 +94,50 @@
   /* Pressão nominal do tubo em mca: o valor informado pelo usuário tem
      precedência sobre o PN do catálogo (que pode não estar cadastrado). */
   C.pnMca = function (conj, tubo) {
-    if (conj && conj.pnMcaOverride !== null && conj.pnMcaOverride !== undefined && conj.pnMcaOverride !== '') {
-      return Number(conj.pnMcaOverride);
-    }
-    if (tubo && tubo.item && tubo.item.pn) return Number(tubo.item.pn) * 10;
-    return null;
+    var i = C.pnInfo(conj, tubo);
+    return i.mca;
   };
+
+  /* Detalha de onde veio a pressão admissível adotada */
+  C.pnInfo = function (conj, tubo) {
+    if (conj && conj.pnMcaOverride !== null && conj.pnMcaOverride !== undefined && conj.pnMcaOverride !== '') {
+      return { mca: Number(conj.pnMcaOverride), origem: 'informado',
+               nota: 'Valor informado no campo PN / PFA do trecho.' };
+    }
+    if (tubo && tubo.item && tubo.item.pn) {
+      return { mca: Number(tubo.item.pn) * 10, origem: 'catalogo',
+               nota: 'PN ' + tubo.item.pn + ' bar do catálogo "' + tubo.cat.nome + '".' };
+    }
+    return { mca: null, origem: 'ausente',
+             nota: 'O catálogo deste tubo não traz a pressão admissível. Informe-a no campo PN / PFA do trecho.' };
+  };
+
+  /* Resistência do CORPO do tubo pela expressão da EN 545 / ISO 10803:
+       PFA [bar] = 20 · e · sigma / (DE − e)      [e e DE em mm, sigma em MPa]
+     Vale para tubos metálicos com espessura de parede conhecida. Serve como
+     referência superior: na prática a pressão admissível do conjunto costuma
+     ser limitada pela JUNTA, e é menor. */
+  C.pfaCorpoBar = function (tubo) {
+    if (!tubo || !tubo.item || !tubo.item.e || !tubo.item.de) return null;
+    var sig = C.SIGMA_ADM[tubo.material];
+    if (!sig) return null;
+    var e = Number(tubo.item.e), de = Number(tubo.item.de);
+    if (!(e > 0) || !(de > e)) return null;
+    return 20 * e * sig / (de - e);
+  };
+
+  /* Tensão admissível por material [MPa] */
+  C.SIGMA_ADM = {
+    fd_cimento: 140, fd_asfalto: 140, fd_sem_rev: 140,   /* EN 545: Rm 420 MPa, SF 3 */
+    aco_sold_novo: 138, aco_rev_esp: 138, aco_galv: 138, aco_inox: 138,
+    aco_rebitado: 100
+  };
+
+  /* Degraus usuais de pressão admissível do ferro fundido dúctil com junta
+     elástica, conforme a EN 545. Qual deles vale em cada DN depende da classe,
+     do diâmetro e do tipo de junta — por isso são oferecidos como escolha, e
+     não adotados automaticamente. */
+  C.DEGRAUS_PFA_BAR = [10, 12, 16, 20, 25, 30, 32, 40, 64, 100];
 
   /* ---------------- perdas de um conjunto ---------------- */
 

@@ -20,6 +20,7 @@
     <button class="btn" type="button" data-acao="novoProjeto">Novo</button>
     <button class="btn" type="button" data-acao="abrirProjeto">Abrir</button>
     <button class="btn" type="button" data-acao="salvarProjeto">Salvar</button>
+    <button class="btn" type="button" data-acao="exportarProjeto" title="Baixar o projeto em arquivo .json">Exportar</button>
     <button class="btn" type="button" data-acao="exemplo">Exemplos</button>
     <button class="btn" type="button" data-acao="imprimir">Imprimir</button>
     <button class="btn" type="button" data-acao="logo" title="Carregar o arquivo oficial da logo">Logo</button>
@@ -29,6 +30,10 @@
 </header>
 
 <nav class="abas" id="abas" role="tablist"></nav>
+
+<div id="fixo" class="faixa-fixa"><div class="interno"></div></div>
+
+<div id="cabecalho-impressao" aria-hidden="true"></div>
 
 <main id="conteudo"></main>
 

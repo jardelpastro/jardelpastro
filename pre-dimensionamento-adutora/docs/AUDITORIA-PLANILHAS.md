@@ -230,6 +230,22 @@ de avisos dos resultados:
 
 Não foi cadastrada a **PFA (pressão de serviço admissível) das classes K do ferro
 fundido dúctil** (K7, K9, K12), porque depende da classe, do DN e do tipo de
-junta, e adotar um valor único levaria a erro de projeto. Há dois caminhos: usar
-os catálogos flangeados, que já trazem o PN da classe de pressão, ou informar o
-valor no campo *PN / PFA do tubo* de cada trecho da adutora.
+junta, e adotar um valor único levaria a erro de projeto.
+
+Vale registrar por que não foi resolvido por fórmula. A expressão da EN 545 para
+a resistência do corpo do tubo,
+
+```
+PFA [bar] = 20 · e · σ / (DE − e)      σ = Rm/SF = 420/3 = 140 MPa
+```
+
+dá, para o K9 DN 300 (e = 7,2 mm, DE = 326 mm), **63 bar** — enquanto o valor
+publicado em catálogo para esse tubo com junta elástica é da ordem de 40 bar.
+A diferença não é erro: o corpo do tubo aguenta mais do que a junta, e é a junta
+que governa. Adotar o número da fórmula seria superestimar a capacidade e
+aprovar pressões que o conjunto não suporta.
+
+O programa então: preenche o campo sozinho quando o catálogo traz o PN; oferece
+os degraus usuais da EN 545 num seletor, para preenchimento em um clique nas
+classes K; e mostra a resistência do corpo apenas como referência na dica do
+campo, dizendo explicitamente que é um limite superior.

@@ -137,6 +137,24 @@ nav.abas button .marcador {
 
 main { max-width: 1500px; margin: 0 auto; padding: 16px; }
 
+/* faixa de resumo fixa logo abaixo das abas */
+.faixa-fixa {
+  position: sticky;
+  top: var(--topo-h, 100px);
+  z-index: 37;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px 9px;
+  display: none;
+}
+.faixa-fixa.ativa { display: block; }
+.faixa-fixa .interno { max-width: 1500px; margin: 0 auto; }
+.faixa-fixa .faixa-resumo { margin: 0; }
+
+#cabecalho-impressao { display: none; }
+.somenteimprime { display: none; }
+.valor-impresso { display: none; }
+
 .faixa-resumo {
   display: flex; gap: 10px; flex-wrap: wrap;
   background: var(--surface); border: 1px solid var(--border);
@@ -258,6 +276,9 @@ th, td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--bor
 th { background: var(--surface-2); font-weight: 600; font-size: 11.5px; color: var(--texto-2); white-space: nowrap; position: relative; }
 th:first-child, td:first-child { text-align: left; }
 th.esq, td.esq { text-align: left; }
+th.ordenavel { cursor: pointer; user-select: none; }
+th.ordenavel:hover { color: var(--azul); background: var(--azul-claro); }
+th .seta { color: var(--teal); }
 td { font-variant-numeric: tabular-nums; }
 tbody tr:hover { background: var(--surface-2); }
 tfoot td { font-weight: 600; background: var(--surface-2); border-top: 2px solid var(--border-forte); }
@@ -310,6 +331,27 @@ tr.selecionada td { font-weight: 600; }
 .pecas-tab .col-dn { width: 168px; }
 .pecas-tab .col-dn select { max-width: 168px; }
 .pecas-tab .col-x { width: 32px; }
+.pecas-tab .col-mover { width: 74px; white-space: nowrap; }
+
+tr.arrastavel .alca {
+  display: inline-block; cursor: grab; color: var(--texto-3); font-size: 14px;
+  padding: 0 3px; user-select: none; line-height: 1;
+}
+tr.arrastavel .alca:active { cursor: grabbing; }
+tr.arrastavel:hover .alca { color: var(--teal); }
+tr.arrastando { opacity: .45; }
+tr.alvo-acima td { box-shadow: inset 0 2px 0 var(--teal-vivo); }
+tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
+.col-mover button { padding: 1px 5px; line-height: 1.2; }
+.col-mover button:disabled { opacity: .3; cursor: default; }
+
+/* cabeçalho de conjunto arrastável (trechos) */
+.conjunto.arrastavel > .cab-conj .alca {
+  cursor: grab; color: var(--texto-3); font-size: 15px; padding: 0 2px; user-select: none;
+}
+.conjunto.arrastando { opacity: .45; }
+.conjunto.alvo-acima { box-shadow: inset 0 3px 0 var(--teal-vivo); }
+.conjunto.alvo-abaixo { box-shadow: inset 0 -3px 0 var(--teal-vivo); }
 
 /* ---------------- conjuntos / trechos ---------------- */
 
@@ -408,15 +450,98 @@ tr.selecionada td { font-weight: 600; }
 .memorial .cab-doc { text-align: center; margin-bottom: 18px; }
 
 @media print {
-  header.topo, nav.abas, .acoes, button, .faixa-resumo { display: none !important; }
-  body { background: #fff; font-size: 10.5pt; }
+  /* A impressão reproduz o que está na tela: mesmos cartões, mesmas cores,
+     mesmas tabelas. Some apenas o que é comando de tela. */
+  :root { --bg: #fff; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  @page { margin: 10mm 8mm; }
+
+  html, body { background: #fff !important; }
+  body { font-size: 8.6pt; color: #16202e; }
+
+  .somenteimprime { display: block !important; margin-bottom: 11px; }
+  header.topo, nav.abas, .faixa-fixa, .naoimprime,
+  .fundo-modal, .toast, .dica, button { display: none !important; }
+
   main { max-width: none; padding: 0; }
-  .cartao { break-inside: avoid; box-shadow: none; border-color: #bbb; margin-bottom: 10px; }
-  .rolagem { overflow: visible; }
+
+  #cabecalho-impressao {
+    display: flex !important;
+    align-items: center; gap: 14px;
+    padding: 0 0 8px; margin-bottom: 12px;
+    border-bottom: 2px solid var(--azul);
+  }
+  #cabecalho-impressao .marca-bloco { color: var(--azul); }
+  #cabecalho-impressao .marca-img { max-height: 46px; }
+  #cabecalho-impressao .dados { flex: 1; }
+  #cabecalho-impressao .dados h1 { font-size: 12pt; margin: 0; }
+  #cabecalho-impressao .dados .linha-dados {
+    font-size: 8pt; color: var(--texto-2); margin-top: 2px;
+    display: flex; gap: 14px; flex-wrap: wrap;
+  }
+  #cabecalho-impressao .dados .linha-dados b { color: var(--texto); font-weight: 600; }
+
+  /* a faixa de resumo entra no papel, logo abaixo do cabeçalho */
+  .faixa-resumo {
+    box-shadow: none; border: 1px solid #c9d2dc; break-inside: avoid;
+    padding: 7px 9px; gap: 12px;
+  }
+  .chip .val { font-size: 10pt; }
+  .chip.forte { background: #eaf5f4 !important; }
+
+  .cartao {
+    break-inside: auto; page-break-inside: auto;
+    box-shadow: none; border-color: #c9d2dc; margin-bottom: 9px;
+  }
+  .cartao > .cab { break-after: avoid; page-break-after: avoid; background: #f2f5f8 !important; }
+  .cartao > .corpo { padding: 9px; }
+  .conjunto { break-inside: auto; border-color: #ccd4de; }
+  .conjunto > .cab-conj { break-after: avoid; background: #f2f5f8 !important; }
+  .conjunto > .cab-conj input.titulo { border-color: transparent; }
+
+  h2, h3, .subtitulo { break-after: avoid; page-break-after: avoid; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  table { font-size: 7.6pt; }
+  th, td { padding: 2px 4px; }
+  .rolagem { overflow: visible !important; max-height: none !important; }
+
+  /* campos: viram texto impresso, sem cara de formulário */
+  input[type="text"], input[type="number"], select, textarea {
+    border: none; border-bottom: 1px solid #c9d2dc; border-radius: 0;
+    background: transparent !important; padding: 1px 2px;
+    -webkit-appearance: none; appearance: none;
+    color: #16202e !important; font-weight: 600;
+  }
+  select { display: none !important; }
+  .valor-impresso {
+    display: inline-block !important;
+    border-bottom: 1px solid #c9d2dc; padding: 1px 2px;
+    font-weight: 600; font-size: inherit; line-height: 1.35;
+    width: 100%; word-break: break-word;
+  }
+  td .valor-impresso, th .valor-impresso { border: none; width: auto; }
+  input.editado, select.editado { background: #fff6e0 !important; border-bottom-color: #b58a2b; }
+  label.campo.chave { background: #eaf5f4 !important; border-color: #7fb8b3; }
+  label.campo > span.rot { color: #556273; }
+  input:disabled, select:disabled { color: #556273 !important; }
+
   tr.bom { background: #eef8f1 !important; }
   tr.atencao { background: #fdf6e3 !important; }
   tr.ruim { background: #fbeeed !important; }
-  .naoimprime { display: none !important; }
+  tr.selecionada { outline: 1.5px solid var(--azul); }
+  .tag { border-width: .8px; }
+
+  .aviso { break-inside: avoid; }
+  .caixa-esquema { break-inside: avoid; background: #fafbfc !important; }
+  svg.perfil, svg.esquema { break-inside: avoid; max-width: 100%; }
+  .perfil { background: #fafbfc !important; }
+
+  .memorial { padding: 0; }
+  .memorial h2 { break-before: auto; }
+
+  a[href]::after { content: none !important; }
 }
 
 @media (max-width: 720px) {
@@ -440,6 +565,7 @@ tr.selecionada td { font-weight: 600; }
     <button class="btn" type="button" data-acao="novoProjeto">Novo</button>
     <button class="btn" type="button" data-acao="abrirProjeto">Abrir</button>
     <button class="btn" type="button" data-acao="salvarProjeto">Salvar</button>
+    <button class="btn" type="button" data-acao="exportarProjeto" title="Baixar o projeto em arquivo .json">Exportar</button>
     <button class="btn" type="button" data-acao="exemplo">Exemplos</button>
     <button class="btn" type="button" data-acao="imprimir">Imprimir</button>
     <button class="btn" type="button" data-acao="logo" title="Carregar o arquivo oficial da logo">Logo</button>
@@ -449,6 +575,10 @@ tr.selecionada td { font-weight: 600; }
 </header>
 
 <nav class="abas" id="abas" role="tablist"></nav>
+
+<div id="fixo" class="faixa-fixa"><div class="interno"></div></div>
+
+<div id="cabecalho-impressao" aria-hidden="true"></div>
 
 <main id="conteudo"></main>
 
@@ -1825,6 +1955,7 @@ tr.selecionada td { font-weight: 600; }
       extensao: 0,
       unidExt: 'm',
       pnMcaOverride: null,
+      pnAuto: true,          /* enquanto verdadeiro, o PN acompanha o catálogo */
       pecas: []
     };
   }
@@ -1938,6 +2069,70 @@ tr.selecionada td { font-weight: 600; }
   E.salvarCatalogos = function (usuario) {
     try { localStorage.setItem(LS_CAT, JSON.stringify(usuario)); return true; }
     catch (e) { return false; }
+  };
+
+  /* ---------------- biblioteca de projetos ----------------
+     Guardada no navegador. Cada registro traz os campos de identificação
+     soltos, para a lista poder ser ordenada sem abrir o projeto. */
+
+  var LS_BIB = 'pda.biblioteca.v1';
+
+  E.biblioteca = function () {
+    try { return JSON.parse(localStorage.getItem(LS_BIB) || '[]') || []; }
+    catch (e) { return []; }
+  };
+
+  E.gravarBiblioteca = function (lista) {
+    try { localStorage.setItem(LS_BIB, JSON.stringify(lista)); return true; }
+    catch (e) { return false; }
+  };
+
+  /* Guarda o projeto. Atualiza o registro de mesmo id, ou cria um novo. */
+  E.guardar = function (st, quandoISO) {
+    var lista = E.biblioteca();
+    if (!st.id) st.id = 'prj_' + Math.random().toString(36).slice(2, 10);
+    var reg = {
+      id: st.id,
+      nome: st.projeto.nome || '(sem nome)',
+      local: st.projeto.local || '',
+      responsavel: st.projeto.responsavel || '',
+      data: st.projeto.data || '',
+      salvoEm: quandoISO,
+      resumo: E.resumoCurto(st),
+      st: clone(st)
+    };
+    var i = -1, k;
+    for (k = 0; k < lista.length; k++) if (lista[k].id === reg.id) i = k;
+    if (i >= 0) lista[i] = reg; else lista.unshift(reg);
+    if (!E.gravarBiblioteca(lista)) return { ok: false, erro: 'sem espaço' };
+    return { ok: true, novo: i < 0, total: lista.length };
+  };
+
+  E.excluirDaBiblioteca = function (id) {
+    E.gravarBiblioteca(E.biblioteca().filter(function (r) { return r.id !== id; }));
+  };
+
+  E.doBiblioteca = function (id) {
+    var lista = E.biblioteca(), i;
+    for (i = 0; i < lista.length; i++) if (lista[i].id === id) return lista[i];
+    return null;
+  };
+
+  /* linha de resumo mostrada na lista */
+  E.resumoCurto = function (st) {
+    var q = Number(st.vazao.valor) || 0;
+    var trechos = (st.adutoras || []).filter(function (a) { return a.ativo !== false; });
+    var ext = 0;
+    trechos.forEach(function (a) {
+      ext += (Number(a.extensao) || 0) * (a.unidExt === 'km' ? 1000 : (a.unidExt === 'm' ? 1 : 1));
+    });
+    return {
+      vazao: q, unidade: st.vazao.unidade,
+      bombas: st.bombas.operando + '/' + st.bombas.instaladas,
+      trechos: trechos.length,
+      extensao: ext,
+      fluido: st.fluido.tipo
+    };
   };
 
   /* ---------------- persistência do projeto ---------------- */
@@ -2084,12 +2279,50 @@ tr.selecionada td { font-weight: 600; }
   /* Pressão nominal do tubo em mca: o valor informado pelo usuário tem
      precedência sobre o PN do catálogo (que pode não estar cadastrado). */
   C.pnMca = function (conj, tubo) {
-    if (conj && conj.pnMcaOverride !== null && conj.pnMcaOverride !== undefined && conj.pnMcaOverride !== '') {
-      return Number(conj.pnMcaOverride);
-    }
-    if (tubo && tubo.item && tubo.item.pn) return Number(tubo.item.pn) * 10;
-    return null;
+    var i = C.pnInfo(conj, tubo);
+    return i.mca;
   };
+
+  /* Detalha de onde veio a pressão admissível adotada */
+  C.pnInfo = function (conj, tubo) {
+    if (conj && conj.pnMcaOverride !== null && conj.pnMcaOverride !== undefined && conj.pnMcaOverride !== '') {
+      return { mca: Number(conj.pnMcaOverride), origem: 'informado',
+               nota: 'Valor informado no campo PN / PFA do trecho.' };
+    }
+    if (tubo && tubo.item && tubo.item.pn) {
+      return { mca: Number(tubo.item.pn) * 10, origem: 'catalogo',
+               nota: 'PN ' + tubo.item.pn + ' bar do catálogo "' + tubo.cat.nome + '".' };
+    }
+    return { mca: null, origem: 'ausente',
+             nota: 'O catálogo deste tubo não traz a pressão admissível. Informe-a no campo PN / PFA do trecho.' };
+  };
+
+  /* Resistência do CORPO do tubo pela expressão da EN 545 / ISO 10803:
+       PFA [bar] = 20 · e · sigma / (DE − e)      [e e DE em mm, sigma em MPa]
+     Vale para tubos metálicos com espessura de parede conhecida. Serve como
+     referência superior: na prática a pressão admissível do conjunto costuma
+     ser limitada pela JUNTA, e é menor. */
+  C.pfaCorpoBar = function (tubo) {
+    if (!tubo || !tubo.item || !tubo.item.e || !tubo.item.de) return null;
+    var sig = C.SIGMA_ADM[tubo.material];
+    if (!sig) return null;
+    var e = Number(tubo.item.e), de = Number(tubo.item.de);
+    if (!(e > 0) || !(de > e)) return null;
+    return 20 * e * sig / (de - e);
+  };
+
+  /* Tensão admissível por material [MPa] */
+  C.SIGMA_ADM = {
+    fd_cimento: 140, fd_asfalto: 140, fd_sem_rev: 140,   /* EN 545: Rm 420 MPa, SF 3 */
+    aco_sold_novo: 138, aco_rev_esp: 138, aco_galv: 138, aco_inox: 138,
+    aco_rebitado: 100
+  };
+
+  /* Degraus usuais de pressão admissível do ferro fundido dúctil com junta
+     elástica, conforme a EN 545. Qual deles vale em cada DN depende da classe,
+     do diâmetro e do tipo de junta — por isso são oferecidos como escolha, e
+     não adotados automaticamente. */
+  C.DEGRAUS_PFA_BAR = [10, 12, 16, 20, 25, 30, 32, 40, 64, 100];
 
   /* ---------------- perdas de um conjunto ---------------- */
 
@@ -3067,6 +3300,115 @@ tr.selecionada td { font-weight: 600; }
       op.dica ? UI.dica(op.dica) : null);
   };
 
+  /* ---------------- reordenação por arraste ----------------
+     A linha inteira vira alvo de arraste; a coluna da alça (⠿) é o que
+     inicia o gesto. Funciona junto com os botões ↑ ↓, que atendem teclado
+     e telas de toque. */
+
+  var arrasteAtual = null;
+
+  UI.linhaArrastavel = function (tr, caminhoArray, i) {
+    tr.setAttribute('draggable', 'true');
+    tr.setAttribute('data-arr', caminhoArray);
+    tr.setAttribute('data-pos', i);
+    tr.classList.add('arrastavel');
+
+    tr.addEventListener('dragstart', function (e) {
+      arrasteAtual = { arr: caminhoArray, de: i };
+      tr.classList.add('arrastando');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', caminhoArray + ':' + i); } catch (x) {}
+      }
+    });
+    tr.addEventListener('dragend', function () {
+      tr.classList.remove('arrastando');
+      limparAlvos();
+      arrasteAtual = null;
+    });
+    tr.addEventListener('dragover', function (e) {
+      if (!arrasteAtual || arrasteAtual.arr !== caminhoArray) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      limparAlvos();
+      tr.classList.add(i < arrasteAtual.de ? 'alvo-acima' : 'alvo-abaixo');
+    });
+    tr.addEventListener('drop', function (e) {
+      if (!arrasteAtual || arrasteAtual.arr !== caminhoArray) return;
+      e.preventDefault();
+      var de = arrasteAtual.de;
+      limparAlvos();
+      arrasteAtual = null;
+      if (de !== i) PDA.App.moverItem(caminhoArray, de, i);
+    });
+    return tr;
+  };
+
+  function limparAlvos() {
+    var el = document.querySelectorAll('.alvo-acima, .alvo-abaixo');
+    var i;
+    for (i = 0; i < el.length; i++) el[i].classList.remove('alvo-acima', 'alvo-abaixo');
+  }
+
+  /* mesma reordenação, para blocos (cartões de trecho) em vez de linhas */
+  UI.blocoArrastavel = function (el, caminhoArray, i) {
+    el.classList.add('arrastavel');
+    el.setAttribute('data-arr', caminhoArray);
+    el.addEventListener('dragstart', function (e) {
+      arrasteAtual = { arr: caminhoArray, de: i };
+      el.classList.add('arrastando');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', caminhoArray + ':' + i); } catch (x) {}
+      }
+    });
+    el.addEventListener('dragend', function () {
+      el.classList.remove('arrastando'); limparAlvos(); arrasteAtual = null;
+    });
+    el.addEventListener('dragover', function (e) {
+      if (!arrasteAtual || arrasteAtual.arr !== caminhoArray) return;
+      e.preventDefault();
+      limparAlvos();
+      el.classList.add(i < arrasteAtual.de ? 'alvo-acima' : 'alvo-abaixo');
+    });
+    el.addEventListener('drop', function (e) {
+      if (!arrasteAtual || arrasteAtual.arr !== caminhoArray) return;
+      e.preventDefault();
+      var de = arrasteAtual.de;
+      limparAlvos(); arrasteAtual = null;
+      if (de !== i) PDA.App.moverItem(caminhoArray, de, i);
+    });
+    return el;
+  };
+
+  /* alça de arraste para o cabeçalho de um bloco */
+  UI.alcaBloco = function (el, caminhoArray, i, total) {
+    return h('span', { style: 'display:inline-flex;align-items:center;gap:2px' },
+      h('span', {
+        class: 'alca naoimprime', title: 'Arraste para reordenar',
+        onmousedown: function () { el.setAttribute('draggable', 'true'); },
+        onmouseup: function () { el.setAttribute('draggable', 'false'); }
+      }, '⠿'),
+      h('button', { class: 'btn mini icone naoimprime', type: 'button', title: 'Mover para cima',
+                    disabled: i === 0,
+                    'data-acao': 'mover', 'data-arr': caminhoArray, 'data-i': i, 'data-para': i - 1 }, '↑'),
+      h('button', { class: 'btn mini icone naoimprime', type: 'button', title: 'Mover para baixo',
+                    disabled: i === total - 1,
+                    'data-acao': 'mover', 'data-arr': caminhoArray, 'data-i': i, 'data-para': i + 1 }, '↓'));
+  };
+
+  /* célula com a alça e os botões de mover */
+  UI.celulaMover = function (caminhoArray, i, total) {
+    return h('td', { class: 'col-mover naoimprime' },
+      h('span', { class: 'alca', title: 'Arraste para reordenar' }, '⠿'),
+      h('button', { class: 'btn mini icone', type: 'button', title: 'Mover para cima',
+                    disabled: i === 0,
+                    'data-acao': 'mover', 'data-arr': caminhoArray, 'data-i': i, 'data-para': i - 1 }, '↑'),
+      h('button', { class: 'btn mini icone', type: 'button', title: 'Mover para baixo',
+                    disabled: i === total - 1,
+                    'data-acao': 'mover', 'data-arr': caminhoArray, 'data-i': i, 'data-para': i + 1 }, '↓'));
+  };
+
   /* ---------------- dica / fonte ---------------- */
 
   UI.dica = function (texto, titulo) {
@@ -3372,7 +3714,7 @@ tr.selecionada td { font-weight: 600; }
 
   Q.barrilete = function (st, ctx) {
     var nb = Math.min(4, Math.max(2, ctx.nInst));
-    var W = 660, HH = 60 + nb * 46;
+    var W = 660, HH = 42 + nb * 46;
     var s = svg(W, HH);
     var g = sv('g');
     var i, y, xB = 96, xInd = 250, xCom = 380, xSai = W - 70;
@@ -3399,9 +3741,6 @@ tr.selecionada td { font-weight: 600; }
         'Q de ' + (i + 1)));
     }
     g.appendChild(sv('text', { x: xSai + 4, y: 47 }, '→ adutora'));
-    g.appendChild(sv('text', { x: 4, y: HH - 6 },
-      'Cada trecho do barrilete comum conduz a vazão das bombas que ele já reuniu: informe 1, 2, 3… no campo "bombas que o trecho coleta".'));
-
     s.appendChild(g);
     return s;
   };
@@ -3411,7 +3750,7 @@ tr.selecionada td { font-weight: 600; }
      ================================================================ */
 
   Q.ramificacao = function (st, ctx) {
-    var W = 660, HH = 150;
+    var W = 660, HH = 138;
     var s = svg(W, HH);
     var g = sv('g');
     g.appendChild(sv('circle', { class: 'bomba', cx: 40, cy: 70, r: 12 }));
@@ -3436,8 +3775,6 @@ tr.selecionada td { font-weight: 600; }
     g.appendChild(sv('rect', { class: 'agua', x: 471, y: 56, width: 48, height: 35 }));
     g.appendChild(sv('text', { class: 'rotulo', x: 495, y: 38, 'text-anchor': 'middle' }, 'chegada'));
 
-    g.appendChild(sv('text', { x: 4, y: HH - 6 },
-      'Os trechos são calculados em série, na ordem da lista. Reduza a fração de vazão do trecho a jusante da derivação e escolha um diâmetro menor.'));
     s.appendChild(g);
     return s;
   };
@@ -3700,6 +4037,9 @@ tr.selecionada td { font-weight: 600; }
         })));
     }
 
+    var caminhoArr = base + '.pecas';
+    var total = (conj.pecas || []).length;
+
     var linhas = (conj.pecas || []).map(function (p, i) {
       var def = PDA.P.buscarPeca(PDA.P.pecas, p.pecaId);
       var K = (p.kOverride !== null && p.kOverride !== undefined && p.kOverride !== '') ? Number(p.kOverride) : (def ? def.K : 0);
@@ -3709,7 +4049,8 @@ tr.selecionada td { font-weight: 600; }
       var perda = K * qtd * v * v / (2 * PDA.H.g);
       somaK += K * qtd; somaH += perda;
 
-      return h('tr', {},
+      return UI.linhaArrastavel(h('tr', {},
+        UI.celulaMover(caminhoArr, i, total),
         h('td', { class: 'esq' },
           h('select', { 'data-bind': base + '.pecas.' + i + '.pecaId', 'data-tipo': 'texto', 'data-estrutural': '1' },
             ordem.map(function (c) {
@@ -3730,9 +4071,10 @@ tr.selecionada td { font-weight: 600; }
         h('td', {}, UI.num(K * qtd, 2)),
         h('td', {}, UI.num(v, 2)),
         h('td', {}, UI.num(perda, 3)),
-        h('td', { class: 'col-x' },
-          h('button', { class: 'btn mini icone perigo naoimprime', type: 'button',
-                        'data-acao': 'removerPeca', 'data-base': base, 'data-i': i, title: 'Remover' }, '×')));
+        h('td', { class: 'col-x naoimprime' },
+          h('button', { class: 'btn mini icone perigo', type: 'button',
+                        'data-acao': 'removerPeca', 'data-base': base, 'data-i': i, title: 'Remover' }, '×'))),
+        caminhoArr, i);
     });
 
     var seletorNovo = h('select', { style: 'max-width:250px', 'data-acao-change': 'addPeca', 'data-base': base },
@@ -3748,6 +4090,8 @@ tr.selecionada td { font-weight: 600; }
         h('span', { class: 'nota' }, 'A peça entra no fim da lista.')),
       linhas.length ? h('div', { class: 'rolagem' }, h('table', { class: 'pecas-tab enxuta' },
         h('thead', {}, h('tr', {},
+          h('th', { class: 'naoimprime' }, 'Ordem',
+            UI.dica('Arraste a linha pela alça ⠿ para reordenar, ou use as setas. A ordem não altera o cálculo — a perda localizada é a soma das peças — mas deixa a lista na sequência física do barrilete, o que ajuda a conferir e a montar a lista de materiais.')),
           h('th', { class: 'esq' }, 'Peça'),
           h('th', {}, 'Qtd.'),
           h('th', {}, 'K', UI.dica('Coeficiente de perda localizada. O campo mostra o valor padrão como sugestão; digite outro para sobrepor apenas nesta peça.\n\n' + PDA.P.fontePecas.az)),
@@ -3759,6 +4103,7 @@ tr.selecionada td { font-weight: 600; }
           h('th', {}, ''))),
         h('tbody', {}, linhas),
         h('tfoot', {}, h('tr', {},
+          h('td', { class: 'naoimprime' }, ''),
           h('td', { class: 'esq', colspan: 5 }, 'Total'),
           h('td', {}, UI.num(somaK, 2)),
           h('td', {}, ''),
@@ -3852,7 +4197,9 @@ tr.selecionada td { font-weight: 600; }
 
   F.conjunto = function (st, ctx, conj, op) {
     var base = op.base;
+    var caixa = h('div', { class: 'conjunto' });
     var cabecalho = [
+      op.arr ? UI.alcaBloco(caixa, op.arr, op.i, op.total) : null,
       op.ativavel ? h('input', { type: 'checkbox', checked: conj.ativo !== false,
                                  'data-bind': base + '.ativo', 'data-tipo': 'bool', 'data-estrutural': '1',
                                  title: 'Considerar este trecho no cálculo' }) : null,
@@ -3865,7 +4212,9 @@ tr.selecionada td { font-weight: 600; }
     ];
 
     if (conj.ativo === false) {
-      return h('div', { class: 'conjunto desativado' }, h('div', { class: 'cab-conj' }, cabecalho));
+      caixa.className = 'conjunto desativado';
+      caixa.appendChild(h('div', { class: 'cab-conj' }, cabecalho));
+      return op.arr ? UI.blocoArrastavel(caixa, op.arr, op.i) : caixa;
     }
 
     var campos = [
@@ -3908,16 +4257,23 @@ tr.selecionada td { font-weight: 600; }
     if (op.adutora) {
       var tuboAtual = PDA.C.resolverTubo(conj, ctx);
       var pnCat = tuboAtual && tuboAtual.item && tuboAtual.item.pn ? Number(tuboAtual.item.pn) * 10 : null;
+      var pnInfo = PDA.C.pnInfo(conj, tuboAtual);
+      var pfaCorpo = PDA.C.pfaCorpoBar(tuboAtual);
       corpo.push(UI.sub('Pressão admissível e cotas do trecho'));
       corpo.push(h('div', { class: 'grade' },
         UI.campo(st, 'PN / PFA do tubo (mca)', base + '.pnMcaOverride', {
+          chave: pnInfo.mca === null,
           editado: conj.pnMcaOverride !== null && conj.pnMcaOverride !== '' && conj.pnMcaOverride !== undefined,
           placeholder: pnCat !== null ? UI.num(pnCat, 0) : 'informar',
           dica: 'Pressão de serviço admissível do tubo, em mca, usada para conferir a pressão em regime permanente e a sobrepressão do transitório.\n\n' +
-                (pnCat !== null
-                  ? 'O catálogo deste tubo informa PN ' + UI.numEdit(tuboAtual.item.pn) + ' bar (' + UI.num(pnCat, 0) + ' mca). Deixe em branco para usar esse valor.'
-                  : 'O catálogo deste tubo não traz a pressão admissível — é o caso das classes K do ferro fundido dúctil, em que a PFA depende da classe, do DN e do tipo de junta. Consulte o catálogo do fabricante e informe aqui. Para tubos flangeados, use os catálogos "Flangeado PN 10/16/25/40", que já trazem o PN.')
+                pnInfo.nota +
+                (pnCat !== null ? '\n\nO campo é preenchido automaticamente quando o catálogo traz o PN; troque o valor se o seu fornecedor indicar outro.' : '') +
+                (pfaCorpo ? '\n\nA resistência do CORPO deste tubo, pela expressão da EN 545 (PFA = 20·e·σ/(DE−e), com σ = ' +
+                  PDA.C.SIGMA_ADM[tuboAtual.material] + ' MPa), é de ' + UI.num(pfaCorpo, 0) + ' bar. ' +
+                  'Na prática a pressão admissível do conjunto é limitada pela JUNTA e costuma ser bem menor — ' +
+                  'por isso o programa não adota esse número sozinho.' : '')
         }),
+        F.seletorPFA(st, conj, base, tuboAtual, pfaCorpo),
         UI.check(st, 'Informar cotas deste trecho', base + '.usarCotas',
           { dica: 'Serve para traçar o perfil e verificar a pressão em cada nó. A cota final do ÚLTIMO trecho é a mesma "cota de chegada" da aba Bombas e níveis — o programa mantém as duas iguais automaticamente.' }),
         conj.usarCotas ? UI.campo(st, 'Cota inicial (m)', base + '.cotaIni',
@@ -3931,9 +4287,29 @@ tr.selecionada td { font-weight: 600; }
     corpo.push(UI.sub('Comparação de diâmetros'));
     corpo.push(F.varredura(st, ctx, conj, op.chave, base));
 
-    return h('div', { class: 'conjunto' },
-      h('div', { class: 'cab-conj' }, cabecalho),
-      h('div', { class: 'corpo-conj' }, corpo));
+    caixa.appendChild(h('div', { class: 'cab-conj' }, cabecalho));
+    caixa.appendChild(h('div', { class: 'corpo-conj' }, corpo));
+    return op.arr ? UI.blocoArrastavel(caixa, op.arr, op.i) : caixa;
+  };
+
+  /* Escolha rápida da pressão admissível, quando o catálogo não traz PN */
+  F.seletorPFA = function (st, conj, base, tubo, pfaCorpo) {
+    if (tubo && tubo.item && tubo.item.pn) return null;   /* já vem do catálogo */
+    var opcoes = [{ v: '', rot: '— escolher um degrau —' }].concat(
+      PDA.C.DEGRAUS_PFA_BAR.map(function (b) {
+        return { v: String(b * 10), rot: 'PN ' + b + ' bar   (' + (b * 10) + ' mca)' };
+      }));
+    var atual = conj.pnMcaOverride === null || conj.pnMcaOverride === undefined ? '' : String(conj.pnMcaOverride);
+    return h('label', { class: 'campo' },
+      h('span', { class: 'rot' }, 'Preencher com um degrau normativo',
+        UI.dica('As classes K do ferro fundido dúctil não têm uma pressão admissível única: a PFA depende da classe, do DN e do tipo de junta, e o valor que governa costuma ser o da junta, não o da parede.\n\n' +
+                'Esta lista traz os degraus usuais de pressão da EN 545 para escolha rápida — ela NÃO diz qual deles se aplica ao seu DN. Confirme no catálogo do fabricante.\n\n' +
+                'Se o tubo for flangeado, prefira os catálogos "Flangeado PN 10/16/25/40": eles já trazem o PN e preenchem o campo sozinhos.' +
+                (pfaCorpo ? '\n\nReferência: a resistência do corpo deste tubo pela EN 545 é de ' + UI.num(pfaCorpo, 0) + ' bar — um limite superior, não a PFA do conjunto.' : ''))),
+      h('select', { 'data-bind': base + '.pnMcaOverride', 'data-tipo': 'num', 'data-estrutural': '1' },
+        opcoes.map(function (o) {
+          return h('option', { value: o.v, selected: o.v === atual }, o.rot);
+        })));
   };
 
   /* ================================================================
@@ -4448,7 +4824,9 @@ tr.selecionada td { font-weight: 600; }
     var out = [];
     out.push(UI.cartao('Barrilete de recalque individual (por bomba)',
       'Da saída da bomba até a derivação comum — conduz a vazão de uma bomba', [
-        PDA.Q.caixa('Como os trechos se dividem', PDA.Q.barrilete(st, ctx), null),
+        PDA.Q.caixa('Como os trechos se dividem', PDA.Q.barrilete(st, ctx),
+          'Cada trecho do barrilete comum conduz a vazão das bombas que ele já reuniu: informe 1, 2, 3… ' +
+          'no campo "bombas que o trecho coleta" de cada um.'),
         UI.check(st, 'Considerar barrilete individual', 'barrileteIndividual.ativo'),
         st.barrileteIndividual.ativo
           ? F.conjunto(st, ctx, st.barrileteIndividual, {
@@ -4481,7 +4859,8 @@ tr.selecionada td { font-weight: 600; }
         return F.conjunto(st, ctx, t, {
           base: chave + '.trechos.' + i, chave: chave + '.' + i,
           tituloEditavel: true, removivel: true, ativavel: true,
-          acaoRemover: acaoDel, i: i, nBombas: true
+          acaoRemover: acaoDel, i: i, nBombas: true,
+          arr: chave + '.trechos', total: bloco.trechos.length
         });
       }) : null
     ];
@@ -4513,7 +4892,8 @@ tr.selecionada td { font-weight: 600; }
           return F.conjunto(st, ctx, a, {
             base: 'adutoras.' + i, chave: 'adutoras.' + i,
             tituloEditavel: true, removivel: st.adutoras.length > 1, ativavel: true,
-            acaoRemover: 'delAdutora', i: i, adutora: true
+            acaoRemover: 'delAdutora', i: i, adutora: true,
+            arr: 'adutoras', total: st.adutoras.length
           });
         })
       ]),
@@ -4753,7 +5133,8 @@ tr.selecionada td { font-weight: 600; }
     res.projeto.adutoras.forEach(function (r) { lTrechos += r.L; });
 
     var linhas = pts.map(function (p, i) {
-      return h('tr', {},
+      return UI.linhaArrastavel(h('tr', {},
+        UI.celulaMover('perfil.pontos', i, pts.length),
         h('td', {}, h('input', { type: 'text', class: 'num', value: UI.numEdit(p.est),
                                  'data-bind': 'perfil.pontos.' + i + '.est', 'data-tipo': 'num', inputmode: 'decimal' })),
         h('td', {}, h('input', { type: 'text', class: 'num', value: UI.numEdit(p.cota),
@@ -4761,9 +5142,10 @@ tr.selecionada td { font-weight: 600; }
         h('td', { class: 'esq' }, h('input', { type: 'text', value: p.rot || '', placeholder: 'opcional',
                                  'data-bind': 'perfil.pontos.' + i + '.rot', 'data-tipo': 'texto' })),
         h('td', {}, UI.num(calc.pontos[i] ? calc.pontos[i].x : 0, 1)),
-        h('td', { class: 'col-x' },
-          h('button', { class: 'btn mini icone perigo naoimprime', type: 'button',
-                        'data-acao': 'delPontoPerfil', 'data-i': i }, '×')));
+        h('td', { class: 'col-x naoimprime' },
+          h('button', { class: 'btn mini icone perigo', type: 'button',
+                        'data-acao': 'delPontoPerfil', 'data-i': i }, '×'))),
+        'perfil.pontos', i);
     });
 
     return h('div', {},
@@ -4787,6 +5169,7 @@ tr.selecionada td { font-weight: 600; }
         ? h('div', { class: 'rolagem', style: 'max-height:340px;overflow-y:auto' },
             h('table', { class: 'enxuta pecas-tab' },
               h('thead', {}, h('tr', {},
+                h('th', { class: 'naoimprime' }, 'Ordem'),
                 h('th', {}, 'Distância (' + st.perfil.unidExt + ')'),
                 h('th', {}, 'Cota do terreno / GI (m)',
                   UI.dica('Cota da geratriz inferior da tubulação, ou do terreno se você preferir trabalhar com o eixo do tubo. O programa compara a linha piezométrica com esta cota para obter a pressão disponível.')),
@@ -6081,6 +6464,175 @@ tr.selecionada td { font-weight: 600; }
   PDA.K = K;
 })(window.PDA = window.PDA || {});
 
+/* ===== 11b-ui-biblioteca.js ===== */
+/* ------------------------------------------------------------------
+ * Biblioteca de projetos: lista os projetos guardados no navegador,
+ * ordenável por qualquer coluna, com os exemplos ao final.
+ * ------------------------------------------------------------------ */
+(function (PDA) {
+  'use strict';
+
+  var B = {};
+  var UI, h;
+
+  B.init = function () { UI = PDA.UI; h = UI.h; };
+
+  B.ordem = { campo: 'salvoEm', desc: true };
+  B.filtro = '';
+
+  var COLUNAS = [
+    { campo: 'nome', rot: 'Projeto', esq: true },
+    { campo: 'local', rot: 'Local', esq: true },
+    { campo: 'responsavel', rot: 'Responsável', esq: true },
+    { campo: 'data', rot: 'Data do projeto', esq: true },
+    { campo: 'salvoEm', rot: 'Salvo em', esq: true }
+  ];
+
+  function dataBR(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    function z(n) { return (n < 10 ? '0' : '') + n; }
+    return z(d.getDate()) + '/' + z(d.getMonth() + 1) + '/' + d.getFullYear() +
+           '  ' + z(d.getHours()) + ':' + z(d.getMinutes());
+  }
+
+  function ordenar(lista) {
+    var c = B.ordem.campo, desc = B.ordem.desc;
+    return lista.slice().sort(function (a, b) {
+      var va = a[c], vb = b[c];
+      if (c === 'salvoEm') {
+        va = va || ''; vb = vb || '';
+        return desc ? String(vb).localeCompare(String(va)) : String(va).localeCompare(String(vb));
+      }
+      va = String(va || '').toLowerCase();
+      vb = String(vb || '').toLowerCase();
+      var r = va.localeCompare(vb, 'pt-BR');
+      return desc ? -r : r;
+    });
+  }
+
+  /* ================================================================
+     Modal
+     ================================================================ */
+
+  B.abrir = function () {
+    var corpo = h('div', {});
+    B.desenhar(corpo);
+    UI.modal('Abrir projeto', corpo, [
+      h('button', { class: 'btn', type: 'button', onclick: UI.fecharModal }, 'Fechar'),
+      h('button', { class: 'btn', type: 'button', 'data-acao': 'importarProjeto' }, 'Abrir de arquivo…')
+    ]);
+  };
+
+  B.desenhar = function (corpo) {
+    UI.limpar(corpo);
+    var todos = PDA.E.biblioteca();
+    var termo = B.filtro.trim().toLowerCase();
+    var lista = termo
+      ? todos.filter(function (r) {
+          return [r.nome, r.local, r.responsavel, r.data].join(' ').toLowerCase().indexOf(termo) >= 0;
+        })
+      : todos;
+    lista = ordenar(lista);
+
+    var busca = h('input', {
+      type: 'text', placeholder: 'filtrar por projeto, local, responsável…',
+      value: B.filtro, style: 'max-width:320px'
+    });
+    busca.addEventListener('input', function () {
+      B.filtro = busca.value;
+      B.desenhar(corpo);
+      var novo = corpo.querySelector('input[type="text"]');
+      if (novo) { novo.focus(); novo.setSelectionRange(novo.value.length, novo.value.length); }
+    });
+
+    corpo.appendChild(h('div', { class: 'linha', style: 'margin-bottom:10px' },
+      busca,
+      h('span', { class: 'nota' },
+        todos.length + ' projeto(s) guardado(s) neste navegador' +
+        (termo ? '  ·  ' + lista.length + ' na busca' : ''))));
+
+    if (!todos.length) {
+      corpo.appendChild(h('div', { class: 'aviso info' },
+        h('b', {}, 'A biblioteca está vazia'),
+        'Use o botão Salvar no cabeçalho para guardar o projeto atual aqui. ' +
+        'A biblioteca fica no navegador deste computador — para levar um projeto para outra máquina, ' +
+        'use Exportar e depois "Abrir de arquivo".'));
+    } else if (!lista.length) {
+      corpo.appendChild(h('p', { class: 'vazio' }, 'Nada encontrado para "' + B.filtro + '".'));
+    } else {
+      var cabs = COLUNAS.map(function (col) {
+        var ativa = B.ordem.campo === col.campo;
+        return h('th', {
+          class: (col.esq ? 'esq ' : '') + 'ordenavel',
+          title: 'Ordenar por ' + col.rot.toLowerCase(),
+          onclick: function () {
+            if (B.ordem.campo === col.campo) B.ordem.desc = !B.ordem.desc;
+            else { B.ordem.campo = col.campo; B.ordem.desc = col.campo === 'salvoEm'; }
+            B.desenhar(corpo);
+          }
+        }, col.rot, ativa ? h('span', { class: 'seta' }, B.ordem.desc ? ' ▾' : ' ▴') : null);
+      });
+      cabs.push(h('th', {}, ''));
+
+      var linhas = lista.map(function (r) {
+        var atual = PDA.App.st && PDA.App.st.id === r.id;
+        return h('tr', { class: atual ? 'selecionada' : null },
+          h('td', { class: 'esq' },
+            h('b', {}, r.nome),
+            atual ? h('span', { class: 'tag neutro', style: 'margin-left:6px' }, 'aberto') : null,
+            h('div', { class: 'nota' }, B.descricao(r))),
+          h('td', { class: 'esq' }, r.local || '—'),
+          h('td', { class: 'esq' }, r.responsavel || '—'),
+          h('td', { class: 'esq' }, r.data || '—'),
+          h('td', { class: 'esq' }, dataBR(r.salvoEm)),
+          h('td', { style: 'white-space:nowrap' },
+            h('button', { class: 'btn mini primario', type: 'button',
+                          'data-acao': 'abrirDaBiblioteca', 'data-id': r.id }, 'Abrir'),
+            h('button', { class: 'btn mini', type: 'button', style: 'margin-left:4px',
+                          'data-acao': 'duplicarDaBiblioteca', 'data-id': r.id,
+                          title: 'Abrir como um projeto novo, sem sobrescrever este' }, 'Duplicar'),
+            h('button', { class: 'btn mini perigo', type: 'button', style: 'margin-left:4px',
+                          'data-acao': 'excluirDaBiblioteca', 'data-id': r.id }, 'Excluir')));
+      });
+
+      corpo.appendChild(h('div', { class: 'rolagem', style: 'max-height:46vh;overflow-y:auto' },
+        h('table', { class: 'enxuta' }, h('thead', {}, h('tr', {}, cabs)), h('tbody', {}, linhas))));
+      corpo.appendChild(h('p', { class: 'nota', style: 'margin-top:7px' },
+        'Clique no título de qualquer coluna para ordenar.'));
+    }
+
+    corpo.appendChild(UI.sub('Exemplos'));
+    corpo.appendChild(h('div', { style: 'display:flex;flex-direction:column;gap:8px' },
+      h('button', {
+        class: 'btn', type: 'button', style: 'text-align:left;padding:10px',
+        'data-acao': 'exemploAgua'
+      }, h('b', {}, 'Adutora de água tratada — 400 L/s, 214 m'),
+         h('div', { class: 'nota' }, 'PEAD PE 100, cotas 620 → 642 m, 3 bombas instaladas e 2 em operação, Hazen-Williams com C = 130.')),
+      h('button', {
+        class: 'btn', type: 'button', style: 'text-align:left;padding:10px',
+        'data-acao': 'exemploEsgoto'
+      }, h('b', {}, 'Linha de recalque de esgoto bruto — 685 L/s, 6,67 km'),
+         h('div', { class: 'nota' }, 'Ferro fundido dúctil K7, cotas 126 → 149 m, 5 bombas instaladas e 4 em operação, Colebrook-White com barrilete comum progressivo.'))));
+  };
+
+  B.descricao = function (r) {
+    var s = r.resumo;
+    if (!s) return '';
+    var partes = [];
+    if (s.vazao) partes.push(UI.numEdit(s.vazao) + ' ' + s.unidade);
+    if (s.bombas) partes.push(s.bombas + ' bombas');
+    if (s.trechos) partes.push(s.trechos + ' trecho(s)');
+    if (s.extensao) partes.push(UI.num(s.extensao, 0) + ' m');
+    var fl = PDA.R.fluidos.filter(function (f) { return f.id === s.fluido; })[0];
+    if (fl) partes.push(fl.rot.toLowerCase());
+    return partes.join('  ·  ');
+  };
+
+  PDA.B = B;
+})(window.PDA = window.PDA || {});
+
 /* ===== 12-app.js ===== */
 /* ------------------------------------------------------------------
  * Aplicação: montagem das abas, ligação dos campos ao estado,
@@ -6116,7 +6668,7 @@ tr.selecionada td { font-weight: 600; }
 
   App.iniciar = function () {
     h = UI.h;
-    PDA.F.init(); PDA.Res.init(); PDA.K.init(); PDA.Q.init(); PDA.Pf.init();
+    PDA.F.init(); PDA.Res.init(); PDA.K.init(); PDA.Q.init(); PDA.Pf.init(); PDA.B.init();
     App.montarMarca();
 
     App.cats = PDA.E.carregarCatalogos();
@@ -6143,6 +6695,7 @@ tr.selecionada td { font-weight: 600; }
 
   App.render = function () {
     App.salvarFoco();
+    var rolagem = window.pageYOffset || document.documentElement.scrollTop || 0;
 
     var st = App.st;
     var ctx, res, erro = null;
@@ -6188,8 +6741,16 @@ tr.selecionada td { font-weight: 600; }
       return;
     }
 
-    if (App.aba !== 'catalogos' && App.aba !== 'fontes' && App.aba !== 'parametros' && App.aba !== 'resumo') {
-      main.appendChild(PDA.Res.faixa(st, ctx, res));
+    /* faixa de resumo fixa abaixo das abas, nas telas de lançamento */
+    var fixo = document.getElementById('fixo');
+    var interno = fixo.firstChild;
+    UI.limpar(interno);
+    var comFaixa = ['bombas', 'succao', 'barrilete', 'adutoras', 'perfil', 'resultados'].indexOf(App.aba) >= 0;
+    fixo.classList.toggle('ativa', comFaixa);
+    if (comFaixa) {
+      interno.appendChild(PDA.Res.faixa(st, ctx, res));
+      /* a versão fixa não sai no papel (é sticky); uma cópia entra no fluxo */
+      main.appendChild(h('div', { class: 'somenteimprime' }, PDA.Res.faixa(st, ctx, res)));
     }
 
     var conteudo;
@@ -6207,16 +6768,85 @@ tr.selecionada td { font-weight: 600; }
       case 'fontes':     conteudo = PDA.K.abaFontes(st, ctx); break;
     }
     UI.add(main, conteudo);
+    App.marcarSelects();
+    App.montarCabecalhoImpressao(st, ctx, res);
+    App.medirTopo();
 
     PDA.E.salvarLocal(st);
     App.restaurarFoco();
+
+    /* devolve a rolagem: sem isso, esvaziar o conteúdo colapsa a página e o
+       navegador joga a tela para o topo a cada tecla digitada */
+    if (App.rolarTopo) { App.rolarTopo = false; window.scrollTo(0, 0); }
+    else if (rolagem > 0) { window.scrollTo(0, rolagem); }
+  };
+
+  /* No papel um <select> aparece cortado na largura da caixa. Ao lado de cada
+     um fica um texto com a opção escolhida, escondido na tela e impresso no
+     lugar do campo. */
+  App.marcarSelects = function () {
+    var sels = document.querySelectorAll('#conteudo select, #fixo select');
+    var i, s2, txt, prox, sp;
+    for (i = 0; i < sels.length; i++) {
+      s2 = sels[i];
+      txt = s2.options && s2.options[s2.selectedIndex] ? s2.options[s2.selectedIndex].text : '';
+      prox = s2.nextSibling;
+      if (prox && prox.nodeType === 1 && prox.className === 'valor-impresso') {
+        prox.textContent = txt;
+      } else {
+        sp = document.createElement('span');
+        sp.className = 'valor-impresso';
+        sp.textContent = txt;
+        if (s2.parentNode) s2.parentNode.insertBefore(sp, s2.nextSibling);
+      }
+    }
+  };
+
+  /* Cabeçalho que só aparece no papel: marca, identificação e a aba impressa */
+  App.montarCabecalhoImpressao = function (st, ctx, res) {
+    var alvo = document.getElementById('cabecalho-impressao');
+    if (!alvo) return;
+    UI.limpar(alvo);
+
+    var aba = App.abas.filter(function (a) { return a.id === App.aba; })[0];
+    var dados = [];
+    function d(rot, val) {
+      if (!val) return;
+      dados.push(h('span', {}, rot + ': ', h('b', {}, val)));
+    }
+    d('Local', st.projeto.local);
+    d('Responsável', st.projeto.responsavel);
+    d('Data', st.projeto.data);
+    d('Folha', aba ? aba.rot : '');
+    d('Impresso em', App.dataHoraBR());
+
+    alvo.appendChild(PDA.M.marca(46));
+    alvo.appendChild(h('div', { class: 'dados' },
+      h('h1', {}, st.projeto.nome || 'Pré-dimensionamento de adutora / linha de recalque'),
+      h('div', { class: 'linha-dados' }, dados)));
+  };
+
+  App.dataHoraBR = function () {
+    var dt = new Date();
+    function z(n) { return (n < 10 ? '0' : '') + n; }
+    return z(dt.getDate()) + '/' + z(dt.getMonth() + 1) + '/' + dt.getFullYear() +
+           ' ' + z(dt.getHours()) + ':' + z(dt.getMinutes());
+  };
+
+  /* altura de cabeçalho + abas, para a faixa fixa grudar no lugar certo */
+  App.medirTopo = function () {
+    var topo = document.querySelector('header.topo');
+    var nav = document.getElementById('abas');
+    if (!topo || !nav) return;
+    var alt = topo.offsetHeight + nav.offsetHeight;
+    document.documentElement.style.setProperty('--topo-h', alt + 'px');
   };
 
   App.irPara = function (aba) {
     App.aba = aba;
+    App.rolarTopo = true;
     PDA.E.salvarConfig({ tema: document.documentElement.getAttribute('data-tema'), aba: aba });
     App.render();
-    window.scrollTo(0, 0);
   };
 
   App.agendar = function (ms) {
@@ -6262,9 +6892,17 @@ tr.selecionada td { font-weight: 600; }
     document.addEventListener('input', function (e) { App.aoDigitar(e, false); });
     document.addEventListener('change', function (e) { App.aoDigitar(e, true); });
     document.addEventListener('click', App.aoClicar);
+    window.addEventListener('resize', App.medirTopo);
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') UI.fecharModal();
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); App.baixarProjeto(); }
+      /* Enter num campo apenas confirma o valor; não recarrega a tela */
+      if (e.key === 'Enter' && e.target && e.target.getAttribute &&
+          e.target.getAttribute('data-bind') && e.target.tagName === 'INPUT') {
+        e.preventDefault();
+        e.target.blur();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); App.guardarNaBiblioteca(); }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); PDA.B.abrir(); }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { /* deixa a impressão nativa */ }
     });
   };
@@ -6301,6 +6939,15 @@ tr.selecionada td { font-weight: 600; }
       var basePai = bind.replace(/\.?catalogoId$/, '');
       var c = basePai ? UI.get(App.st, basePai) : App.st;
       if (c) c.itemRot = '';
+    }
+
+    /* pressão admissível: acompanha o catálogo enquanto o usuário não digitar
+       um valor próprio */
+    if (/\.pnMcaOverride$/.test(bind)) {
+      var conjPN = UI.get(App.st, bind.replace('.pnMcaOverride', ''));
+      if (conjPN) conjPN.pnAuto = false;
+    } else if (/\.(catalogoId|itemRot)$/.test(bind)) {
+      App.autoPreencherPN(bind.replace(/\.(catalogoId|itemRot)$/, ''));
     }
 
     /* cota de chegada e cota final do último trecho são o mesmo número:
@@ -6378,6 +7025,12 @@ tr.selecionada td { font-weight: 600; }
     }
 
     switch (acao) {
+      case 'mover': {
+        App.moverItem(el.getAttribute('data-arr'), Number(el.getAttribute('data-i')),
+                      Number(el.getAttribute('data-para')));
+        return;
+      }
+
       case 'removerPeca':
         UI.get(st, base).pecas.splice(Number(i), 1);
         App.render(); return;
@@ -6413,7 +7066,7 @@ tr.selecionada td { font-weight: 600; }
         return;
 
       case 'editarMotores': App.modalMotores(); return;
-      case 'imprimir': window.print(); return;
+      case 'imprimir': App.imprimir(); return;
 
       case 'irAba': App.irPara(el.getAttribute('data-aba')); return;
 
@@ -6493,9 +7146,51 @@ tr.selecionada td { font-weight: 600; }
         UI.confirmar('Novo projeto', 'Descartar os dados atuais e começar um projeto em branco?',
           function () { App.st = PDA.E.padrao(); App.aba = 'projeto'; App.render(); });
         return;
-      case 'abrirProjeto': App.abrirArquivo(App.carregarProjeto); return;
-      case 'salvarProjeto': App.baixarProjeto(); return;
-      case 'exemplo': App.modalExemplos(); return;
+      case 'abrirProjeto': PDA.B.abrir(); return;
+      case 'importarProjeto': UI.fecharModal(); App.abrirArquivo(App.carregarProjeto); return;
+      case 'salvarProjeto': App.guardarNaBiblioteca(); return;
+      case 'exportarProjeto': App.baixarProjeto(); return;
+      case 'exemplo': PDA.B.abrir(); return;
+      case 'exemploAgua':
+        UI.fecharModal(); App.st = App.exemploAgua(); App.autoPreencherPNTodos();
+        App.irPara('resumo'); return;
+      case 'exemploEsgoto':
+        UI.fecharModal(); App.st = App.exemploEsgoto(); App.autoPreencherPNTodos();
+        App.irPara('resumo'); return;
+      case 'abrirDaBiblioteca': {
+        var reg = PDA.E.doBiblioteca(el.getAttribute('data-id'));
+        if (!reg) { UI.toast('Projeto não encontrado.'); return; }
+        App.st = PDA.E.migrar(PDA.E.clone(reg.st));
+        App.st.id = reg.id;
+        UI.fecharModal();
+        App.irPara('resumo');
+        UI.toast('Projeto "' + reg.nome + '" aberto.');
+        return;
+      }
+      case 'duplicarDaBiblioteca': {
+        var reg2 = PDA.E.doBiblioteca(el.getAttribute('data-id'));
+        if (!reg2) return;
+        App.st = PDA.E.migrar(PDA.E.clone(reg2.st));
+        App.st.id = null;
+        App.st.projeto.nome = (App.st.projeto.nome || 'Projeto') + ' (cópia)';
+        UI.fecharModal();
+        App.irPara('resumo');
+        UI.toast('Cópia aberta. Use Salvar para guardá-la como um projeto novo.');
+        return;
+      }
+      case 'excluirDaBiblioteca': {
+        var id3 = el.getAttribute('data-id');
+        var reg3 = PDA.E.doBiblioteca(id3);
+        UI.confirmar('Excluir da biblioteca',
+          'Excluir "' + (reg3 ? reg3.nome : id3) + '" da biblioteca deste navegador? ' +
+          'O arquivo exportado, se houver, não é afetado.',
+          function () {
+            PDA.E.excluirDaBiblioteca(id3);
+            UI.toast('Projeto excluído.');
+            PDA.B.abrir();
+          });
+        return;
+      }
       case 'ajuda': App.modalAjuda(); return;
       case 'tema':
         var atual = document.documentElement.getAttribute('data-tema') === 'escuro' ? 'claro' : 'escuro';
@@ -6503,6 +7198,38 @@ tr.selecionada td { font-weight: 600; }
         PDA.E.salvarConfig({ tema: atual, aba: App.aba });
         return;
     }
+  };
+
+  /* Preenche o PN do trecho com o do catálogo, quando houver. Só age
+     enquanto o usuário não tiver informado um valor próprio. */
+  App.autoPreencherPN = function (caminhoConj) {
+    var conj = UI.get(App.st, caminhoConj);
+    if (!conj || conj.pnAuto === false) return;
+    var ctx;
+    try { ctx = PDA.C.contexto(App.st, App.cats); } catch (e) { return; }
+    var tubo = PDA.C.resolverTubo(conj, ctx);
+    if (tubo && tubo.item && tubo.item.pn && conj.itemRot) {
+      conj.pnMcaOverride = Number(tubo.item.pn) * 10;
+    } else {
+      conj.pnMcaOverride = null;
+    }
+  };
+
+  /* Aplica o preenchimento automático a todos os trechos de adutora */
+  App.autoPreencherPNTodos = function () {
+    App.st.adutoras.forEach(function (a, i) { App.autoPreencherPN('adutoras.' + i); });
+  };
+
+  /* Move um item de posição dentro de um array do estado */
+  App.moverItem = function (caminho, de, para) {
+    var arr = UI.get(App.st, caminho);
+    if (!Array.isArray(arr)) return;
+    if (de < 0 || de >= arr.length) return;
+    para = Math.max(0, Math.min(arr.length - 1, para));
+    if (de === para) return;
+    var item = arr.splice(de, 1)[0];
+    arr.splice(para, 0, item);
+    App.render();
   };
 
   /* ================================================================
@@ -6534,6 +7261,59 @@ tr.selecionada td { font-weight: 600; }
     var n = (st.projeto.nome || 'adutora').replace(/[^\wÀ-ÿ .-]+/g, '').trim().slice(0, 60) || 'adutora';
     return n + sufixo;
   }
+
+  /* Guarda o projeto atual na biblioteca do navegador */
+  App.guardarNaBiblioteca = function () {
+    var st = App.st;
+    if (!st.projeto.nome || st.projeto.nome === PDA.E.padrao().projeto.nome) {
+      App.pedirNome();
+      return;
+    }
+    var r = PDA.E.guardar(st, App.agora());
+    if (!r.ok) {
+      UI.modal('Não foi possível guardar', [
+        h('p', {}, 'O armazenamento do navegador está cheio. Exclua projetos antigos na biblioteca ' +
+                   'ou exporte este projeto em arquivo.'),
+        h('div', { class: 'linha', style: 'margin-top:10px' },
+          h('button', { class: 'btn primario', type: 'button', onclick: function () { UI.fecharModal(); App.baixarProjeto(); } }, 'Exportar em arquivo'),
+          h('button', { class: 'btn', type: 'button', onclick: function () { UI.fecharModal(); PDA.B.abrir(); } }, 'Abrir a biblioteca'))
+      ]);
+      return;
+    }
+    App.render();
+    UI.toast(r.novo ? 'Projeto guardado na biblioteca.' : 'Projeto atualizado na biblioteca.');
+  };
+
+  App.pedirNome = function () {
+    var inp = h('input', { type: 'text', value: App.st.projeto.nome || '', placeholder: 'Ex.: EEE Jardim Aeroporto — LR até a ETE' });
+    var loc = h('input', { type: 'text', value: App.st.projeto.local || '', placeholder: 'Cidade / obra' });
+    var resp = h('input', { type: 'text', value: App.st.projeto.responsavel || '', placeholder: 'Responsável técnico' });
+    UI.modal('Nome do projeto', [
+      h('p', { class: 'nota' },
+        'A biblioteca organiza os projetos por estes campos. Dê um nome antes de guardar — ' +
+        'os outros dois são opcionais e ajudam a achar depois.'),
+      h('div', { class: 'grade', style: 'margin-top:10px' },
+        h('label', { class: 'campo chave' }, h('span', { class: 'rot' }, 'Projeto / obra'), inp),
+        h('label', { class: 'campo' }, h('span', { class: 'rot' }, 'Local'), loc),
+        h('label', { class: 'campo' }, h('span', { class: 'rot' }, 'Responsável técnico'), resp))
+    ], [
+      h('button', { class: 'btn', type: 'button', onclick: UI.fecharModal }, 'Cancelar'),
+      h('button', {
+        class: 'btn primario', type: 'button', onclick: function () {
+          if (!inp.value.trim()) { UI.toast('Informe o nome do projeto.'); return; }
+          App.st.projeto.nome = inp.value.trim();
+          App.st.projeto.local = loc.value.trim();
+          App.st.projeto.responsavel = resp.value.trim();
+          UI.fecharModal();
+          App.guardarNaBiblioteca();
+        }
+      }, 'Guardar')
+    ]);
+    setTimeout(function () { inp.focus(); inp.select(); }, 30);
+  };
+
+  /* data/hora atual em ISO — isolada para poder ser fixada nos testes */
+  App.agora = function () { return new Date().toISOString(); };
 
   App.baixarProjeto = function () {
     App.baixar(nomeArquivo(App.st, '.adutora.json'),
@@ -6568,6 +7348,7 @@ tr.selecionada td { font-weight: 600; }
     var proj = dados.projeto || (dados.versao !== undefined && dados.vazao ? dados : null);
     if (!proj) { UI.toast('Este arquivo não contém um projeto.'); return; }
     App.st = PDA.E.migrar(proj);
+    App.autoPreencherPNTodos();
     if (dados.catalogosUsuario && dados.catalogosUsuario.length) {
       var atuais = App.cats.usuario.slice();
       dados.catalogosUsuario.forEach(function (c) {
@@ -6752,6 +7533,12 @@ tr.selecionada td { font-weight: 600; }
     return st;
   };
 
+  App.imprimir = function () {
+    App.montarCabecalhoImpressao(App.st, null, null);
+    UI.fecharModal();
+    window.print();
+  };
+
   App.modalLogo = function () {
     var atual = PDA.M.logoGravada();
     var previa = h('div', { style: 'margin:11px 0;min-height:52px;display:flex;align-items:center;gap:11px' });
@@ -6842,10 +7629,23 @@ tr.selecionada td { font-weight: 600; }
           'motor com folga excessiva, NPSH apertado, pressão negativa ou acima da classe do tubo. ' +
           'Passe o mouse para ver o motivo. O número em âmbar sobre a aba Resultados conta quantos pontos ' +
           'estão fora de faixa; sobre a aba Resumo, avisa que há incoerência nos dados de entrada.'),
-        UI.sub('Salvar o trabalho'),
-        h('p', {}, 'O projeto é guardado automaticamente no navegador deste computador. Para levar para outra máquina ' +
-          'ou anexar ao processo, use ', h('b', {}, 'Salvar'), ' (gera um arquivo .json) e ', h('b', {}, 'Abrir'), '. ' +
-          'Atalho: Ctrl+S salva o arquivo.'),
+        UI.sub('Guardar e reabrir projetos'),
+        h('p', {}, h('b', {}, 'Salvar'), ' guarda o projeto na biblioteca deste navegador, identificado pelo nome, ' +
+          'local, responsável e data. ', h('b', {}, 'Abrir'), ' mostra a biblioteca: dá para filtrar e ordenar por ' +
+          'qualquer coluna clicando no título, abrir, duplicar ou excluir. Os exemplos ficam na mesma tela. ' +
+          'Atalhos: Ctrl+S guarda, Ctrl+O abre.'),
+        h('p', {}, h('b', {}, 'Exportar'), ' gera um arquivo .json para levar o projeto a outro computador ou anexar ' +
+          'ao processo; na biblioteca, "Abrir de arquivo" faz o caminho de volta. Além disso, o projeto em andamento ' +
+          'é guardado sozinho a cada alteração, então fechar o navegador não perde nada.'),
+        UI.sub('Ordem das peças e dos trechos'),
+        h('p', {}, 'Arraste pela alça ⠿ ou use as setas ↑ ↓ para reordenar peças, trechos de barrilete, trechos de ' +
+          'adutora e pontos de perfil. A ordem não muda o resultado do cálculo — a perda é a soma das parcelas — ' +
+          'mas deixa a lista na sequência física da instalação, o que ajuda na conferência e na lista de materiais.'),
+        UI.sub('Impressão'),
+        h('p', {}, 'O que sai no papel é a mesma tela que você está vendo, com as cores das tabelas e os desenhos, ' +
+          'mais um cabeçalho com a logo e a identificação do projeto. Os comandos somem e os campos viram texto. ' +
+          'Imprima a aba que interessa: a aba Resultados traz o memorial completo. Para as tabelas largas, ' +
+          'escolha orientação paisagem na janela de impressão.'),
         h('div', { class: 'aviso' },
           h('b', {}, 'Alcance do programa'),
           'Trata-se de pré-dimensionamento. Define ordem de grandeza de diâmetro, altura manométrica e potência, ' +

@@ -28,6 +28,7 @@
       extensao: 0,
       unidExt: 'm',
       pnMcaOverride: null,
+      pnAuto: true,          /* enquanto verdadeiro, o PN acompanha o catálogo */
       pecas: []
     };
   }
@@ -141,6 +142,70 @@
   E.salvarCatalogos = function (usuario) {
     try { localStorage.setItem(LS_CAT, JSON.stringify(usuario)); return true; }
     catch (e) { return false; }
+  };
+
+  /* ---------------- biblioteca de projetos ----------------
+     Guardada no navegador. Cada registro traz os campos de identificação
+     soltos, para a lista poder ser ordenada sem abrir o projeto. */
+
+  var LS_BIB = 'pda.biblioteca.v1';
+
+  E.biblioteca = function () {
+    try { return JSON.parse(localStorage.getItem(LS_BIB) || '[]') || []; }
+    catch (e) { return []; }
+  };
+
+  E.gravarBiblioteca = function (lista) {
+    try { localStorage.setItem(LS_BIB, JSON.stringify(lista)); return true; }
+    catch (e) { return false; }
+  };
+
+  /* Guarda o projeto. Atualiza o registro de mesmo id, ou cria um novo. */
+  E.guardar = function (st, quandoISO) {
+    var lista = E.biblioteca();
+    if (!st.id) st.id = 'prj_' + Math.random().toString(36).slice(2, 10);
+    var reg = {
+      id: st.id,
+      nome: st.projeto.nome || '(sem nome)',
+      local: st.projeto.local || '',
+      responsavel: st.projeto.responsavel || '',
+      data: st.projeto.data || '',
+      salvoEm: quandoISO,
+      resumo: E.resumoCurto(st),
+      st: clone(st)
+    };
+    var i = -1, k;
+    for (k = 0; k < lista.length; k++) if (lista[k].id === reg.id) i = k;
+    if (i >= 0) lista[i] = reg; else lista.unshift(reg);
+    if (!E.gravarBiblioteca(lista)) return { ok: false, erro: 'sem espaço' };
+    return { ok: true, novo: i < 0, total: lista.length };
+  };
+
+  E.excluirDaBiblioteca = function (id) {
+    E.gravarBiblioteca(E.biblioteca().filter(function (r) { return r.id !== id; }));
+  };
+
+  E.doBiblioteca = function (id) {
+    var lista = E.biblioteca(), i;
+    for (i = 0; i < lista.length; i++) if (lista[i].id === id) return lista[i];
+    return null;
+  };
+
+  /* linha de resumo mostrada na lista */
+  E.resumoCurto = function (st) {
+    var q = Number(st.vazao.valor) || 0;
+    var trechos = (st.adutoras || []).filter(function (a) { return a.ativo !== false; });
+    var ext = 0;
+    trechos.forEach(function (a) {
+      ext += (Number(a.extensao) || 0) * (a.unidExt === 'km' ? 1000 : (a.unidExt === 'm' ? 1 : 1));
+    });
+    return {
+      vazao: q, unidade: st.vazao.unidade,
+      bombas: st.bombas.operando + '/' + st.bombas.instaladas,
+      trechos: trechos.length,
+      extensao: ext,
+      fluido: st.fluido.tipo
+    };
   };
 
   /* ---------------- persistência do projeto ---------------- */

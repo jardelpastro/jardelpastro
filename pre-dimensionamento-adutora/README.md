@@ -25,9 +25,12 @@ Abre no navegador que já existe na máquina (Chrome, Edge, Firefox, Safari).
 - Não envia dado nenhum para fora: todo o cálculo roda no navegador
 - Funciona em Windows, macOS e Linux
 
-O projeto em andamento é guardado automaticamente no navegador daquele
-computador. Para levar de uma máquina a outra, use **Salvar** (gera um arquivo
-`.json`) e **Abrir**.
+O projeto em andamento é guardado sozinho a cada alteração. **Salvar** guarda o
+projeto na biblioteca do navegador; **Abrir** mostra essa biblioteca, com filtro e
+ordenação por projeto, local, responsável, data do projeto ou data de gravação —
+os exemplos ficam na mesma tela. Para levar de uma máquina a outra, **Exportar**
+gera um arquivo `.json` e "Abrir de arquivo" faz o caminho de volta.
+Atalhos: Ctrl+S guarda, Ctrl+O abre.
 
 ## Por onde começar
 
@@ -97,7 +100,9 @@ derivação) ou um valor absoluto. Trechos podem ser adicionados, duplicados,
 desativados e removidos.
 
 **Peças e conexões** — 38 peças com coeficiente K de tabela, cada uma com
-quantidade e K sobreponível. Quando a peça tem diâmetro diferente do tubo do
+quantidade e K sobreponível. A lista é reordenável: arraste pela alça ⠿ ou use as
+setas ↑ ↓ para deixar as peças na sequência física do barrilete. O mesmo vale
+para trechos de barrilete, trechos de adutora e pontos de perfil. Quando a peça tem diâmetro diferente do tubo do
 trecho — uma redução, uma válvula menor que a linha — basta escolher o **DN
 comercial**: o programa busca o diâmetro interno correspondente no catálogo e
 calcula a perda com a velocidade nesse diâmetro.
@@ -124,6 +129,15 @@ o custo do tubo, o custo anual da energia associada à perda de carga daquele
 trecho e o custo anual total, marcando com **$** o diâmetro de menor custo. O
 preço do tubo é estimado por lei de potência sobre o DN, com coeficientes
 editáveis: serve para localizar o mínimo, não para orçar.
+
+**Biblioteca de projetos** — os projetos ficam guardados no navegador com nome,
+local, responsável e data. A tela de abrir lista todos, com filtro por texto e
+ordenação por qualquer coluna, e permite abrir, duplicar ou excluir.
+
+**Impressão fiel à tela** — o papel reproduz a aba que está aberta: mesmos
+cartões, mesmas cores das tabelas, mesmos desenhos. Some o que é comando de tela,
+os campos viram texto e entra um cabeçalho com a logo e a identificação do
+projeto. A aba Resultados traz o memorial completo.
 
 **Bombas de 1 a 50** — um cenário de cálculo para cada quantidade em operação
 simultânea, com vazão, altura manométrica, potência útil, potência de eixo,
@@ -180,10 +194,11 @@ src/js/09-ui-forms.js       painéis de entrada
 src/js/09b-ui-perfil.js     perfil da linha e envoltórias
 src/js/10-ui-resultados.js  resultados, piezométrica e memorial
 src/js/11-ui-catalogos.js   catálogos e fontes
+src/js/11b-ui-biblioteca.js biblioteca de projetos
 src/js/12-app.js            aplicação, ações, arquivos
 build.py                    gera dist/Pre-dimensionamento-Adutora.html
 tests/run.js                210 testes do núcleo de cálculo
-tests/ui.js                 157 testes de interface em navegador
+tests/ui.js                 219 testes de interface em navegador
 docs/AUDITORIA-PLANILHAS.md auditoria das planilhas de origem
 ```
 
@@ -204,6 +219,21 @@ ferro fundido, `e = DE/SDR` para PEAD), a monotonicidade dos coeficientes com a
 idade, os cenários de bombeamento, a classificação por cores, a curva do sistema,
 o ponto de operação em paralelo, as envoltórias do transitório e o ótimo
 econômico de diâmetro.
+
+## Pressão admissível do tubo
+
+Quando o catálogo traz o PN — PEAD, PVC, PVC-O, ferro fundido flangeado —, o
+campo *PN / PFA do tubo* do trecho é **preenchido sozinho** e acompanha a troca de
+diâmetro, até você digitar um valor próprio.
+
+As classes K do ferro fundido dúctil (K7, K9, K12) não têm PN único: a pressão
+admissível depende da classe, do DN e do tipo de junta, e o que costuma governar
+é a junta, não a parede. Para esses casos há um seletor com os degraus usuais de
+pressão da EN 545 (10, 12, 16, 20, 25, 30, 32, 40 bar…), que preenche o campo em
+um clique — a lista oferece os degraus, não afirma qual se aplica ao seu DN.
+A dica do campo mostra, como referência, a resistência do corpo do tubo pela
+expressão da EN 545 (`PFA = 20·e·σ/(DE−e)`), deixando claro que é um limite
+superior. Confirme sempre no catálogo do fabricante.
 
 ## A logo
 

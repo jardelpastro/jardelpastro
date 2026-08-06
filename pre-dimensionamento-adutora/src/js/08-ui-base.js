@@ -176,6 +176,115 @@
       op.dica ? UI.dica(op.dica) : null);
   };
 
+  /* ---------------- reordenação por arraste ----------------
+     A linha inteira vira alvo de arraste; a coluna da alça (⠿) é o que
+     inicia o gesto. Funciona junto com os botões ↑ ↓, que atendem teclado
+     e telas de toque. */
+
+  var arrasteAtual = null;
+
+  UI.linhaArrastavel = function (tr, caminhoArray, i) {
+    tr.setAttribute('draggable', 'true');
+    tr.setAttribute('data-arr', caminhoArray);
+    tr.setAttribute('data-pos', i);
+    tr.classList.add('arrastavel');
+
+    tr.addEventListener('dragstart', function (e) {
+      arrasteAtual = { arr: caminhoArray, de: i };
+      tr.classList.add('arrastando');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', caminhoArray + ':' + i); } catch (x) {}
+      }
+    });
+    tr.addEventListener('dragend', function () {
+      tr.classList.remove('arrastando');
+      limparAlvos();
+      arrasteAtual = null;
+    });
+    tr.addEventListener('dragover', function (e) {
+      if (!arrasteAtual || arrasteAtual.arr !== caminhoArray) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      limparAlvos();
+      tr.classList.add(i < arrasteAtual.de ? 'alvo-acima' : 'alvo-abaixo');
+    });
+    tr.addEventListener('drop', function (e) {
+      if (!arrasteAtual || arrasteAtual.arr !== caminhoArray) return;
+      e.preventDefault();
+      var de = arrasteAtual.de;
+      limparAlvos();
+      arrasteAtual = null;
+      if (de !== i) PDA.App.moverItem(caminhoArray, de, i);
+    });
+    return tr;
+  };
+
+  function limparAlvos() {
+    var el = document.querySelectorAll('.alvo-acima, .alvo-abaixo');
+    var i;
+    for (i = 0; i < el.length; i++) el[i].classList.remove('alvo-acima', 'alvo-abaixo');
+  }
+
+  /* mesma reordenação, para blocos (cartões de trecho) em vez de linhas */
+  UI.blocoArrastavel = function (el, caminhoArray, i) {
+    el.classList.add('arrastavel');
+    el.setAttribute('data-arr', caminhoArray);
+    el.addEventListener('dragstart', function (e) {
+      arrasteAtual = { arr: caminhoArray, de: i };
+      el.classList.add('arrastando');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', caminhoArray + ':' + i); } catch (x) {}
+      }
+    });
+    el.addEventListener('dragend', function () {
+      el.classList.remove('arrastando'); limparAlvos(); arrasteAtual = null;
+    });
+    el.addEventListener('dragover', function (e) {
+      if (!arrasteAtual || arrasteAtual.arr !== caminhoArray) return;
+      e.preventDefault();
+      limparAlvos();
+      el.classList.add(i < arrasteAtual.de ? 'alvo-acima' : 'alvo-abaixo');
+    });
+    el.addEventListener('drop', function (e) {
+      if (!arrasteAtual || arrasteAtual.arr !== caminhoArray) return;
+      e.preventDefault();
+      var de = arrasteAtual.de;
+      limparAlvos(); arrasteAtual = null;
+      if (de !== i) PDA.App.moverItem(caminhoArray, de, i);
+    });
+    return el;
+  };
+
+  /* alça de arraste para o cabeçalho de um bloco */
+  UI.alcaBloco = function (el, caminhoArray, i, total) {
+    return h('span', { style: 'display:inline-flex;align-items:center;gap:2px' },
+      h('span', {
+        class: 'alca naoimprime', title: 'Arraste para reordenar',
+        onmousedown: function () { el.setAttribute('draggable', 'true'); },
+        onmouseup: function () { el.setAttribute('draggable', 'false'); }
+      }, '⠿'),
+      h('button', { class: 'btn mini icone naoimprime', type: 'button', title: 'Mover para cima',
+                    disabled: i === 0,
+                    'data-acao': 'mover', 'data-arr': caminhoArray, 'data-i': i, 'data-para': i - 1 }, '↑'),
+      h('button', { class: 'btn mini icone naoimprime', type: 'button', title: 'Mover para baixo',
+                    disabled: i === total - 1,
+                    'data-acao': 'mover', 'data-arr': caminhoArray, 'data-i': i, 'data-para': i + 1 }, '↓'));
+  };
+
+  /* célula com a alça e os botões de mover */
+  UI.celulaMover = function (caminhoArray, i, total) {
+    return h('td', { class: 'col-mover naoimprime' },
+      h('span', { class: 'alca', title: 'Arraste para reordenar' }, '⠿'),
+      h('button', { class: 'btn mini icone', type: 'button', title: 'Mover para cima',
+                    disabled: i === 0,
+                    'data-acao': 'mover', 'data-arr': caminhoArray, 'data-i': i, 'data-para': i - 1 }, '↑'),
+      h('button', { class: 'btn mini icone', type: 'button', title: 'Mover para baixo',
+                    disabled: i === total - 1,
+                    'data-acao': 'mover', 'data-arr': caminhoArray, 'data-i': i, 'data-para': i + 1 }, '↓'));
+  };
+
   /* ---------------- dica / fonte ---------------- */
 
   UI.dica = function (texto, titulo) {

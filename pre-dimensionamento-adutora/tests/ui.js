@@ -377,7 +377,7 @@ function titulo(t) { console.log('\n' + t); }
 
   titulo('20. Exportar projeto em arquivo');
   const dl = page.waitForEvent('download', { timeout: 5000 });
-  await page.locator('[data-acao="salvarProjeto"]').click();
+  await page.locator('[data-acao="exportarProjeto"]').click();
   const arq = await dl;
   ok('download disparado', /\.adutora\.json$/.test(arq.suggestedFilename()), arq.suggestedFilename());
 
@@ -699,11 +699,337 @@ function titulo(t) { console.log('\n' + t); }
   ok('memorial ressalva o limite da análise econômica',
      /não para orçar/i.test(mem));
 
-  titulo('25. Impressão');
-  await page.locator('#abas button', { hasText: 'Resultados' }).click();
+  titulo('26. Rolagem preservada ao editar');
+  await page.locator('#abas button', { hasText: 'Barriletes' }).click();
+  await page.waitForTimeout(400);
+  /* desce até um campo do último trecho do barrilete comum */
+  const nTr = await page.evaluate(() => window.PDA.App.st.barrileteComum.trechos.length);
+  const campoFundo = page.locator(`input[data-bind="barrileteComum.trechos.${nTr - 1}.extensao"]`);
+  await campoFundo.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(200);
+  const yAntes = await page.evaluate(() => window.pageYOffset);
+  ok('rolou para o meio da página', yAntes > 300, String(yAntes));
+  await campoFundo.fill('12,5');
+  await page.waitForTimeout(500);
+  const yDepois = await page.evaluate(() => window.pageYOffset);
+  ok('a tela não volta para o topo ao digitar', Math.abs(yDepois - yAntes) < 60,
+     yAntes + ' -> ' + yDepois);
+  const focoDepois = await page.evaluate(() => document.activeElement.getAttribute('data-bind'));
+  ok('o foco continua no campo editado',
+     focoDepois === `barrileteComum.trechos.${nTr - 1}.extensao`, String(focoDepois));
+  /* Tab também não pode jogar a tela para cima */
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(450);
+  const yTab = await page.evaluate(() => window.pageYOffset);
+  ok('Tab não joga a tela para o topo', Math.abs(yTab - yAntes) < 120, yAntes + ' -> ' + yTab);
+  /* adicionar peça também mantém a posição */
+  const yA = await page.evaluate(() => window.pageYOffset);
+  await page.locator(`select[data-acao-change="addPeca"][data-base="barrileteComum.trechos.${nTr - 1}"]`)
+    .selectOption('curva90');
+  await page.waitForTimeout(450);
+  const yB = await page.evaluate(() => window.pageYOffset);
+  ok('adicionar peça mantém a posição da tela', Math.abs(yB - yA) < 120, yA + ' -> ' + yB);
+  /* trocar de aba, aí sim, volta ao topo */
+  await page.locator('#abas button', { hasText: 'Resumo' }).click();
+  await page.waitForTimeout(350);
+  ok('trocar de aba volta ao topo', (await page.evaluate(() => window.pageYOffset)) < 40);
+
+  titulo('27. Faixa de resumo fixa');
+  await page.locator('#abas button', { hasText: 'Adutora' }).click();
+  await page.waitForTimeout(400);
+  ok('faixa fixa ativa na aba Adutora',
+     await page.evaluate(() => document.getElementById('fixo').classList.contains('ativa')));
+  ok('posição sticky aplicada',
+     (await page.evaluate(() => getComputedStyle(document.getElementById('fixo')).position)) === 'sticky');
+  const topoAntes = await page.evaluate(() => document.getElementById('fixo').getBoundingClientRect().top);
+  await page.evaluate(() => window.scrollTo(0, 900));
+  await page.waitForTimeout(250);
+  const topoDepois = await page.evaluate(() => document.getElementById('fixo').getBoundingClientRect().top);
+  ok('a faixa continua visível ao rolar', topoDepois > 0 && topoDepois < 200,
+     'topo em ' + topoDepois.toFixed(0) + ' px');
+  ok('a faixa mostra a vazão', /L\/s/.test(await page.locator('#fixo').innerText()));
+  await page.locator('#abas button', { hasText: 'Resumo' }).click();
   await page.waitForTimeout(300);
-  const pdf = await page.pdf({ format: 'A4', printBackground: true });
+  ok('faixa fixa oculta na aba Resumo',
+     !(await page.evaluate(() => document.getElementById('fixo').classList.contains('ativa'))));
+  await page.locator('#abas button', { hasText: 'Parâmetros' }).click();
+  await page.waitForTimeout(300);
+  ok('faixa fixa oculta em Parâmetros',
+     !(await page.evaluate(() => document.getElementById('fixo').classList.contains('ativa'))));
+
+  titulo('28. Reordenar peças');
+  await page.locator('#abas button', { hasText: 'Adutora' }).click();
+  await page.waitForTimeout(400);
+  const antesOrdem = await page.evaluate(() => window.PDA.App.st.adutoras[0].pecas.map(p => p.pecaId));
+  ok('há peças para reordenar', antesOrdem.length >= 3, JSON.stringify(antesOrdem));
+  ok('coluna de ordem presente',
+     (await page.locator('#conteudo .col-mover').count()) >= 3);
+  ok('alça de arraste presente', (await page.locator('#conteudo .col-mover .alca').count()) >= 3);
+  ok('linhas marcadas como arrastáveis',
+     (await page.locator('#conteudo tr.arrastavel[draggable="true"]').count()) >= 3);
+  /* mover a primeira peça para baixo pelo botão */
+  await page.locator('[data-acao="mover"][data-arr="adutoras.0.pecas"][data-i="0"][data-para="1"]').click();
+  await page.waitForTimeout(400);
+  const depoisOrdem = await page.evaluate(() => window.PDA.App.st.adutoras[0].pecas.map(p => p.pecaId));
+  ok('botão desce a peça uma posição',
+     depoisOrdem[0] === antesOrdem[1] && depoisOrdem[1] === antesOrdem[0],
+     JSON.stringify(antesOrdem) + ' -> ' + JSON.stringify(depoisOrdem));
+  /* subir de volta */
+  await page.locator('[data-acao="mover"][data-arr="adutoras.0.pecas"][data-i="1"][data-para="0"]').click();
+  await page.waitForTimeout(400);
+  const voltaOrdem = await page.evaluate(() => window.PDA.App.st.adutoras[0].pecas.map(p => p.pecaId));
+  ok('botão sobe a peça de volta',
+     JSON.stringify(voltaOrdem) === JSON.stringify(antesOrdem), JSON.stringify(voltaOrdem));
+  ok('primeira peça não tem botão de subir habilitado',
+     await page.evaluate(() =>
+       document.querySelector('[data-acao="mover"][data-arr="adutoras.0.pecas"][data-i="0"][data-para="-1"]').disabled));
+  /* a reordenação não altera a perda total */
+  const perdaAntes = await page.evaluate(() =>
+    window.PDA.C.resumo(window.PDA.App.st, window.PDA.App.cats).projeto.adutoras[0].hl);
+  await page.evaluate(() => window.PDA.App.moverItem('adutoras.0.pecas', 0, 2));
+  await page.waitForTimeout(350);
+  const perdaDepois = await page.evaluate(() =>
+    window.PDA.C.resumo(window.PDA.App.st, window.PDA.App.cats).projeto.adutoras[0].hl);
+  ok('reordenar não muda a perda localizada', Math.abs(perdaAntes - perdaDepois) < 1e-12,
+     perdaAntes.toFixed(6) + ' vs ' + perdaDepois.toFixed(6));
+
+  titulo('29. Reordenar trechos');
+  await page.locator('#abas button', { hasText: 'Barriletes' }).click();
+  await page.waitForTimeout(400);
+  const trAntes = await page.evaluate(() => window.PDA.App.st.barrileteComum.trechos.map(t => t.nBombas));
+  ok('trechos arrastáveis', (await page.locator('#conteudo .conjunto.arrastavel').count()) >= 2);
+  await page.locator('[data-acao="mover"][data-arr="barrileteComum.trechos"][data-i="0"][data-para="1"]').click();
+  await page.waitForTimeout(400);
+  const trDepois = await page.evaluate(() => window.PDA.App.st.barrileteComum.trechos.map(t => t.nBombas));
+  ok('trecho de barrilete muda de posição',
+     trDepois[0] === trAntes[1] && trDepois[1] === trAntes[0],
+     JSON.stringify(trAntes) + ' -> ' + JSON.stringify(trDepois));
+  await page.locator('[data-acao="mover"][data-arr="barrileteComum.trechos"][data-i="1"][data-para="0"]').click();
+  await page.waitForTimeout(400);
+
+  titulo('30. PN pré-preenchido');
+  await page.locator('#abas button', { hasText: 'Adutora' }).click();
+  await page.waitForTimeout(400);
+  /* catálogo com PN: preenche sozinho */
+  await page.selectOption('select[data-bind="adutoras.0.catalogoId"]', 'fd_flg_pn16');
+  await page.waitForTimeout(400);
+  await page.selectOption('select[data-bind="adutoras.0.itemRot"]', 'DN 400');
+  await page.waitForTimeout(450);
+  const pn1 = await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride);
+  ok('catálogo com PN preenche o campo sozinho', pn1 === 160, String(pn1));
+  const campoPN = page.locator('input[data-bind="adutoras.0.pnMcaOverride"]');
+  ok('o valor aparece no campo', (await campoPN.inputValue()) === '160',
+     await campoPN.inputValue());
+  /* trocar de diâmetro atualiza */
+  await page.selectOption('select[data-bind="adutoras.0.itemRot"]', 'DN 600');
+  await page.waitForTimeout(450);
+  ok('trocar de diâmetro mantém o PN do catálogo',
+     (await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)) === 160);
+  /* valor digitado pelo usuário não é sobrescrito */
+  await campoPN.fill('95');
+  await page.waitForTimeout(450);
+  await page.selectOption('select[data-bind="adutoras.0.itemRot"]', 'DN 500');
+  await page.waitForTimeout(450);
+  ok('valor informado pelo usuário não é sobrescrito',
+     (await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)) === 95,
+     String(await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)));
+  /* classe K: seletor de degraus normativos */
+  await page.evaluate(() => { window.PDA.App.st.adutoras[0].pnAuto = true; window.PDA.App.render(); });
+  await page.selectOption('select[data-bind="adutoras.0.catalogoId"]', 'fd_k9');
+  await page.waitForTimeout(400);
+  await page.selectOption('select[data-bind="adutoras.0.itemRot"]', 'DN 400');
+  await page.waitForTimeout(450);
+  ok('classe K sem PN deixa o campo em branco',
+     (await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)) === null);
+  const selDegrau = page.locator('select[data-bind="adutoras.0.pnMcaOverride"]');
+  ok('seletor de degraus aparece para as classes K', (await selDegrau.count()) === 1);
+  ok('degraus da EN 545 oferecidos', (await selDegrau.locator('option').count()) >= 8);
+  await selDegrau.selectOption('400');
+  await page.waitForTimeout(450);
+  ok('escolher o degrau preenche o PN',
+     (await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)) === 400);
+  ok('a verificação de pressão passa a concluir',
+     (await page.evaluate(() =>
+       window.PDA.C.resumo(window.PDA.App.st, window.PDA.App.cats).piezometrica[1].pnMca)) === 400);
+  ok('a origem do PN é registrada',
+     (await page.evaluate(() => {
+       const P = window.PDA, ctx = P.C.contexto(P.App.st, P.App.cats);
+       return P.C.pnInfo(P.App.st.adutoras[0], P.C.resolverTubo(P.App.st.adutoras[0], ctx)).origem;
+     })) === 'informado');
+
+  titulo('31. Biblioteca de projetos');
+  await page.evaluate(() => localStorage.removeItem('pda.biblioteca.v1'));
+  await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    st.id = null;
+    st.projeto = { nome: 'EEE Aeroporto', local: 'Chapecó', responsavel: 'J. Pastro', data: '10/03/2026', obs: '' };
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(300);
+  await page.locator('[data-acao="salvarProjeto"]').click();
+  await page.waitForTimeout(400);
+  const bib1 = await page.evaluate(() => window.PDA.E.biblioteca().length);
+  ok('projeto guardado na biblioteca', bib1 === 1, String(bib1));
+  /* mais dois, para testar ordenação */
+  await page.evaluate(() => {
+    const A = window.PDA.App, E = window.PDA.E;
+    A.st.id = null; A.st.projeto.nome = 'Adutora Zona Norte'; A.st.projeto.local = 'Ararangua';
+    A.st.projeto.responsavel = 'A. Silva';
+    E.guardar(A.st, '2026-01-05T10:00:00.000Z');
+    A.st.id = null; A.st.projeto.nome = 'Booster Centro'; A.st.projeto.local = 'Blumenau';
+    A.st.projeto.responsavel = 'Z. Souza';
+    E.guardar(A.st, '2026-07-20T10:00:00.000Z');
+  });
+  await page.locator('[data-acao="abrirProjeto"]').click();
+  await page.waitForSelector('.modal');
+  await page.waitForTimeout(250);
+  ok('biblioteca lista os três projetos',
+     (await page.locator('.modal tbody tr').count()) === 3,
+     String(await page.locator('.modal tbody tr').count()));
+  ok('exemplos aparecem na mesma tela',
+     /Adutora de água tratada/.test(await page.locator('.modal').innerText()));
+  /* ordenar por nome */
+  await page.locator('.modal th[title="Ordenar por projeto"]').click();
+  await page.waitForTimeout(220);
+  let nomes = await page.locator('.modal tbody tr td:first-child b').allTextContents();
+  ok('ordena por nome crescente',
+     JSON.stringify(nomes) === JSON.stringify(['Adutora Zona Norte', 'Booster Centro', 'EEE Aeroporto']),
+     JSON.stringify(nomes));
+  await page.locator('.modal th[title="Ordenar por projeto"]').click();
+  await page.waitForTimeout(220);
+  nomes = await page.locator('.modal tbody tr td:first-child b').allTextContents();
+  ok('segundo clique inverte a ordem', nomes[0] === 'EEE Aeroporto', JSON.stringify(nomes));
+  /* ordenar por local */
+  await page.locator('.modal th[title="Ordenar por local"]').click();
+  await page.waitForTimeout(220);
+  const locais = await page.locator('.modal tbody tr td:nth-child(2)').allTextContents();
+  ok('ordena por local', locais[0].trim() === 'Ararangua', JSON.stringify(locais));
+  /* ordenar por responsável */
+  await page.locator('.modal th[title="Ordenar por responsável"]').click();
+  await page.waitForTimeout(220);
+  const resps = await page.locator('.modal tbody tr td:nth-child(3)').allTextContents();
+  ok('ordena por responsável', resps[0].trim() === 'A. Silva', JSON.stringify(resps));
+  /* filtrar */
+  await page.locator('.modal input[type="text"]').fill('blumenau');
+  await page.waitForTimeout(280);
+  ok('filtro reduz a lista', (await page.locator('.modal tbody tr').count()) === 1,
+     String(await page.locator('.modal tbody tr').count()));
+  await page.locator('.modal input[type="text"]').fill('');
+  await page.waitForTimeout(280);
+  /* abrir um projeto */
+  await page.locator('.modal tbody tr', { hasText: 'EEE Aeroporto' })
+    .locator('button', { hasText: 'Abrir' }).click();
+  await page.waitForTimeout(450);
+  ok('projeto aberto da biblioteca',
+     (await page.evaluate(() => window.PDA.App.st.projeto.nome)) === 'EEE Aeroporto');
+  ok('modal fechou ao abrir', (await page.locator('.modal').count()) === 0);
+  /* salvar de novo atualiza em vez de duplicar */
+  await page.locator('[data-acao="salvarProjeto"]').click();
+  await page.waitForTimeout(400);
+  ok('salvar de novo atualiza o registro',
+     (await page.evaluate(() => window.PDA.E.biblioteca().length)) === 3);
+  /* duplicar */
+  await page.locator('[data-acao="abrirProjeto"]').click();
+  await page.waitForSelector('.modal');
+  await page.locator('.modal tbody tr', { hasText: 'EEE Aeroporto' })
+    .locator('button', { hasText: 'Duplicar' }).click();
+  await page.waitForTimeout(450);
+  ok('duplicar abre uma cópia sem id',
+     /\(cópia\)/.test(await page.evaluate(() => window.PDA.App.st.projeto.nome)) &&
+     !(await page.evaluate(() => window.PDA.App.st.id)),
+     await page.evaluate(() => window.PDA.App.st.projeto.nome));
+  /* excluir */
+  await page.locator('[data-acao="abrirProjeto"]').click();
+  await page.waitForSelector('.modal');
+  await page.locator('.modal tbody tr', { hasText: 'Booster Centro' })
+    .locator('button', { hasText: 'Excluir' }).click();
+  await page.waitForSelector('.modal button:has-text("Confirmar")');
+  await page.locator('.modal button', { hasText: 'Confirmar' }).click();
+  await page.waitForTimeout(450);
+  ok('projeto excluído da biblioteca',
+     (await page.evaluate(() => window.PDA.E.biblioteca().length)) === 2);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  /* sobrevive ao recarregar */
+  await page.reload();
+  await page.waitForSelector('#abas button');
+  await page.waitForTimeout(400);
+  ok('biblioteca sobrevive ao recarregar',
+     (await page.evaluate(() => window.PDA.E.biblioteca().length)) === 2);
+
+  titulo('32. Projeto sem nome pede identificação');
+  await page.evaluate(() => {
+    window.PDA.App.st = window.PDA.E.padrao();
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(300);
+  await page.locator('[data-acao="salvarProjeto"]').click();
+  await page.waitForSelector('.modal');
+  ok('pede o nome antes de guardar',
+     /Nome do projeto/.test(await page.locator('.modal .cab').innerText()));
+  await page.locator('.modal input').first().fill('Projeto de teste');
+  await page.locator('.modal button', { hasText: 'Guardar' }).click();
+  await page.waitForTimeout(450);
+  ok('guardado com o nome informado',
+     (await page.evaluate(() => window.PDA.E.biblioteca()))
+       .some(r => r.nome === 'Projeto de teste'));
+
+  titulo('25. Impressão fiel');
+  await page.locator('[data-acao="exemplo"]').click();
+  await page.waitForSelector('.modal');
+  await page.locator('.modal button', { hasText: 'Linha de recalque de esgoto' }).click();
+  await page.waitForTimeout(500);
+  await page.locator('#abas button', { hasText: 'Adutora' }).click();
+  await page.waitForTimeout(450);
+
+  ok('cabeçalho de impressão montado',
+     (await page.locator('#cabecalho-impressao .marca-bloco').count()) === 1);
+  const cabImp = await page.evaluate(() => document.getElementById('cabecalho-impressao').textContent);
+  ok('cabeçalho traz o nome do projeto', /esgoto bruto/i.test(cabImp), cabImp.slice(0, 70));
+  ok('cabeçalho identifica a folha impressa', /Adutora/.test(cabImp));
+  ok('cabeçalho oculto na tela',
+     (await page.evaluate(() => getComputedStyle(document.getElementById('cabecalho-impressao')).display)) === 'none');
+
+  await page.emulateMedia({ media: 'print' });
+  await page.waitForTimeout(250);
+  const impr = await page.evaluate(() => {
+    function vis(sel) {
+      const e = document.querySelector(sel);
+      /* getClientRects vazio cobre também o caso de um ancestral escondido */
+      return e ? e.getClientRects().length > 0 : false;
+    }
+    return {
+      cabecalho: vis('#cabecalho-impressao'),
+      logo: !!document.querySelector('#cabecalho-impressao .marca-simbolo svg, #cabecalho-impressao img.marca-img'),
+      topo: vis('header.topo'),
+      abas: vis('nav.abas'),
+      fixa: vis('.faixa-fixa'),
+      copiaFaixa: vis('.somenteimprime'),
+      cartoes: document.querySelectorAll('.cartao').length,
+      tabelas: document.querySelectorAll('table').length,
+      botoes: vis('button.btn'),
+      inputs: vis('input[data-bind]'),
+      esquema: vis('svg.esquema')
+    };
+  });
+  ok('cabeçalho aparece no papel', impr.cabecalho);
+  ok('logo vai junto no papel', impr.logo);
+  ok('barra de comandos e abas somem', !impr.topo && !impr.abas);
+  ok('a faixa fixa é substituída por uma cópia no fluxo', !impr.fixa && impr.copiaFaixa);
+  ok('cartões preservados no papel', impr.cartoes > 1, String(impr.cartoes));
+  ok('tabelas preservadas no papel', impr.tabelas > 1, String(impr.tabelas));
+  ok('botões somem', !impr.botoes);
+  ok('campos preenchidos continuam visíveis', impr.inputs);
+  ok('desenho esquemático vai para o papel', impr.esquema);
+  await page.emulateMedia({ media: 'screen' });
+  await page.waitForTimeout(200);
+
+  const pdf = await page.pdf({ format: 'A4', printBackground: true, landscape: true });
   ok('gera PDF de impressão', pdf.length > 12000, (pdf.length / 1024).toFixed(0) + ' kB');
+  await page.locator('#abas button', { hasText: 'Resultados' }).click();
+  await page.waitForTimeout(400);
+  const pdf2 = await page.pdf({ format: 'A4', printBackground: true });
+  ok('memorial gera PDF com várias páginas', pdf2.length > 20000, (pdf2.length / 1024).toFixed(0) + ' kB');
 
   await browser.close();
   console.log('\n' + '='.repeat(60));

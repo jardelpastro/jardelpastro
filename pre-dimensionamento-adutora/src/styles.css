@@ -130,6 +130,24 @@ nav.abas button .marcador {
 
 main { max-width: 1500px; margin: 0 auto; padding: 16px; }
 
+/* faixa de resumo fixa logo abaixo das abas */
+.faixa-fixa {
+  position: sticky;
+  top: var(--topo-h, 100px);
+  z-index: 37;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px 9px;
+  display: none;
+}
+.faixa-fixa.ativa { display: block; }
+.faixa-fixa .interno { max-width: 1500px; margin: 0 auto; }
+.faixa-fixa .faixa-resumo { margin: 0; }
+
+#cabecalho-impressao { display: none; }
+.somenteimprime { display: none; }
+.valor-impresso { display: none; }
+
 .faixa-resumo {
   display: flex; gap: 10px; flex-wrap: wrap;
   background: var(--surface); border: 1px solid var(--border);
@@ -251,6 +269,9 @@ th, td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--bor
 th { background: var(--surface-2); font-weight: 600; font-size: 11.5px; color: var(--texto-2); white-space: nowrap; position: relative; }
 th:first-child, td:first-child { text-align: left; }
 th.esq, td.esq { text-align: left; }
+th.ordenavel { cursor: pointer; user-select: none; }
+th.ordenavel:hover { color: var(--azul); background: var(--azul-claro); }
+th .seta { color: var(--teal); }
 td { font-variant-numeric: tabular-nums; }
 tbody tr:hover { background: var(--surface-2); }
 tfoot td { font-weight: 600; background: var(--surface-2); border-top: 2px solid var(--border-forte); }
@@ -303,6 +324,27 @@ tr.selecionada td { font-weight: 600; }
 .pecas-tab .col-dn { width: 168px; }
 .pecas-tab .col-dn select { max-width: 168px; }
 .pecas-tab .col-x { width: 32px; }
+.pecas-tab .col-mover { width: 74px; white-space: nowrap; }
+
+tr.arrastavel .alca {
+  display: inline-block; cursor: grab; color: var(--texto-3); font-size: 14px;
+  padding: 0 3px; user-select: none; line-height: 1;
+}
+tr.arrastavel .alca:active { cursor: grabbing; }
+tr.arrastavel:hover .alca { color: var(--teal); }
+tr.arrastando { opacity: .45; }
+tr.alvo-acima td { box-shadow: inset 0 2px 0 var(--teal-vivo); }
+tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
+.col-mover button { padding: 1px 5px; line-height: 1.2; }
+.col-mover button:disabled { opacity: .3; cursor: default; }
+
+/* cabeçalho de conjunto arrastável (trechos) */
+.conjunto.arrastavel > .cab-conj .alca {
+  cursor: grab; color: var(--texto-3); font-size: 15px; padding: 0 2px; user-select: none;
+}
+.conjunto.arrastando { opacity: .45; }
+.conjunto.alvo-acima { box-shadow: inset 0 3px 0 var(--teal-vivo); }
+.conjunto.alvo-abaixo { box-shadow: inset 0 -3px 0 var(--teal-vivo); }
 
 /* ---------------- conjuntos / trechos ---------------- */
 
@@ -401,15 +443,98 @@ tr.selecionada td { font-weight: 600; }
 .memorial .cab-doc { text-align: center; margin-bottom: 18px; }
 
 @media print {
-  header.topo, nav.abas, .acoes, button, .faixa-resumo { display: none !important; }
-  body { background: #fff; font-size: 10.5pt; }
+  /* A impressão reproduz o que está na tela: mesmos cartões, mesmas cores,
+     mesmas tabelas. Some apenas o que é comando de tela. */
+  :root { --bg: #fff; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  @page { margin: 10mm 8mm; }
+
+  html, body { background: #fff !important; }
+  body { font-size: 8.6pt; color: #16202e; }
+
+  .somenteimprime { display: block !important; margin-bottom: 11px; }
+  header.topo, nav.abas, .faixa-fixa, .naoimprime,
+  .fundo-modal, .toast, .dica, button { display: none !important; }
+
   main { max-width: none; padding: 0; }
-  .cartao { break-inside: avoid; box-shadow: none; border-color: #bbb; margin-bottom: 10px; }
-  .rolagem { overflow: visible; }
+
+  #cabecalho-impressao {
+    display: flex !important;
+    align-items: center; gap: 14px;
+    padding: 0 0 8px; margin-bottom: 12px;
+    border-bottom: 2px solid var(--azul);
+  }
+  #cabecalho-impressao .marca-bloco { color: var(--azul); }
+  #cabecalho-impressao .marca-img { max-height: 46px; }
+  #cabecalho-impressao .dados { flex: 1; }
+  #cabecalho-impressao .dados h1 { font-size: 12pt; margin: 0; }
+  #cabecalho-impressao .dados .linha-dados {
+    font-size: 8pt; color: var(--texto-2); margin-top: 2px;
+    display: flex; gap: 14px; flex-wrap: wrap;
+  }
+  #cabecalho-impressao .dados .linha-dados b { color: var(--texto); font-weight: 600; }
+
+  /* a faixa de resumo entra no papel, logo abaixo do cabeçalho */
+  .faixa-resumo {
+    box-shadow: none; border: 1px solid #c9d2dc; break-inside: avoid;
+    padding: 7px 9px; gap: 12px;
+  }
+  .chip .val { font-size: 10pt; }
+  .chip.forte { background: #eaf5f4 !important; }
+
+  .cartao {
+    break-inside: auto; page-break-inside: auto;
+    box-shadow: none; border-color: #c9d2dc; margin-bottom: 9px;
+  }
+  .cartao > .cab { break-after: avoid; page-break-after: avoid; background: #f2f5f8 !important; }
+  .cartao > .corpo { padding: 9px; }
+  .conjunto { break-inside: auto; border-color: #ccd4de; }
+  .conjunto > .cab-conj { break-after: avoid; background: #f2f5f8 !important; }
+  .conjunto > .cab-conj input.titulo { border-color: transparent; }
+
+  h2, h3, .subtitulo { break-after: avoid; page-break-after: avoid; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  table { font-size: 7.6pt; }
+  th, td { padding: 2px 4px; }
+  .rolagem { overflow: visible !important; max-height: none !important; }
+
+  /* campos: viram texto impresso, sem cara de formulário */
+  input[type="text"], input[type="number"], select, textarea {
+    border: none; border-bottom: 1px solid #c9d2dc; border-radius: 0;
+    background: transparent !important; padding: 1px 2px;
+    -webkit-appearance: none; appearance: none;
+    color: #16202e !important; font-weight: 600;
+  }
+  select { display: none !important; }
+  .valor-impresso {
+    display: inline-block !important;
+    border-bottom: 1px solid #c9d2dc; padding: 1px 2px;
+    font-weight: 600; font-size: inherit; line-height: 1.35;
+    width: 100%; word-break: break-word;
+  }
+  td .valor-impresso, th .valor-impresso { border: none; width: auto; }
+  input.editado, select.editado { background: #fff6e0 !important; border-bottom-color: #b58a2b; }
+  label.campo.chave { background: #eaf5f4 !important; border-color: #7fb8b3; }
+  label.campo > span.rot { color: #556273; }
+  input:disabled, select:disabled { color: #556273 !important; }
+
   tr.bom { background: #eef8f1 !important; }
   tr.atencao { background: #fdf6e3 !important; }
   tr.ruim { background: #fbeeed !important; }
-  .naoimprime { display: none !important; }
+  tr.selecionada { outline: 1.5px solid var(--azul); }
+  .tag { border-width: .8px; }
+
+  .aviso { break-inside: avoid; }
+  .caixa-esquema { break-inside: avoid; background: #fafbfc !important; }
+  svg.perfil, svg.esquema { break-inside: avoid; max-width: 100%; }
+  .perfil { background: #fafbfc !important; }
+
+  .memorial { padding: 0; }
+  .memorial h2 { break-before: auto; }
+
+  a[href]::after { content: none !important; }
 }
 
 @media (max-width: 720px) {
