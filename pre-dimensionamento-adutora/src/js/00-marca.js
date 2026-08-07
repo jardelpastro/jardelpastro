@@ -12,7 +12,14 @@
 
   var M = {};
   var LS_LOGO = 'pda.logo.v1';
+  var LS_MODO = 'pda.logo.modo.v1';
   var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  /* Caixa em que qualquer logo tem de caber, na tela e no papel. A imagem é
+     ajustada por object-fit: contain, então uma logo comprida encolhe pela
+     largura e uma logo alta encolhe pela altura — nas duas situações ela cabe
+     inteira, sem distorcer e sem empurrar o resto do cabeçalho. */
+  M.CAIXA = { larguraTela: 230, larguraImpressao: 190 };
 
   M.cores = {
     navy: '#0E2148',
@@ -76,32 +83,60 @@
     return svg;
   };
 
-  /* marca completa (símbolo + nome) para o cabeçalho */
-  M.marca = function (alturaPx) {
-    var logo = M.logoGravada();
+  /* marca completa para o cabeçalho.
+     op: { altura, larguraMax, semTexto } */
+  M.marca = function (alturaPx, op) {
+    op = op || {};
+    var modo = M.modo();
     var caixa = document.createElement('div');
     caixa.className = 'marca-bloco';
+    if (modo === 'nenhuma') { caixa.className += ' marca-vazia'; return caixa; }
 
-    if (logo) {
-      var img = document.createElement('img');
-      img.src = logo;
-      img.alt = 'Logo';
-      img.className = 'marca-img';
-      img.style.height = alturaPx + 'px';
-      caixa.appendChild(img);
-      return caixa;
+    var alt = alturaPx || 38;
+    var larg = op.larguraMax || M.CAIXA.larguraTela;
+
+    if (modo === 'usuario') {
+      var logo = M.logoGravada();
+      if (logo) {
+        var moldura = document.createElement('span');
+        moldura.className = 'marca-moldura';
+        moldura.style.height = alt + 'px';
+        moldura.style.maxWidth = larg + 'px';
+        var img = document.createElement('img');
+        img.src = logo;
+        img.alt = 'Logo';
+        img.className = 'marca-img';
+        moldura.appendChild(img);
+        caixa.appendChild(moldura);
+        return caixa;
+      }
     }
 
     var simb = document.createElement('span');
     simb.className = 'marca-simbolo';
-    simb.appendChild(M.simbolo(alturaPx));
+    simb.appendChild(M.simbolo(alt));
     caixa.appendChild(simb);
 
-    var txt = document.createElement('span');
-    txt.className = 'marca-nome';
-    txt.innerHTML = '<b>PASTRO</b><i>ENGENHARIA</i>';
-    caixa.appendChild(txt);
+    if (!op.semTexto) {
+      var txt = document.createElement('span');
+      txt.className = 'marca-nome';
+      txt.innerHTML = '<b>PASTRO</b><i>ENGENHARIA</i>';
+      caixa.appendChild(txt);
+    }
     return caixa;
+  };
+
+  /* 'padrao' (o desenho), 'usuario' (arquivo carregado) ou 'nenhuma' */
+  M.modo = function () {
+    var m;
+    try { m = localStorage.getItem(LS_MODO); } catch (e) { m = null; }
+    if (m === 'nenhuma') return 'nenhuma';
+    if (m === 'usuario' && M.logoGravada()) return 'usuario';
+    return 'padrao';
+  };
+
+  M.definirModo = function (m) {
+    try { localStorage.setItem(LS_MODO, m); return true; } catch (e) { return false; }
   };
 
   M.logoGravada = function () {
@@ -109,11 +144,27 @@
   };
 
   M.gravarLogo = function (dataUri) {
-    try { localStorage.setItem(LS_LOGO, dataUri); return true; } catch (e) { return false; }
+    try {
+      localStorage.setItem(LS_LOGO, dataUri);
+      localStorage.setItem(LS_MODO, 'usuario');
+      return true;
+    } catch (e) { return false; }
   };
 
   M.removerLogo = function () {
-    try { localStorage.removeItem(LS_LOGO); } catch (e) {}
+    try { localStorage.removeItem(LS_LOGO); localStorage.setItem(LS_MODO, 'padrao'); } catch (e) {}
+  };
+
+  /* Mede a imagem carregada e devolve a proporção, para avisar quando a logo
+     for muito comprida ou muito alta e ficar pequena dentro da caixa. */
+  M.medir = function (dataUri, cb) {
+    var img = new Image();
+    img.onload = function () {
+      var prop = img.naturalWidth / Math.max(1, img.naturalHeight);
+      cb({ largura: img.naturalWidth, altura: img.naturalHeight, proporcao: prop });
+    };
+    img.onerror = function () { cb(null); };
+    img.src = dataUri;
   };
 
   PDA.M = M;

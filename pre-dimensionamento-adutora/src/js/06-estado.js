@@ -125,6 +125,8 @@
       curvaBomba: {
         ativo: false, unidQ: 'L/s', pontos: [], npshr: null
       },
+      /* textos do memorial */
+      memorial: { introducao: '', objetivo: '' },
       /* análise econômica de diâmetro */
       economia: {
         ativo: false, tarifa: 0.65, horasDia: 20, anos: 20, taxa: 8,

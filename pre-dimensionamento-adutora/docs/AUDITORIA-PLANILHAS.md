@@ -238,6 +238,51 @@ por isso eram coloridos pela faixa de velocidade do barrilete (até 3,5 m/s em
 água) em vez da faixa de sucção (até 2,0 m/s), que é a que preserva o NPSH.
 Corrigido, com ajuste automático dos projetos já gravados ao serem abertos.
 
+### 3.11 Numeração do sumário e dos índices deslocada de uma página
+
+Defeito da versão que introduziu o memorial exportável, encontrado ao conferir as
+páginas geradas contra o que o sumário anunciava.
+
+O paginador calcula os números de página medindo os blocos de verdade, e depois
+mapeia cada capítulo, figura e tabela para a página em que caiu. O deslocamento
+usado nesse mapeamento era `1 + páginas de sumário` — contava a capa, mas não
+contava que o corpo começa **depois** da última página de índice. Com capa mais
+duas páginas de sumário/índices, o capítulo que sai na página 4 era anunciado
+como página 3, e o erro se repetia em todas as 49 chamadas.
+
+Corrigido para `2 + páginas de sumário`. Um teste de interface passou a conferir,
+para cada chamada do sumário e dos índices, o número anunciado contra a página em
+que o elemento realmente aparece.
+
+### 3.12 Tabela cortada e página quase em branco na paginação
+
+Na mesma revisão, duas falhas de quebra de página:
+
+- a divisão de uma tabela entre páginas estimava o espaço da legenda, do
+  cabeçalho e das bordas por uma folga fixa de 8 px; quando a estimativa ficava
+  curta, a primeira parte não cabia no que restava da página e era empurrada
+  inteira para a seguinte, deixando três linhas numa folha praticamente vazia.
+  Agora esse custo é **medido**, montando uma parte de uma linha só e descontando
+  a altura da linha;
+- um título de capítulo podia ficar sozinho no pé da página. Passou a exigir
+  espaço para pelo menos três linhas de texto depois dele; caso contrário, começa
+  na página seguinte.
+
+No exemplo de esgoto o documento caiu de 23 para 21 páginas, sem nenhuma quebra
+malfeita. Os testes conferem que nenhum bloco ultrapassa o rodapé e que nenhuma
+página termina em título.
+
+### 3.13 Impressão do memorial saía em branco a partir da prévia
+
+A prévia mostra o documento dentro de uma janela; o botão de imprimir fechava
+essa janela **depois** de montar o documento, e como o documento estava dentro
+dela, ia junto — a impressão saía sem nada. Corrigido: a janela é fechada antes,
+e o documento é recolocado no corpo da página antes de montar.
+
+No mesmo passo, o nome do arquivo `.doc` levava um travessão; o navegador
+descarta nomes com esse caractere e salvava tudo como `download`, sem extensão.
+O nome passa por uma limpeza antes de ir para o arquivo.
+
 ## 4. Itens que dependem de conferência do fornecedor
 
 Marcados no programa com a etiqueta **"conferir catálogo"** e listados no painel

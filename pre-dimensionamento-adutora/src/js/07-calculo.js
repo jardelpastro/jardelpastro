@@ -336,16 +336,21 @@
   /* ---------------- classificação (cores) ---------------- */
 
   /* v [m/s], J [m/m] -> {classe:'bom'|'atencao'|'ruim', motivos:[]} */
+  /* número no padrão brasileiro, para os motivos saírem legíveis no
+     memorial e nas dicas */
+  function fmt(v, d) { return Number(v).toFixed(d === undefined ? 2 : d).replace('.', ','); }
+  C.fmt = fmt;
+
   C.classificar = function (v, J, crit) {
     var jKm = J * 1000;
     var motivos = [], classe = 'bom';
 
     if (!(v > 0)) return { classe: 'na', motivos: ['sem vazão'] };
 
-    if (v < crit.vMin) { classe = 'ruim'; motivos.push('v = ' + v.toFixed(2) + ' m/s abaixo da mínima de ' + crit.vMin.toFixed(2) + ' m/s'); }
-    else if (v > crit.vMax) { classe = 'ruim'; motivos.push('v = ' + v.toFixed(2) + ' m/s acima da máxima de ' + crit.vMax.toFixed(2) + ' m/s'); }
+    if (v < crit.vMin) { classe = 'ruim'; motivos.push('v = ' + fmt(v, 2) + ' m/s abaixo da mínima de ' + fmt(crit.vMin, 2) + ' m/s'); }
+    else if (v > crit.vMax) { classe = 'ruim'; motivos.push('v = ' + fmt(v, 2) + ' m/s acima da máxima de ' + fmt(crit.vMax, 2) + ' m/s'); }
 
-    if (jKm > crit.jMax) { classe = 'ruim'; motivos.push('J = ' + jKm.toFixed(2) + ' m/km acima do limite de ' + crit.jMax.toFixed(2) + ' m/km'); }
+    if (jKm > crit.jMax) { classe = 'ruim'; motivos.push('J = ' + fmt(jKm, 2) + ' m/km acima do limite de ' + fmt(crit.jMax, 2) + ' m/km'); }
 
     if (classe !== 'ruim') {
       var vOk = v >= crit.vBom[0] && v <= crit.vBom[1];
@@ -353,8 +358,8 @@
       if (vOk && jOk) { classe = 'bom'; motivos.push('velocidade e perda unitária na faixa recomendada'); }
       else {
         classe = 'atencao';
-        if (!vOk) motivos.push('v = ' + v.toFixed(2) + ' m/s fora da faixa recomendada (' + crit.vBom[0].toFixed(2) + ' a ' + crit.vBom[1].toFixed(2) + ' m/s)');
-        if (!jOk) motivos.push('J = ' + jKm.toFixed(2) + ' m/km fora da faixa recomendada (' + crit.jBom[0].toFixed(2) + ' a ' + crit.jBom[1].toFixed(2) + ' m/km)');
+        if (!vOk) motivos.push('v = ' + fmt(v, 2) + ' m/s fora da faixa recomendada (' + fmt(crit.vBom[0], 2) + ' a ' + fmt(crit.vBom[1], 2) + ' m/s)');
+        if (!jOk) motivos.push('J = ' + fmt(jKm, 2) + ' m/km fora da faixa recomendada (' + fmt(crit.jBom[0], 2) + ' a ' + fmt(crit.jBom[1], 2) + ' m/km)');
       }
     }
     return { classe: classe, motivos: motivos };
@@ -373,32 +378,32 @@
     var mot = [];
     /* limite inferior: abaixo de -10 mca a coluna d'água se rompe */
     if (pressao <= -10) {
-      mot.push('pressão de ' + pressao.toFixed(2) + ' mca: abaixo do limite físico de vaporização (cerca de −10 mca) — ' +
+      mot.push('pressão de ' + fmt(pressao, 2) + ' mca: abaixo do limite físico de vaporização (cerca de −10 mca) — ' +
                (op.transitorio ? 'há separação de coluna neste ponto' : 'a linha piezométrica passa muito abaixo da tubulação, o escoamento previsto é impossível'));
       return { classe: 'ruim', motivos: mot };
     }
     if (pressao < 0) {
-      mot.push('pressão negativa de ' + pressao.toFixed(2) + ' mca: a linha piezométrica passa abaixo da tubulação' +
+      mot.push('pressão negativa de ' + fmt(pressao, 2) + ' mca: a linha piezométrica passa abaixo da tubulação' +
                (op.transitorio ? ' — risco de cavitação e, em tubo de parede fina, de colapso' : ' — reveja as cotas e a altura manométrica'));
       return { classe: 'ruim', motivos: mot };
     }
     var pMin = op.pressaoMinima === undefined ? 0 : op.pressaoMinima;
     if (pressao < pMin) {
-      mot.push('pressão de ' + pressao.toFixed(2) + ' mca abaixo da mínima adotada de ' + pMin.toFixed(2) + ' mca');
+      mot.push('pressão de ' + fmt(pressao, 2) + ' mca abaixo da mínima adotada de ' + fmt(pMin, 2) + ' mca');
       return { classe: 'atencao', motivos: mot };
     }
     if (pnMca === null || pnMca === undefined) {
       return { classe: 'na', motivos: ['pressão admissível do tubo não informada'] };
     }
     if (pressao > pnMca) {
-      mot.push('pressão de ' + pressao.toFixed(2) + ' mca acima da admissível do tubo (' + pnMca.toFixed(0) + ' mca)');
+      mot.push('pressão de ' + fmt(pressao, 2) + ' mca acima da admissível do tubo (' + fmt(pnMca, 0) + ' mca)');
       return { classe: 'ruim', motivos: mot };
     }
     if (pressao > 0.85 * pnMca) {
-      mot.push('pressão de ' + pressao.toFixed(2) + ' mca usa mais de 85 % da admissível do tubo (' + pnMca.toFixed(0) + ' mca)');
+      mot.push('pressão de ' + fmt(pressao, 2) + ' mca usa mais de 85 % da admissível do tubo (' + fmt(pnMca, 0) + ' mca)');
       return { classe: 'atencao', motivos: mot };
     }
-    mot.push('pressão de ' + pressao.toFixed(2) + ' mca, com folga sobre a admissível de ' + pnMca.toFixed(0) + ' mca');
+    mot.push('pressão de ' + fmt(pressao, 2) + ' mca, com folga sobre a admissível de ' + fmt(pnMca, 0) + ' mca');
     return { classe: 'bom', motivos: mot };
   };
 

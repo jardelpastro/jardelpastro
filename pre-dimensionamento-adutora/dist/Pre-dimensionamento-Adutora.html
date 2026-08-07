@@ -95,7 +95,11 @@ header.topo .versao { font-size: 11px; color: var(--texto-3); }
 .marca-bloco { display: flex; align-items: center; gap: 9px; color: var(--azul); }
 [data-tema="escuro"] .marca-bloco { color: #cfe0f5; }
 .marca-simbolo { display: block; line-height: 0; }
-.marca-img { display: block; width: auto; max-width: 240px; object-fit: contain; }
+/* qualquer logo cabe na mesma caixa: comprida encolhe pela largura,
+   alta encolhe pela altura, e nunca distorce nem empurra o cabeçalho */
+.marca-moldura { display: flex; align-items: center; justify-content: flex-start; overflow: hidden; }
+.marca-img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.marca-bloco.marca-vazia { display: none; }
 .marca-nome { display: flex; flex-direction: column; line-height: 1; font-family: Georgia, "Times New Roman", serif; }
 .marca-nome b { font-size: 19px; letter-spacing: .5px; color: var(--azul); }
 .marca-nome i { font-size: 10.5px; font-style: normal; letter-spacing: 1.6px; color: var(--teal); font-weight: 600; }
@@ -439,6 +443,27 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
   font-size: 13px; z-index: 200; box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
 }
 
+/* ---------------- escolha da logo ---------------- */
+
+.previa-logo { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+.previa-caixa {
+  border: 1px dashed var(--border-forte); border-radius: var(--r);
+  padding: 10px 12px 12px; background: var(--surface-2); min-width: 260px;
+}
+.previa-caixa.papel { background: #fff; }
+[data-tema="escuro"] .previa-caixa.papel { background: #f7f9fb; }
+[data-tema="escuro"] .previa-caixa.papel .marca-nome b { color: #0E2148; }
+[data-tema="escuro"] .previa-caixa.papel .marca-bloco { color: #0E2148; }
+.previa-rot {
+  display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--texto-3); margin-bottom: 7px;
+}
+
+.lista-opcoes { display: flex; flex-direction: column; gap: 8px; }
+button.btn.opcao-logo { text-align: left; padding: 10px 12px; }
+button.btn.opcao-logo.escolhida { border-color: var(--teal); background: var(--teal-claro); }
+button.btn.opcao-logo b { display: block; margin-bottom: 2px; }
+
 /* ---------------- fontes ---------------- */
 
 .fonte-item { border-left: 3px solid var(--azul); padding: 8px 12px; margin-bottom: 10px; background: var(--surface-2); border-radius: 0 4px 4px 0; }
@@ -555,6 +580,128 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
   nav.abas { top: 47px; }
   .grade { grid-template-columns: 1fr; }
 }
+
+/* ==================================================================
+   Memorial: documento paginado
+   ================================================================== */
+
+.doc {
+  font-family: "Times New Roman", Times, Georgia, serif;
+  color: #16202e;
+  font-size: 11pt;
+  line-height: 1.45;
+}
+.doc-medidor { position: absolute; left: -20000px; top: 0; visibility: hidden; }
+
+.doc .pagina {
+  width: 210mm;
+  height: 297mm;
+  background: #fff;
+  margin: 0 auto 10mm;
+  box-shadow: 0 2px 10px rgba(16, 30, 46, .18);
+  padding: 20mm 20mm 15mm 25mm;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.doc .pag-cabecalho {
+  height: 14mm; flex: none;
+  display: flex; align-items: center; gap: 8mm;
+  border-bottom: .6pt solid #b9c2cc;
+  color: #0E2148;
+}
+.doc .pag-cabecalho .pc-titulo { font-size: 9pt; color: #556273; margin-left: auto; text-align: right; }
+.doc .pag-corpo { flex: 1 1 auto; overflow: hidden; }
+.doc .pag-rodape {
+  height: 10mm; flex: none;
+  display: flex; align-items: center; justify-content: space-between;
+  border-top: .6pt solid #b9c2cc;
+  font-size: 8.5pt; color: #556273;
+}
+
+.doc .pag-corpo > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.doc .doc-h1 {
+  font-size: 14pt; font-weight: bold; color: #0E2148;
+  margin: 0; padding: 4pt 0 6pt;
+}
+.doc .doc-h1-frente { text-align: center; padding-bottom: 10pt; }
+.doc .doc-h2 { font-size: 12pt; font-weight: bold; color: #0E2148; margin: 0; padding: 10pt 0 4pt; }
+.doc .doc-p { margin: 0; padding-bottom: 6pt; text-align: justify; text-indent: 0; }
+.doc .doc-nota { font-size: 9.5pt; color: #333; margin: 0; padding-bottom: 6pt; text-align: justify; }
+.doc .doc-ref { margin: 0; padding-bottom: 7pt; text-align: left; font-size: 10.5pt; }
+
+.doc .doc-formula { margin: 0; padding: 7pt 0; text-align: center; }
+.doc .formula-txt {
+  font-size: 12pt; letter-spacing: .2px;
+  font-family: "Cambria Math", "Times New Roman", serif;
+}
+.doc .formula-leg { font-size: 8.5pt; color: #444; margin-top: 2pt; }
+.doc .doc-aplicacao {
+  margin: 0 0 0 10mm; padding: 5pt 0 7pt;
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 9pt; color: #16202e;
+}
+.doc .aplic-linha { margin: 1.5pt 0; }
+
+.doc .doc-quadro { margin: 0; padding: 6pt 0 9pt; }
+.doc .doc-cap-tab, .doc .doc-cap-fig {
+  font-size: 9.5pt; font-weight: bold; text-align: center; margin-bottom: 2pt;
+}
+.doc .doc-cap-fig { margin-top: 3pt; margin-bottom: 0; }
+.doc .doc-fonte { font-size: 8pt; color: #556273; text-align: center; margin-top: 2pt; }
+.doc .doc-fig { text-align: center; }
+.doc .doc-fig svg { max-width: 100%; height: auto; }
+
+.doc .doc-tabela { border-collapse: collapse; width: 100%; font-size: 8.6pt; }
+.doc .doc-tabela th, .doc .doc-tabela td {
+  border: .5pt solid #9aa5b1; padding: 1.6pt 3pt; text-align: right;
+}
+.doc .doc-tabela th { background: #eef2f6; text-align: center; font-weight: bold; }
+.doc .doc-tabela td.esq, .doc .doc-tabela th.esq { text-align: left; }
+.doc .doc-tabela tr.total td { font-weight: bold; background: #f4f6f8; }
+.doc .doc-tabela tr.destaque td { background: #eaf5f4; }
+
+.doc .doc-sum { display: flex; align-items: baseline; gap: 4px; margin: 0; padding: 2.5pt 0; font-size: 10.5pt; }
+.doc .doc-sum.nivel1 { font-weight: bold; }
+.doc .doc-sum.nivel2 { padding-left: 8mm; }
+.doc .sum-pts { flex: 1 1 auto; border-bottom: 1px dotted #8592a1; height: .8em; }
+.doc .sum-pag { flex: none; font-variant-numeric: tabular-nums; }
+
+.doc .pagina-capa { padding: 30mm 25mm; }
+.doc .doc-capa { display: flex; flex-direction: column; height: 100%; text-align: center; }
+.doc .capa-topo { display: flex; justify-content: center; }
+.doc .capa-meio { margin-top: 42mm; }
+.doc .capa-tipo {
+  text-transform: uppercase; letter-spacing: 3px; font-size: 10pt; color: #0E6F66; font-weight: bold;
+}
+.doc .capa-titulo { font-size: 22pt; color: #0E2148; margin: 8mm 0 4mm; line-height: 1.25; }
+.doc .capa-sub { font-size: 12pt; color: #556273; }
+.doc .capa-linha { width: 60mm; height: 2px; background: #14A5A0; margin: 8mm auto 0; }
+.doc .capa-dados { margin-top: auto; font-size: 11pt; line-height: 1.9; }
+.doc .capa-rodape { margin-top: 10mm; font-size: 9pt; color: #8592a1; }
+
+.visor-doc {
+  background: #48525e; background: #48525e; padding: 10mm 0;
+  max-height: 62vh; overflow: auto; border-radius: 4px;
+}
+.visor-doc .doc { transform: scale(.62); transform-origin: top center; }
+.visor-doc #doc-saida { width: 210mm; margin: 0 auto; }
+
+#doc-saida { display: none; }
+html.imprimindo-doc #doc-saida { display: block; }
+
+@media print {
+  html.imprimindo-doc body > * { display: none !important; }
+  html.imprimindo-doc #doc-saida { display: block !important; }
+  html.imprimindo-doc #cabecalho-impressao { display: none !important; }
+  html.imprimindo-doc { background: #fff; }
+  html.imprimindo-doc .doc .pagina {
+    box-shadow: none; margin: 0; page-break-after: always; break-after: page;
+  }
+  html.imprimindo-doc .doc .pagina:last-child { page-break-after: auto; break-after: auto; }
+}
 </style>
 </head>
 <body>
@@ -610,7 +757,14 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
 
   var M = {};
   var LS_LOGO = 'pda.logo.v1';
+  var LS_MODO = 'pda.logo.modo.v1';
   var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  /* Caixa em que qualquer logo tem de caber, na tela e no papel. A imagem é
+     ajustada por object-fit: contain, então uma logo comprida encolhe pela
+     largura e uma logo alta encolhe pela altura — nas duas situações ela cabe
+     inteira, sem distorcer e sem empurrar o resto do cabeçalho. */
+  M.CAIXA = { larguraTela: 230, larguraImpressao: 190 };
 
   M.cores = {
     navy: '#0E2148',
@@ -674,32 +828,60 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
     return svg;
   };
 
-  /* marca completa (símbolo + nome) para o cabeçalho */
-  M.marca = function (alturaPx) {
-    var logo = M.logoGravada();
+  /* marca completa para o cabeçalho.
+     op: { altura, larguraMax, semTexto } */
+  M.marca = function (alturaPx, op) {
+    op = op || {};
+    var modo = M.modo();
     var caixa = document.createElement('div');
     caixa.className = 'marca-bloco';
+    if (modo === 'nenhuma') { caixa.className += ' marca-vazia'; return caixa; }
 
-    if (logo) {
-      var img = document.createElement('img');
-      img.src = logo;
-      img.alt = 'Logo';
-      img.className = 'marca-img';
-      img.style.height = alturaPx + 'px';
-      caixa.appendChild(img);
-      return caixa;
+    var alt = alturaPx || 38;
+    var larg = op.larguraMax || M.CAIXA.larguraTela;
+
+    if (modo === 'usuario') {
+      var logo = M.logoGravada();
+      if (logo) {
+        var moldura = document.createElement('span');
+        moldura.className = 'marca-moldura';
+        moldura.style.height = alt + 'px';
+        moldura.style.maxWidth = larg + 'px';
+        var img = document.createElement('img');
+        img.src = logo;
+        img.alt = 'Logo';
+        img.className = 'marca-img';
+        moldura.appendChild(img);
+        caixa.appendChild(moldura);
+        return caixa;
+      }
     }
 
     var simb = document.createElement('span');
     simb.className = 'marca-simbolo';
-    simb.appendChild(M.simbolo(alturaPx));
+    simb.appendChild(M.simbolo(alt));
     caixa.appendChild(simb);
 
-    var txt = document.createElement('span');
-    txt.className = 'marca-nome';
-    txt.innerHTML = '<b>PASTRO</b><i>ENGENHARIA</i>';
-    caixa.appendChild(txt);
+    if (!op.semTexto) {
+      var txt = document.createElement('span');
+      txt.className = 'marca-nome';
+      txt.innerHTML = '<b>PASTRO</b><i>ENGENHARIA</i>';
+      caixa.appendChild(txt);
+    }
     return caixa;
+  };
+
+  /* 'padrao' (o desenho), 'usuario' (arquivo carregado) ou 'nenhuma' */
+  M.modo = function () {
+    var m;
+    try { m = localStorage.getItem(LS_MODO); } catch (e) { m = null; }
+    if (m === 'nenhuma') return 'nenhuma';
+    if (m === 'usuario' && M.logoGravada()) return 'usuario';
+    return 'padrao';
+  };
+
+  M.definirModo = function (m) {
+    try { localStorage.setItem(LS_MODO, m); return true; } catch (e) { return false; }
   };
 
   M.logoGravada = function () {
@@ -707,11 +889,27 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
   };
 
   M.gravarLogo = function (dataUri) {
-    try { localStorage.setItem(LS_LOGO, dataUri); return true; } catch (e) { return false; }
+    try {
+      localStorage.setItem(LS_LOGO, dataUri);
+      localStorage.setItem(LS_MODO, 'usuario');
+      return true;
+    } catch (e) { return false; }
   };
 
   M.removerLogo = function () {
-    try { localStorage.removeItem(LS_LOGO); } catch (e) {}
+    try { localStorage.removeItem(LS_LOGO); localStorage.setItem(LS_MODO, 'padrao'); } catch (e) {}
+  };
+
+  /* Mede a imagem carregada e devolve a proporção, para avisar quando a logo
+     for muito comprida ou muito alta e ficar pequena dentro da caixa. */
+  M.medir = function (dataUri, cb) {
+    var img = new Image();
+    img.onload = function () {
+      var prop = img.naturalWidth / Math.max(1, img.naturalHeight);
+      cb({ largura: img.naturalWidth, altura: img.naturalHeight, proporcao: prop });
+    };
+    img.onerror = function () { cb(null); };
+    img.src = dataUri;
   };
 
   PDA.M = M;
@@ -2065,6 +2263,8 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       curvaBomba: {
         ativo: false, unidQ: 'L/s', pontos: [], npshr: null
       },
+      /* textos do memorial */
+      memorial: { introducao: '', objetivo: '' },
       /* análise econômica de diâmetro */
       economia: {
         ativo: false, tarifa: 0.65, horasDia: 20, anos: 20, taxa: 8,
@@ -2557,16 +2757,21 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
   /* ---------------- classificação (cores) ---------------- */
 
   /* v [m/s], J [m/m] -> {classe:'bom'|'atencao'|'ruim', motivos:[]} */
+  /* número no padrão brasileiro, para os motivos saírem legíveis no
+     memorial e nas dicas */
+  function fmt(v, d) { return Number(v).toFixed(d === undefined ? 2 : d).replace('.', ','); }
+  C.fmt = fmt;
+
   C.classificar = function (v, J, crit) {
     var jKm = J * 1000;
     var motivos = [], classe = 'bom';
 
     if (!(v > 0)) return { classe: 'na', motivos: ['sem vazão'] };
 
-    if (v < crit.vMin) { classe = 'ruim'; motivos.push('v = ' + v.toFixed(2) + ' m/s abaixo da mínima de ' + crit.vMin.toFixed(2) + ' m/s'); }
-    else if (v > crit.vMax) { classe = 'ruim'; motivos.push('v = ' + v.toFixed(2) + ' m/s acima da máxima de ' + crit.vMax.toFixed(2) + ' m/s'); }
+    if (v < crit.vMin) { classe = 'ruim'; motivos.push('v = ' + fmt(v, 2) + ' m/s abaixo da mínima de ' + fmt(crit.vMin, 2) + ' m/s'); }
+    else if (v > crit.vMax) { classe = 'ruim'; motivos.push('v = ' + fmt(v, 2) + ' m/s acima da máxima de ' + fmt(crit.vMax, 2) + ' m/s'); }
 
-    if (jKm > crit.jMax) { classe = 'ruim'; motivos.push('J = ' + jKm.toFixed(2) + ' m/km acima do limite de ' + crit.jMax.toFixed(2) + ' m/km'); }
+    if (jKm > crit.jMax) { classe = 'ruim'; motivos.push('J = ' + fmt(jKm, 2) + ' m/km acima do limite de ' + fmt(crit.jMax, 2) + ' m/km'); }
 
     if (classe !== 'ruim') {
       var vOk = v >= crit.vBom[0] && v <= crit.vBom[1];
@@ -2574,8 +2779,8 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       if (vOk && jOk) { classe = 'bom'; motivos.push('velocidade e perda unitária na faixa recomendada'); }
       else {
         classe = 'atencao';
-        if (!vOk) motivos.push('v = ' + v.toFixed(2) + ' m/s fora da faixa recomendada (' + crit.vBom[0].toFixed(2) + ' a ' + crit.vBom[1].toFixed(2) + ' m/s)');
-        if (!jOk) motivos.push('J = ' + jKm.toFixed(2) + ' m/km fora da faixa recomendada (' + crit.jBom[0].toFixed(2) + ' a ' + crit.jBom[1].toFixed(2) + ' m/km)');
+        if (!vOk) motivos.push('v = ' + fmt(v, 2) + ' m/s fora da faixa recomendada (' + fmt(crit.vBom[0], 2) + ' a ' + fmt(crit.vBom[1], 2) + ' m/s)');
+        if (!jOk) motivos.push('J = ' + fmt(jKm, 2) + ' m/km fora da faixa recomendada (' + fmt(crit.jBom[0], 2) + ' a ' + fmt(crit.jBom[1], 2) + ' m/km)');
       }
     }
     return { classe: classe, motivos: motivos };
@@ -2594,32 +2799,32 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
     var mot = [];
     /* limite inferior: abaixo de -10 mca a coluna d'água se rompe */
     if (pressao <= -10) {
-      mot.push('pressão de ' + pressao.toFixed(2) + ' mca: abaixo do limite físico de vaporização (cerca de −10 mca) — ' +
+      mot.push('pressão de ' + fmt(pressao, 2) + ' mca: abaixo do limite físico de vaporização (cerca de −10 mca) — ' +
                (op.transitorio ? 'há separação de coluna neste ponto' : 'a linha piezométrica passa muito abaixo da tubulação, o escoamento previsto é impossível'));
       return { classe: 'ruim', motivos: mot };
     }
     if (pressao < 0) {
-      mot.push('pressão negativa de ' + pressao.toFixed(2) + ' mca: a linha piezométrica passa abaixo da tubulação' +
+      mot.push('pressão negativa de ' + fmt(pressao, 2) + ' mca: a linha piezométrica passa abaixo da tubulação' +
                (op.transitorio ? ' — risco de cavitação e, em tubo de parede fina, de colapso' : ' — reveja as cotas e a altura manométrica'));
       return { classe: 'ruim', motivos: mot };
     }
     var pMin = op.pressaoMinima === undefined ? 0 : op.pressaoMinima;
     if (pressao < pMin) {
-      mot.push('pressão de ' + pressao.toFixed(2) + ' mca abaixo da mínima adotada de ' + pMin.toFixed(2) + ' mca');
+      mot.push('pressão de ' + fmt(pressao, 2) + ' mca abaixo da mínima adotada de ' + fmt(pMin, 2) + ' mca');
       return { classe: 'atencao', motivos: mot };
     }
     if (pnMca === null || pnMca === undefined) {
       return { classe: 'na', motivos: ['pressão admissível do tubo não informada'] };
     }
     if (pressao > pnMca) {
-      mot.push('pressão de ' + pressao.toFixed(2) + ' mca acima da admissível do tubo (' + pnMca.toFixed(0) + ' mca)');
+      mot.push('pressão de ' + fmt(pressao, 2) + ' mca acima da admissível do tubo (' + fmt(pnMca, 0) + ' mca)');
       return { classe: 'ruim', motivos: mot };
     }
     if (pressao > 0.85 * pnMca) {
-      mot.push('pressão de ' + pressao.toFixed(2) + ' mca usa mais de 85 % da admissível do tubo (' + pnMca.toFixed(0) + ' mca)');
+      mot.push('pressão de ' + fmt(pressao, 2) + ' mca usa mais de 85 % da admissível do tubo (' + fmt(pnMca, 0) + ' mca)');
       return { classe: 'atencao', motivos: mot };
     }
-    mot.push('pressão de ' + pressao.toFixed(2) + ' mca, com folga sobre a admissível de ' + pnMca.toFixed(0) + ' mca');
+    mot.push('pressão de ' + fmt(pressao, 2) + ' mca, com folga sobre a admissível de ' + fmt(pnMca, 0) + ' mca');
     return { classe: 'bom', motivos: mot };
   };
 
@@ -6799,6 +7004,7 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
   App.iniciar = function () {
     h = UI.h;
     PDA.F.init(); PDA.Res.init(); PDA.K.init(); PDA.Q.init(); PDA.Pf.init(); PDA.B.init();
+    PDA.MEM.init(); PDA.X.init();
     App.montarMarca();
 
     App.cats = PDA.E.carregarCatalogos();
@@ -7283,7 +7489,12 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
       case 'abrirProjeto': PDA.B.abrir(); return;
       case 'importarProjeto': UI.fecharModal(); App.abrirArquivo(App.carregarProjeto); return;
       case 'salvarProjeto': App.guardarNaBiblioteca(); return;
-      case 'exportarProjeto': App.baixarProjeto(); return;
+      case 'exportarProjeto': App.modalExportar(); return;
+      case 'exportarArquivo': UI.fecharModal(); App.baixarProjeto(); return;
+      case 'memorial': UI.fecharModal(); PDA.X.previa(); return;
+      case 'memorialPdf': PDA.X.pdf(); return;
+      case 'memorialWord': PDA.X.word(); return;
+      case 'editarIntroducao': PDA.X.modalIntroducao(); return;
       case 'exemplo': PDA.B.abrir(); return;
       case 'exemploAgua':
         UI.fecharModal(); App.st = App.exemploAgua(); App.autoPreencherPNTodos();
@@ -7686,52 +7897,128 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
     window.print();
   };
 
+  App.modalExportar = function () {
+    UI.modal('Exportar', [
+      h('div', { class: 'lista-opcoes' },
+        h('button', { class: 'btn opcao-logo', type: 'button', 'data-acao': 'memorial' },
+          h('b', {}, 'Memorial descritivo e de cálculo'),
+          h('div', { class: 'nota' },
+            'Documento completo em A4: capa, sumário, índice de figuras e de tabelas, introdução, ' +
+            'metodologia com as fórmulas e as fontes, memória de cálculo trecho a trecho com os valores ' +
+            'substituídos, tabelas de resultados, figuras e bibliografia. Sai em PDF pelo próprio navegador ' +
+            'ou em arquivo .doc para editar no Word.')),
+        h('button', { class: 'btn opcao-logo', type: 'button', 'data-acao': 'exportarArquivo' },
+          h('b', {}, 'Arquivo do projeto (.json)'),
+          h('div', { class: 'nota' },
+            'Todos os dados de entrada, para abrir em outro computador ou guardar junto ao processo. ' +
+            'Recupera-se por Abrir → "Abrir de arquivo".')))
+    ]);
+  };
+
   App.modalLogo = function () {
-    var atual = PDA.M.logoGravada();
-    var previa = h('div', { style: 'margin:11px 0;min-height:52px;display:flex;align-items:center;gap:11px' });
+    var modo = PDA.M.modo();
+    var previa = h('div', { class: 'previa-logo' });
+    var aviso = h('div', {});
+
     function mostrar() {
       UI.limpar(previa);
-      previa.appendChild(PDA.M.marca(42));
+      previa.appendChild(h('div', { class: 'previa-caixa' },
+        h('span', { class: 'previa-rot' }, 'no cabeçalho'),
+        PDA.M.marca(38)));
+      previa.appendChild(h('div', { class: 'previa-caixa papel' },
+        h('span', { class: 'previa-rot' }, 'no papel'),
+        PDA.M.marca(46, { larguraMax: PDA.M.CAIXA.larguraImpressao })));
+      if (PDA.M.modo() === 'nenhuma') {
+        previa.appendChild(h('p', { class: 'nota' }, 'Sem logo: o cabeçalho e o memorial saem só com o nome do projeto.'));
+      }
     }
-    mostrar();
+
+    function escolher(m) {
+      PDA.M.definirModo(m);
+      App.montarMarca();
+      App.render();
+      App.modalLogo();
+    }
+
+    function opcao(id, titulo, descricao, extra) {
+      var atual = PDA.M.modo() === id;
+      return h('button', {
+        class: 'btn opcao-logo' + (atual ? ' escolhida' : ''), type: 'button',
+        onclick: function () { if (!atual) escolher(id); }
+      }, h('b', {}, (atual ? '● ' : '○ ') + titulo),
+         h('div', { class: 'nota' }, descricao), extra || null);
+    }
 
     var entrada = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/svg+xml,image/webp' });
     entrada.addEventListener('change', function () {
       var f = entrada.files && entrada.files[0];
       if (!f) return;
       if (f.size > 900 * 1024) {
-        UI.toast('Arquivo muito grande (máx. 900 kB). Reduza a imagem e tente de novo.');
+        UI.toast('Arquivo muito grande (máximo 900 kB). Reduza a imagem e tente de novo.');
         return;
       }
       var fr = new FileReader();
       fr.onload = function () {
-        if (!PDA.M.gravarLogo(String(fr.result))) {
-          UI.toast('Não foi possível gravar a logo neste navegador.');
-          return;
-        }
-        App.montarMarca();
-        mostrar();
-        UI.toast('Logo carregada.');
+        var uri = String(fr.result);
+        PDA.M.medir(uri, function (m) {
+          if (!PDA.M.gravarLogo(uri)) {
+            UI.toast('Não foi possível gravar a logo neste navegador.');
+            return;
+          }
+          App.montarMarca(); App.render();
+          mostrar();
+          UI.limpar(aviso);
+          if (m) {
+            var alturaEfetiva = Math.min(38, PDA.M.CAIXA.larguraTela / m.proporcao);
+            if (m.proporcao > 7) {
+              UI.add(aviso, h('div', { class: 'aviso' },
+                'Esta logo é bem comprida (proporção ' + UI.num(m.proporcao, 1) + ':1). Ela cabe inteira na caixa, ' +
+                'mas fica com cerca de ' + UI.num(alturaEfetiva, 0) + ' px de altura. Se preferir mais destaque, ' +
+                'use uma versão mais compacta da marca — só o símbolo, ou símbolo e nome em duas linhas.'));
+            } else if (m.proporcao < 0.8) {
+              UI.add(aviso, h('div', { class: 'aviso' },
+                'Esta logo é mais alta que larga (proporção ' + UI.num(m.proporcao, 2) + ':1). Ela cabe inteira, ' +
+                'limitada pela altura da caixa. Uma versão horizontal costuma render melhor em cabeçalho.'));
+            } else {
+              UI.add(aviso, h('div', { class: 'aviso ok' },
+                'Logo carregada: ' + m.largura + ' × ' + m.altura + ' px. Cabe bem na caixa do cabeçalho.'));
+            }
+          }
+          UI.toast('Logo carregada.');
+        });
       };
       fr.readAsDataURL(f);
     });
 
+    mostrar();
+
     UI.modal('Logo do cabeçalho', [
       h('p', { class: 'nota' },
-        'O símbolo que aparece hoje é um desenho vetorial feito para acompanhar as cores da marca. ' +
-        'Carregue aqui o arquivo oficial (PNG com fundo transparente, JPG ou SVG) e ele substitui o desenho — ' +
-        'no cabeçalho e na impressão do memorial. Fica gravado neste navegador; em outro computador, ' +
-        'é preciso carregar de novo.'),
+        'A logo aparece no cabeçalho do programa e no topo de tudo o que é impresso ou exportado. ' +
+        'Qualquer imagem carregada é ajustada para caber na mesma caixa: uma logo comprida encolhe pela largura, ' +
+        'uma logo alta encolhe pela altura, e nenhuma delas distorce nem empurra o resto do cabeçalho.'),
       previa,
-      entrada,
-      h('p', { class: 'nota', style: 'margin-top:9px' },
-        'Prefira uma imagem com cerca de 400 px de largura e fundo transparente. Limite de 900 kB.'),
-      atual ? h('div', { style: 'margin-top:11px' },
+      aviso,
+      UI.sub('Qual usar'),
+      h('div', { class: 'lista-opcoes' },
+        opcao('padrao', 'O desenho que já vem no programa',
+          'Símbolo vetorial com as cores da marca. É o padrão e continua disponível mesmo depois de você carregar um arquivo.'),
+        opcao('usuario', 'Um arquivo meu',
+          PDA.M.logoGravada()
+            ? 'Uma logo já está carregada neste navegador. Carregue outra abaixo para substituir.'
+            : 'Carregue o arquivo oficial abaixo — PNG com fundo transparente, JPG, SVG ou WebP, até 900 kB.',
+          h('div', { style: 'margin-top:7px' }, entrada)),
+        opcao('nenhuma', 'Sem logo',
+          'O cabeçalho e o memorial saem apenas com o nome do projeto, sem imagem nenhuma.')),
+      PDA.M.logoGravada() ? h('div', { style: 'margin-top:11px' },
         h('button', {
           class: 'btn perigo', type: 'button', onclick: function () {
-            PDA.M.removerLogo(); App.montarMarca(); mostrar(); UI.toast('Logo removida.');
+            PDA.M.removerLogo(); App.montarMarca(); App.render(); App.modalLogo();
+            UI.toast('Arquivo removido; voltou o desenho padrão.');
           }
-        }, 'Remover a logo carregada e voltar ao desenho')) : null
+        }, 'Apagar o arquivo carregado')) : null,
+      h('p', { class: 'nota', style: 'margin-top:11px' },
+        'A escolha vale para este navegador. Em outro computador é preciso carregar de novo.')
     ]);
   };
 
@@ -7806,6 +8093,1516 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', App.iniciar);
     else App.iniciar();
   }
+})(window.PDA = window.PDA || {});
+
+/* ===== 13-memorial.js ===== */
+/* ------------------------------------------------------------------
+ * Memorial descritivo e de cálculo.
+ *
+ * Monta o documento completo — capa, sumário, índices, capítulos com
+ * fórmula, aplicação numérica e tabela de resultados, e a bibliografia.
+ * A paginação e a exportação ficam em 14-exportar.js.
+ * ------------------------------------------------------------------ */
+(function (PDA) {
+  'use strict';
+
+  var MEM = {};
+  var UI, h;
+
+  MEM.init = function () { UI = PDA.UI; h = UI.h; };
+
+  function n(v, d) { return UI.num(v, d === undefined ? 2 : d); }
+  function ne(v) { return UI.numEdit(v); }
+
+  /* ================================================================
+     Bibliografia
+     ================================================================ */
+
+  MEM.biblio = {
+    az: { cit: 'AZEVEDO NETTO; FERNÁNDEZ, 2015',
+          ref: 'AZEVEDO NETTO, J. M.; FERNÁNDEZ, M. F. <b>Manual de Hidráulica</b>. 9. ed. São Paulo: Blucher, 2015.' },
+    porto: { cit: 'PORTO, 2006',
+          ref: 'PORTO, R. M. <b>Hidráulica Básica</b>. 4. ed. São Carlos: EESC-USP, 2006.' },
+    tsutiya: { cit: 'TSUTIYA, 2006',
+          ref: 'TSUTIYA, M. T. <b>Abastecimento de Água</b>. 4. ed. São Paulo: Departamento de Engenharia Hidráulica e Sanitária da Escola Politécnica da USP, 2006.' },
+    tsutiyaEsgoto: { cit: 'TSUTIYA; ALEM SOBRINHO, 2011',
+          ref: 'TSUTIYA, M. T.; ALEM SOBRINHO, P. <b>Coleta e Transporte de Esgoto Sanitário</b>. 3. ed. São Paulo: Departamento de Engenharia Hidráulica e Sanitária da Escola Politécnica da USP, 2011.' },
+    colebrook: { cit: 'COLEBROOK, 1939',
+          ref: 'COLEBROOK, C. F. Turbulent flow in pipes, with particular reference to the transition region between the smooth and rough pipe laws. <b>Journal of the Institution of Civil Engineers</b>, v. 11, n. 4, p. 133-156, 1939.' },
+    swamee: { cit: 'SWAMEE; JAIN, 1976',
+          ref: 'SWAMEE, P. K.; JAIN, A. K. Explicit equations for pipe-flow problems. <b>Journal of the Hydraulics Division, ASCE</b>, v. 102, n. 5, p. 657-664, 1976.' },
+    zigrang: { cit: 'ZIGRANG; SYLVESTER, 1982',
+          ref: 'ZIGRANG, D. J.; SYLVESTER, N. D. Explicit approximations to the solution of Colebrook\'s friction factor equation. <b>AIChE Journal</b>, v. 28, n. 3, p. 514-515, 1982.' },
+    halliwell: { cit: 'HALLIWELL, 1963',
+          ref: 'HALLIWELL, A. R. Velocity of a water-hammer wave in an elastic pipe. <b>Journal of the Hydraulics Division, ASCE</b>, v. 89, n. 4, p. 1-21, 1963.' },
+    streeter: { cit: 'STREETER; WYLIE, 1978',
+          ref: 'STREETER, V. L.; WYLIE, E. B. <b>Fluid Transients</b>. New York: McGraw-Hill, 1978.' },
+    joukowsky: { cit: 'JOUKOWSKY, 1898',
+          ref: 'JOUKOWSKY, N. Über den hydraulischen Stoss in Wasserleitungsröhren. <b>Mémoires de l\'Académie Impériale des Sciences de St.-Pétersbourg</b>, 1898.' },
+    nbr12214: { cit: 'ABNT NBR 12214', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 12214</b>: projeto de sistema de bombeamento de água para abastecimento público. Rio de Janeiro, 1992.' },
+    nbr12215: { cit: 'ABNT NBR 12215', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 12215</b>: projeto de adutora de água para abastecimento público. Rio de Janeiro, 1991.' },
+    nbr12208: { cit: 'ABNT NBR 12208', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 12208</b>: projeto de estações elevatórias de esgoto sanitário. Rio de Janeiro, 1992.' },
+    nbr7675: { cit: 'ABNT NBR 7675', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 7675</b>: tubos e conexões de ferro fundido dúctil e acessórios para sistemas de adução e distribuição de água. Rio de Janeiro.' },
+    nbr8682: { cit: 'ABNT NBR 8682', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 8682</b>: revestimento interno de argamassa de cimento em tubos de ferro fundido dúctil. Rio de Janeiro.' },
+    nbr15561: { cit: 'ABNT NBR 15561', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 15561</b>: tubos de polietileno PE 80 e PE 100 para sistemas de distribuição de água. Rio de Janeiro.' },
+    nbr7665: { cit: 'ABNT NBR 7665', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 7665</b>: tubos de PVC-U com junta elástica para adutoras e redes de água — série DEFoFo. Rio de Janeiro.' },
+    nbr5647: { cit: 'ABNT NBR 5647', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 5647</b>: sistemas para adução e distribuição de água — tubos e conexões de PVC-U com junta elástica. Rio de Janeiro.' },
+    nbr16631: { cit: 'ABNT NBR 16631 / ISO 16422', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 16631</b>: tubos e conexões de PVC-O para sistemas de adução e distribuição de água. Rio de Janeiro. Baseada na ISO 16422.' },
+    nbr5580: { cit: 'ABNT NBR 5580', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 5580</b>: tubos de aço-carbono para usos comuns na condução de fluidos. Rio de Janeiro.' },
+    nbr5590: { cit: 'ABNT NBR 5590', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 5590</b>: tubos de aço-carbono com costura, com ou sem revestimento, para condução de fluidos. Rio de Janeiro.' },
+    nbr8890: { cit: 'ABNT NBR 8890', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 8890</b>: tubo de concreto de seção circular para água pluvial e esgoto sanitário. Rio de Janeiro.' },
+    nbr15536: { cit: 'ABNT NBR 15536', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 15536</b>: sistemas para adução e distribuição de água e coletores de esgoto — tubos e conexões de PRFV. Rio de Janeiro.' },
+    asme: { cit: 'ASME B36.10M', ref: 'AMERICAN SOCIETY OF MECHANICAL ENGINEERS. <b>ASME B36.10M</b>: welded and seamless wrought steel pipe. New York.' },
+    en545: { cit: 'EN 545', ref: 'EUROPEAN COMMITTEE FOR STANDARDIZATION. <b>EN 545</b>: ductile iron pipes, fittings, accessories and their joints for water pipelines. Brussels.' },
+    en1092: { cit: 'EN 1092-2', ref: 'EUROPEAN COMMITTEE FOR STANDARDIZATION. <b>EN 1092-2</b>: flanges and their joints — cast iron flanges. Brussels.' }
+  };
+
+  MEM.cit = function (chave) {
+    var b = MEM.biblio[chave];
+    return b ? '(' + b.cit + ')' : '';
+  };
+
+  /* ================================================================
+     Blocos do documento
+     ================================================================ */
+
+  function Doc(st, ctx, res) {
+    this.st = st; this.ctx = ctx; this.res = res;
+    this.blocos = [];
+    this.capitulos = [];
+    this.figuras = [];
+    this.tabelas = [];
+    this.fontesUsadas = {};
+    this.nCap = 0;
+  }
+
+  Doc.prototype.add = function (el) { if (el) this.blocos.push(el); return el; };
+
+  Doc.prototype.capitulo = function (titulo) {
+    this.nCap++;
+    var id = 'cap' + this.nCap;
+    var el = h('h1', { class: 'doc-h1 bloco', 'data-ref': id }, this.nCap + '. ' + titulo);
+    this.capitulos.push({ id: id, num: String(this.nCap), titulo: titulo, nivel: 1 });
+    this.add(el);
+    this.nSub = 0;
+    return el;
+  };
+
+  Doc.prototype.secao = function (titulo) {
+    this.nSub = (this.nSub || 0) + 1;
+    var num = this.nCap + '.' + this.nSub;
+    var id = 'sec' + num.replace('.', '_');
+    this.capitulos.push({ id: id, num: num, titulo: titulo, nivel: 2 });
+    return this.add(h('h2', { class: 'doc-h2 bloco', 'data-ref': id }, num + '. ' + titulo));
+  };
+
+  Doc.prototype.p = function () {
+    var el = h('p', { class: 'doc-p bloco' });
+    var i;
+    for (i = 0; i < arguments.length; i++) UI.add(el, arguments[i]);
+    return this.add(el);
+  };
+
+  Doc.prototype.nota = function (txt) {
+    return this.add(h('p', { class: 'doc-nota bloco' }, txt));
+  };
+
+  /* fórmula simbólica, centralizada e numerada */
+  Doc.prototype.formula = function (txt, legenda) {
+    var el = h('div', { class: 'doc-formula bloco-junto' },
+      h('div', { class: 'formula-txt' }, txt),
+      legenda ? h('div', { class: 'formula-leg' }, legenda) : null);
+    return this.add(el);
+  };
+
+  /* aplicação numérica: a mesma fórmula com os valores no lugar das letras */
+  Doc.prototype.aplicacao = function () {
+    var linhas = [], i;
+    for (i = 0; i < arguments.length; i++) if (arguments[i]) linhas.push(arguments[i]);
+    return this.add(h('div', { class: 'doc-aplicacao bloco-junto' },
+      linhas.map(function (l) { return h('div', { class: 'aplic-linha' }, l); })));
+  };
+
+  Doc.prototype.tabela = function (titulo, cabs, linhas, fonte) {
+    var num = this.tabelas.length + 1;
+    var id = 'tab' + num;
+    this.tabelas.push({ id: id, num: num, titulo: titulo });
+    var tab = h('table', { class: 'doc-tabela' },
+      h('thead', {}, h('tr', {}, cabs.map(function (c) {
+        return typeof c === 'string' ? h('th', {}, c)
+          : h('th', { class: c.esq ? 'esq' : null }, c.rot);
+      }))),
+      h('tbody', {}, linhas));
+    return this.add(h('div', { class: 'doc-quadro bloco-tabela', 'data-ref': id },
+      h('div', { class: 'doc-cap-tab' }, 'Tabela ' + num + ' — ' + titulo),
+      tab,
+      fonte ? h('div', { class: 'doc-fonte' }, 'Fonte: ' + fonte) : null));
+  };
+
+  Doc.prototype.figura = function (titulo, el, fonte) {
+    var num = this.figuras.length + 1;
+    var id = 'fig' + num;
+    this.figuras.push({ id: id, num: num, titulo: titulo });
+    return this.add(h('div', { class: 'doc-quadro bloco-junto', 'data-ref': id },
+      h('div', { class: 'doc-fig' }, el),
+      h('div', { class: 'doc-cap-fig' }, 'Figura ' + num + ' — ' + titulo),
+      fonte ? h('div', { class: 'doc-fonte' }, 'Fonte: ' + fonte) : null));
+  };
+
+  Doc.prototype.usar = function () {
+    var i;
+    for (i = 0; i < arguments.length; i++) this.fontesUsadas[arguments[i]] = true;
+    return MEM.cit(arguments[0]);
+  };
+
+  /* ================================================================
+     Montagem
+     ================================================================ */
+
+  MEM.documento = function (st, ctx, res, op) {
+    op = op || {};
+    var D = new Doc(st, ctx, res);
+    var c = res.projeto;
+    var usaHW = st.calculo.metodo === 'hw';
+    var submersivel = st.bombas.tipo === 'submersivel';
+    var fl = PDA.R.fluidos.filter(function (f) { return f.id === st.fluido.tipo; })[0];
+    var esgoto = ctx.familiaCriterio === 'esgoto';
+
+    /* ---------------- 1. Introdução ---------------- */
+    D.capitulo('Introdução');
+    var intro = (st.memorial && st.memorial.introducao) ? st.memorial.introducao : MEM.introducaoPadrao(st, ctx, res);
+    intro.split(/\n\s*\n/).forEach(function (par) {
+      if (par.trim()) D.p(par.trim());
+    });
+
+    if (st.memorial && st.memorial.objetivo) {
+      D.secao('Objetivo');
+      st.memorial.objetivo.split(/\n\s*\n/).forEach(function (par) { if (par.trim()) D.p(par.trim()); });
+    }
+
+    /* ---------------- 2. Dados de projeto ---------------- */
+    D.capitulo('Dados de projeto e premissas');
+    D.p('Os dados de partida adotados neste pré-dimensionamento estão reunidos na Tabela 1. ' +
+        'As cotas são altitudes absolutas, referidas ao mesmo datum do levantamento topográfico do projeto.');
+
+    function lin(rot, val) {
+      return h('tr', {}, h('td', { class: 'esq' }, rot), h('td', { class: 'esq' }, val));
+    }
+    var dados = [
+      lin('Fluido bombeado', fl ? fl.rot : '—'),
+      lin('Temperatura do fluido', ne(st.fluido.temperatura) + ' °C'),
+      lin('Altitude do local', ne(st.fluido.altitude) + ' m'),
+      lin('Vazão total de projeto', n(ctx.qTotal * 1000) + ' L/s  (' + n(ctx.qTotal * 3600) + ' m³/h)'),
+      lin('Vazão por bomba', n(ctx.qBomba * 1000) + ' L/s'),
+      lin('Conjuntos instalados', ne(ctx.nInst) + ' unidade(s)'),
+      lin('Conjuntos em operação simultânea', ne(ctx.nOp) + ' unidade(s)'),
+      lin('Arranjo dos conjuntos', ({ afogada: 'bomba afogada', succao: 'bomba com sucção negativa',
+                                      submersivel: 'bomba submersível' })[st.bombas.tipo]),
+      lin('Cota do nível d\'água de sucção — mínimo', n(st.cotas.nivelSuccaoMin) + ' m'),
+      lin('Cota do nível d\'água de sucção — máximo', n(st.cotas.nivelSuccaoMax) + ' m'),
+      submersivel ? null : lin('Cota do eixo da bomba', n(st.cotas.eixoBomba) + ' m'),
+      lin('Cota de partida da adutora', n(PDA.C.cotaPartida(st)) + ' m'),
+      lin('Cota de chegada', n(st.cotas.nivelChegada) + ' m'),
+      lin('Altura geométrica de projeto', n(c.HgMax) + ' m  (com o nível de sucção mínimo)'),
+      lin('Rendimento adotado para a bomba', ne(st.bombas.rendBomba) + ' %'),
+      st.bombas.usarRendMotor ? lin('Rendimento adotado para o motor', ne(st.bombas.rendMotor) + ' %') : null,
+      lin('Fórmula de perda de carga distribuída', PDA.C.rotMetodo[st.calculo.metodo]),
+      lin('Perda de carga localizada', 'Método dos coeficientes de perda (K)')
+    ].filter(Boolean);
+    D.tabela('Dados de projeto e premissas adotadas', ['Item', 'Valor adotado'], dados,
+      'Dados de entrada do projeto.');
+
+    D.figura('Esquema da elevatória com as cotas de projeto',
+      PDA.Q.niveisCotas(st, ctx, c),
+      'Elaborado pelo programa a partir dos dados do projeto.');
+
+    /* ---------------- 3. Metodologia ---------------- */
+    D.capitulo('Metodologia de cálculo');
+    D.p('O dimensionamento hidráulico foi conduzido pelo balanço de energia entre o nível de sucção e o ponto ' +
+        'de chegada. A altura manométrica total corresponde à soma da altura geométrica com as perdas de carga ' +
+        'distribuídas e localizadas em todos os trechos percorridos pelo escoamento ' + D.usar('az') + '.');
+    D.formula('Hm  =  Hg  +  Σ hf  +  Σ hₗ',
+      'Hm: altura manométrica total (mca);  Hg: altura geométrica (m);  hf: perda de carga distribuída (m);  hₗ: perda de carga localizada (m).');
+
+    D.secao('Perda de carga distribuída');
+    if (usaHW) {
+      D.p('A perda de carga distribuída foi obtida pela fórmula empírica de Hazen-Williams ' + D.usar('az') +
+          ', aplicável a água em temperatura ambiente, condutos de 50 a 3500 mm e velocidades de até cerca de ' +
+          '3 m/s. O coeficiente C sintetiza a rugosidade da parede e a idade do tubo.');
+      D.formula('J  =  ' + ne(st.calculo.hwK) + ' · Q^' + ne(st.calculo.hwExpQ) +
+                ' · C^−' + ne(st.calculo.hwExpQ) + ' · D^−' + ne(st.calculo.hwExpD),
+        'J: perda de carga unitária (m/m);  Q: vazão (m³/s);  C: coeficiente de Hazen-Williams (adimensional);  D: diâmetro interno (m).');
+    } else {
+      D.p('A perda de carga distribuída foi obtida pela fórmula universal de Darcy-Weisbach, com o fator de ' +
+          'atrito determinado pela equação de Colebrook-White ' + D.usar('colebrook') +
+          ', resolvida por iteração. Essa formulação vale para qualquer regime turbulento e trabalha com a ' +
+          'rugosidade absoluta equivalente da parede ' + D.usar('porto') + '.');
+      D.formula('J  =  f · v² / (2 · g · D)',
+        'J: perda de carga unitária (m/m);  f: fator de atrito (adimensional);  v: velocidade média (m/s);  g: aceleração da gravidade, 9,80665 m/s²;  D: diâmetro interno (m).');
+      D.formula('1 / √f  =  − 2 · log₁₀ [ ε / (3,7 · D)  +  2,51 / (Re · √f) ]',
+        'ε: rugosidade absoluta equivalente (m);  Re: número de Reynolds (adimensional).');
+      D.formula('Re  =  v · D / ν',
+        'ν: viscosidade cinemática do fluido (m²/s), calculada em função da temperatura.');
+      if (st.calculo.metodo === 'swamee') {
+        D.p('Na condição adotada, o fator de atrito foi obtido pela aproximação explícita de Swamee-Jain ' +
+            D.usar('swamee') + ', cujo desvio em relação à solução iterativa de Colebrook-White é inferior a 1,5 % ' +
+            'na faixa de interesse.');
+      } else if (st.calculo.metodo === 'zigrang') {
+        D.p('Na condição adotada, o fator de atrito foi obtido pela aproximação explícita de Zigrang-Sylvester ' +
+            D.usar('zigrang') + ', cujo desvio em relação à solução iterativa é inferior a 1 % na faixa de interesse.');
+      }
+      D.p('A viscosidade cinemática foi calculada para ' + ne(st.fluido.temperatura) + ' °C, resultando em ν = ' +
+          n(ctx.ni * 1e6, 3) + ' × 10⁻⁶ m²/s ' + D.usar('az') + '.');
+    }
+
+    D.secao('Perda de carga localizada');
+    D.p('As perdas localizadas foram calculadas pelo método dos coeficientes de perda de carga, peça a peça, ' +
+        'com a velocidade do próprio trecho — ou com a velocidade no diâmetro da peça, quando informado ' +
+        'diâmetro distinto do tubo ' + D.usar('az') + '.');
+    D.formula('hₗ  =  K · v² / (2 · g)',
+      'hₗ: perda de carga localizada (m);  K: coeficiente de perda da peça (adimensional).');
+
+    D.secao('Coeficientes de rugosidade adotados');
+    D.p('Os coeficientes de rugosidade foram adotados em função do material do tubo e da faixa de idade ou ' +
+        'condição de conservação, a partir das faixas consagradas na literatura ' + D.usar('az') + ' ' +
+        MEM.cit('porto') + '.' +
+        (esgoto ? ' Por se tratar de ' + (fl ? fl.rot.toLowerCase() : 'esgoto') +
+          ', foi aplicado um agravo sobre o valor de referência, prática usual em linhas de recalque em que a ' +
+          'formação de biofilme na parede aumenta a rugosidade efetiva ' + D.usar('tsutiyaEsgoto') + '.' : ''));
+    D.usar('porto');
+
+    /* deixa explícito de onde veio o valor: tabela, tabela com o agravo do
+       fluido, ou número digitado pelo projetista */
+    function origemRug(r, cons) {
+      if (r.tubo.cOverride || r.tubo.epsOverride) return 'informado pelo projetista';
+      var aj = cons.ajusteFluido;
+      var d = aj ? (usaHW ? aj.dC : aj.dEps) : 0;
+      if (!d) return 'valor de referência';
+      return 'valor de referência com agravo de ' +
+             (usaHW ? n(Math.abs(d), 0) + ' no C' : n(Math.abs(d), 2) + ' mm em ε') +
+             ' (' + aj.rot.toLowerCase() + ')';
+    }
+
+    var linhasRug = [];
+    var vistosRug = {};
+    c.succao.concat(c.recalque, c.adutoras).forEach(function (r) {
+      if (!r.tubo || !r.tubo.item) return;
+      var chave = r.tubo.material + '|' + r.conj.idade + '|' + (usaHW ? r.tubo.C : r.tubo.epsMm);
+      if (vistosRug[chave]) return;
+      vistosRug[chave] = true;
+      var cons = r.tubo.consulta || {};
+      var faixa = usaHW ? cons.faixaC : cons.faixaEps;
+      linhasRug.push(h('tr', {},
+        h('td', { class: 'esq' }, (PDA.R.materiais[r.tubo.material] || {}).rot || r.tubo.material),
+        h('td', { class: 'esq' }, (PDA.R.faixasIdade.filter(function (f) { return f.id === r.conj.idade; })[0] || {}).rot || '—'),
+        h('td', {}, faixa ? ne(faixa[0]) + ' a ' + ne(faixa[1]) : '—'),
+        h('td', {}, usaHW ? n(r.tubo.C, 0) : n(r.tubo.epsMm, 4)),
+        h('td', { class: 'esq' }, origemRug(r, cons))));
+    });
+    if (linhasRug.length) {
+      D.tabela('Coeficientes de rugosidade adotados',
+        [{ rot: 'Material', esq: true }, { rot: 'Idade / condição', esq: true },
+         usaHW ? 'Faixa de C' : 'Faixa de ε (mm)',
+         usaHW ? 'C adotado' : 'ε adotado (mm)', { rot: 'Origem', esq: true }], linhasRug,
+        MEM.biblio.az.cit + '; ' + MEM.biblio.porto.cit + '.');
+    }
+
+    /* ---------------- capítulos de trechos ---------------- */
+    if (c.succao.length) MEM.capituloTrechos(D, 'Barrilete de sucção', c.succao, 'succao');
+    if (c.recalque.length) MEM.capituloTrechos(D, 'Barrilete de recalque', c.recalque, 'barrilete');
+    if (c.adutoras.length) MEM.capituloTrechos(D, 'Adutora / linha de recalque', c.adutoras, 'adutora');
+
+    /* ---------------- perfil ---------------- */
+    if (res.envoltoria) MEM.capituloPerfil(D);
+
+    /* ---------------- resumo das perdas ---------------- */
+    MEM.capituloResumo(D);
+
+    /* ---------------- bomba ---------------- */
+    MEM.capituloBomba(D);
+
+    if (!submersivel) MEM.capituloNPSH(D);
+    if (res.curvaBomba && res.operacao && !res.operacao.erro) MEM.capituloOperacao(D);
+    if (st.golpe.avaliar && res.golpe && res.golpe.length) MEM.capituloTransitorio(D);
+
+    /* ---------------- considerações finais ---------------- */
+    D.capitulo('Considerações finais');
+    D.p('Os resultados apresentados correspondem a um PRÉ-dimensionamento: definem a ordem de grandeza do ' +
+        'diâmetro, da altura manométrica e da potência dos conjuntos, e apontam os pontos que exigem atenção. ' +
+        'O projeto executivo permanece condicionado à obtenção da curva característica da bomba, à verificação ' +
+        'do ponto de operação real, à conferência do NPSH requerido pelo fabricante e à análise do regime ' +
+        'transitório com os respectivos dispositivos de proteção ' + D.usar('nbr12214') + ' ' +
+        MEM.cit('nbr12215') + '.');
+    D.usar('nbr12215');
+
+    var pend = PDA.Res.coletarAvisos(st, ctx, res);
+    if (pend.length) {
+      D.p('A verificação automática dos critérios adotados registrou os pontos relacionados na Tabela ' +
+          (D.tabelas.length + 1) + ', que devem ser analisados antes do fechamento do projeto.');
+      D.tabela('Pontos a verificar', [{ rot: 'Item', esq: true }, { rot: 'Observação', esq: true }],
+        pend.map(function (t, i) {
+          return h('tr', {}, h('td', {}, String(i + 1)), h('td', { class: 'esq' }, t));
+        }), 'Verificação automática dos critérios adotados.');
+    }
+
+    if (st.projeto.obs) {
+      D.secao('Observações do projeto');
+      st.projeto.obs.split(/\n\s*\n/).forEach(function (par) { if (par.trim()) D.p(par.trim()); });
+    }
+
+    /* ---------------- bibliografia ---------------- */
+    D.capitulo('Referências bibliográficas');
+    D.p('As referências abaixo correspondem às fontes efetivamente utilizadas nas formulações, nos coeficientes ' +
+        'e nos critérios adotados neste memorial. Recomenda-se conferir a edição vigente das normas citadas.');
+    var chaves = Object.keys(D.fontesUsadas);
+    /* acrescenta as normas dos catálogos de tubo empregados */
+    var mapaCat = { nbr7675: 'nbr7675', nbr8682: 'nbr8682', iso4427: 'nbr15561', nbr7665: 'nbr7665',
+                    nbr5647: 'nbr5647', iso16422: 'nbr16631', nbr5580: 'nbr5580', nbr5590: 'nbr5590',
+                    asme_b3610: 'asme', nbr8890: 'nbr8890', nbr15536: 'nbr15536', en1092: 'en1092',
+                    nbr12214: 'nbr12214', nbr12215: 'nbr12215', nbr12208: 'nbr12208', tsutiya: 'tsutiya',
+                    tsutiya_esgoto: 'tsutiyaEsgoto' };
+    c.succao.concat(c.recalque, c.adutoras).forEach(function (r) {
+      if (!r.tubo || !r.tubo.cat) return;
+      (r.tubo.cat.fonteIds || []).forEach(function (f) {
+        if (mapaCat[f] && chaves.indexOf(mapaCat[f]) < 0) chaves.push(mapaCat[f]);
+      });
+    });
+    if (esgoto && chaves.indexOf('nbr12208') < 0) chaves.push('nbr12208');
+    if (chaves.indexOf('nbr12214') < 0) chaves.push('nbr12214');
+
+    var refs = chaves.map(function (k) { return MEM.biblio[k]; }).filter(Boolean);
+    refs.sort(function (a, b) { return a.ref.localeCompare(b.ref, 'pt-BR'); });
+    refs.forEach(function (r) {
+      D.add(h('p', { class: 'doc-ref bloco', html: r.ref }));
+    });
+
+    return D;
+  };
+
+  /* ================================================================
+     Capítulo genérico de trechos
+     ================================================================ */
+
+  MEM.capituloTrechos = function (D, titulo, trechos, tipo) {
+    var st = D.st, ctx = D.ctx;
+    var usaHW = st.calculo.metodo === 'hw';
+    var g = PDA.H.g;
+
+    D.capitulo(titulo);
+
+    var validos = trechos.filter(function (r) { return r.tubo && r.tubo.item; });
+    if (!validos.length) {
+      D.p('Não há trechos lançados com diâmetro definido neste grupo.');
+      return;
+    }
+
+    var intro = {
+      succao: 'A tubulação de sucção conduz o fluido do poço até a bomba. As perdas de carga deste trecho ' +
+              'entram integralmente no cálculo do NPSH disponível, razão pela qual a velocidade é mantida ' +
+              'baixa e o número de singularidades, mínimo ' + D.usar('nbr12214') + '.',
+      barrilete: 'O barrilete reúne a descarga dos conjuntos elevatórios até a saída da estação. O trecho ' +
+              'individual conduz a vazão de uma bomba; cada trecho do barrilete comum conduz a vazão das ' +
+              'bombas que já reuniu, o que é considerado trecho a trecho neste memorial.',
+      adutora: 'A adutora conduz a vazão da saída da estação até o ponto de entrega. Quando a linha se ' +
+              'ramifica, cada trecho a jusante da derivação conduz a fração de vazão correspondente, com ' +
+              'diâmetro próprio.'
+    }[tipo];
+    D.p(intro);
+
+    var crit = PDA.C.criterioDe(st, ctx, tipo);
+    D.p('Os diâmetros foram verificados contra os seguintes critérios: velocidade entre ' + ne(crit.vBom[0]) +
+        ' e ' + ne(crit.vBom[1]) + ' m/s (mínima admissível de ' + ne(crit.vMin) + ' m/s e máxima de ' +
+        ne(crit.vMax) + ' m/s) e perda de carga unitária de até ' + ne(crit.jMax) + ' m/km' +
+        (crit.fonte && MEM.biblio[({ nbr12214: 'nbr12214', nbr12215: 'nbr12215', nbr12208: 'nbr12208' })[crit.fonte]]
+          ? ' ' + D.usar(({ nbr12214: 'nbr12214', nbr12215: 'nbr12215', nbr12208: 'nbr12208' })[crit.fonte]) : '') + '.');
+
+    validos.forEach(function (r) {
+      D.secao(r.rot);
+      var t = r.tubo;
+      var dm = t.diM;
+      var A = Math.PI * dm * dm / 4;
+
+      D.p('Tubo adotado: ' + t.cat.nome + ', ' + t.item.rot + ', com diâmetro interno de ' + n(t.diMm, 1) +
+          ' mm' + (t.item.e ? ' e espessura de parede de ' + n(t.item.e, 1) + ' mm' : '') + '. ' +
+          'Extensão de ' + n(r.L, 1) + ' m e vazão de ' + n(r.Q * 1000, 1) + ' L/s' +
+          (r.nBombas ? ' (' + r.nBombas + ' bomba(s))' : '') + '.');
+
+      D.formula('v  =  Q / A  =  4 · Q / (π · D²)', null);
+      D.aplicacao('A  =  π × ' + n(dm, 4) + '² / 4  =  ' + n(A, 5) + ' m²',
+                  'v  =  4 × ' + n(r.Q, 4) + ' / (π × ' + n(dm, 4) + '²)  =  ' + n(r.v, 3) + ' m/s');
+
+      if (usaHW) {
+        D.aplicacao('J  =  ' + ne(st.calculo.hwK) + ' × ' + n(r.Q, 4) + '^' + ne(st.calculo.hwExpQ) +
+                    ' × ' + n(t.C, 0) + '^−' + ne(st.calculo.hwExpQ) + ' × ' + n(dm, 4) + '^−' + ne(st.calculo.hwExpD),
+                    'J  =  ' + n(r.J, 5) + ' m/m  =  ' + n(r.J * 1000, 2) + ' m/km');
+      } else {
+        D.aplicacao('Re  =  ' + n(r.v, 3) + ' × ' + n(dm, 4) + ' / ' + n(ctx.ni * 1e6, 3) + '×10⁻⁶  =  ' +
+                    n(r.Re / 1000, 0) + ' × 10³',
+                    'ε / D  =  ' + n(t.epsMm, 4) + ' / ' + n(t.diMm, 1) + '  =  ' + (t.epsMm / t.diMm).toExponential(2).replace('.', ','),
+                    'f  =  ' + n(r.f, 5) + '   (regime ' + (r.regime || 'turbulento') + ')',
+                    'J  =  ' + n(r.f, 5) + ' × ' + n(r.v, 3) + '² / (2 × ' + n(g, 3) + ' × ' + n(dm, 4) + ')  =  ' +
+                    n(r.J, 5) + ' m/m  =  ' + n(r.J * 1000, 2) + ' m/km');
+      }
+      D.aplicacao('hf  =  J × L  =  ' + n(r.J, 5) + ' × ' + n(r.L, 1) + '  =  ' + n(r.hf, 3) + ' m');
+
+      if (r.pecas && r.pecas.length) {
+        var somaK = 0, somaH = 0;
+        var linhasP = r.pecas.map(function (p) {
+          somaK += p.K * p.qtd; somaH += p.h;
+          return h('tr', {},
+            h('td', { class: 'esq' }, p.rot),
+            h('td', {}, ne(p.qtd)),
+            h('td', {}, ne(p.K)),
+            h('td', {}, n(p.K * p.qtd, 2)),
+            h('td', {}, n(p.diMm, 0)),
+            h('td', {}, n(p.v, 2)),
+            h('td', {}, n(p.h, 4)));
+        });
+        linhasP.push(h('tr', { class: 'total' },
+          h('td', { class: 'esq' }, 'Total'), h('td', {}, ''), h('td', {}, ''),
+          h('td', {}, n(somaK, 2)), h('td', {}, ''), h('td', {}, ''), h('td', {}, n(somaH, 4))));
+        D.tabela('Peças e conexões — ' + r.rot,
+          [{ rot: 'Peça', esq: true }, 'Quant.', 'K unitário', 'ΣK', 'DI (mm)', 'v (m/s)', 'hₗ (m)'],
+          linhasP, PDA.P.fontePecas.az.replace(/\.$/, '') + '.');
+        D.usar('az');
+        D.aplicacao('Σhₗ  =  ΣK × v² / (2 · g)  =  ' + n(somaK, 2) + ' × ' + n(r.v, 3) +
+                    '² / (2 × ' + n(g, 3) + ')  =  ' + n(r.hl, 3) + ' m');
+      }
+
+      D.aplicacao('h total do trecho  =  hf + Σhₗ  =  ' + n(r.hf, 3) + ' + ' + n(r.hl, 3) +
+                  '  =  ' + n(r.htotal, 3) + ' m');
+
+      var cl = PDA.C.classificar(r.v, r.J, crit);
+      D.p('Verificação: velocidade de ' + n(r.v, 2) + ' m/s e perda unitária de ' + n(r.J * 1000, 2) +
+          ' m/km — ' + ({ bom: 'dentro das faixas recomendadas', atencao: 'fora da faixa recomendada, porém dentro dos limites admissíveis',
+                          ruim: 'FORA dos limites admissíveis', na: 'sem vazão' })[cl.classe] + '.' +
+          (cl.classe !== 'bom' ? ' ' + cl.motivos.join('; ') + '.' : ''));
+    });
+
+    /* tabela resumo do grupo */
+    var somaL = 0, somaHf = 0, somaHl = 0;
+    var linhas = validos.map(function (r) {
+      somaL += r.L; somaHf += r.hf; somaHl += r.hl;
+      return h('tr', {},
+        h('td', { class: 'esq' }, r.rot),
+        h('td', { class: 'esq' }, r.tubo.item.rot),
+        h('td', {}, n(r.tubo.diMm, 1)),
+        h('td', {}, n(r.L, 1)),
+        h('td', {}, n(r.Q * 1000, 1)),
+        h('td', {}, n(r.v, 2)),
+        h('td', {}, n(r.J * 1000, 2)),
+        h('td', {}, n(r.hf, 3)),
+        h('td', {}, n(r.hl, 3)),
+        h('td', {}, n(r.htotal, 3)));
+    });
+    linhas.push(h('tr', { class: 'total' },
+      h('td', { class: 'esq' }, 'Total'), h('td', {}, ''), h('td', {}, ''),
+      h('td', {}, n(somaL, 1)), h('td', {}, ''), h('td', {}, ''), h('td', {}, ''),
+      h('td', {}, n(somaHf, 3)), h('td', {}, n(somaHl, 3)), h('td', {}, n(somaHf + somaHl, 3))));
+
+    D.tabela('Resumo — ' + titulo,
+      [{ rot: 'Trecho', esq: true }, { rot: 'Diâmetro', esq: true }, 'DI (mm)', 'L (m)', 'Q (L/s)',
+       'v (m/s)', 'J (m/km)', 'hf (m)', 'Σhₗ (m)', 'h total (m)'], linhas,
+      'Resultados calculados pelo programa.');
+
+    if (tipo === 'adutora') {
+      var v = PDA.C.varrer(st, ctx, validos[0].conj, 'adutoras.0', ctx.nOp);
+      var lc = v.linhas.map(function (l) {
+        return h('tr', { class: l.rot === validos[0].conj.itemRot ? 'destaque' : null },
+          h('td', { class: 'esq' }, l.rot + (l.rot === validos[0].conj.itemRot ? '  (adotado)' : '')),
+          h('td', {}, n(l.diMm, 1)),
+          h('td', {}, n(l.v, 2)),
+          h('td', {}, n(l.jKm, 2)),
+          h('td', {}, n(l.htotal, 3)),
+          h('td', { class: 'esq' }, ({ bom: 'adequado', atencao: 'atenção', ruim: 'inadequado', na: '—' })[l.classe]));
+      });
+      D.tabela('Comparação de diâmetros — ' + validos[0].rot,
+        [{ rot: 'Diâmetro', esq: true }, 'DI (mm)', 'v (m/s)', 'J (m/km)', 'h total (m)', { rot: 'Situação', esq: true }],
+        lc, 'Varredura do catálogo, com os critérios de velocidade e perda unitária adotados.');
+      D.p('O diâmetro de Bresse, tomado como referência de ordem de grandeza, resulta entre ' +
+          n(v.bresse.k07, 0) + ' e ' + n(v.bresse.k13, 0) + ' mm para a vazão do trecho ' + D.usar('tsutiya') + '.');
+    }
+  };
+
+  /* ================================================================
+     Perfil e envoltórias
+     ================================================================ */
+
+  MEM.capituloPerfil = function (D) {
+    var st = D.st, ctx = D.ctx, res = D.res;
+    var env = res.envoltoria;
+    D.capitulo('Perfil da linha e verificação de pressões');
+    D.p('O perfil da tubulação foi lançado com ' + env.pontos.length + ' pontos, cobrindo ' +
+        n(env.lTrechos, 0) + ' m de extensão. A linha piezométrica em regime permanente foi interpolada a ' +
+        'partir das perdas de carga de cada trecho, e a pressão disponível em cada ponto corresponde à ' +
+        'diferença entre a linha piezométrica e a cota da geratriz da tubulação.');
+    D.p('Sobre a linha piezométrica permanente foram traçadas as envoltórias de pressão máxima e mínima do ' +
+        'regime transitório, pela hipótese de anteprojeto em que a sobrepressão vale integralmente na ' +
+        'elevatória e decai linearmente até zero no ponto de chegada, onde o nível do reservatório é fixo ' +
+        D.usar('porto') + ' ' + MEM.cit('nbr12215') + '.');
+    D.usar('nbr12215');
+    D.formula('p_máx(x)  =  LP(x)  +  Δh · (1 − x/L)  −  cota(x)',
+      'LP: linha piezométrica em regime permanente (m);  Δh: sobrepressão na elevatória (mca);  x: distância desde a elevatória (m);  L: extensão total (m).');
+    D.aplicacao('Δh adotado na elevatória  =  ' + n(env.dh, 2) + ' mca',
+                'Maior pressão  =  ' + n(env.criticoMax.pMax, 2) + ' mca, na distância ' + n(env.criticoMax.x, 0) + ' m',
+                'Menor pressão  =  ' + n(env.criticoMin.pMin, 2) + ' mca, na distância ' + n(env.criticoMin.x, 0) + ' m');
+
+    D.figura('Perfil da linha com a piezométrica e as envoltórias de pressão',
+      PDA.Pf.grafico(st, ctx, res),
+      'Elaborado pelo programa a partir do perfil lançado e das perdas calculadas.');
+
+    var linhas = env.pontos.map(function (p) {
+      return h('tr', {},
+        h('td', {}, n(p.x, 1)),
+        h('td', { class: 'esq' }, p.rot || '—'),
+        h('td', {}, n(p.cota, 2)),
+        h('td', {}, n(p.hgl, 2)),
+        h('td', {}, n(p.pPerm, 2)),
+        h('td', {}, n(p.pMax, 2)),
+        h('td', {}, n(p.pMin, 2)),
+        h('td', {}, p.pn ? n(p.pn, 0) : '—'),
+        h('td', { class: 'esq' }, ({ bom: 'adequado', atencao: 'atenção', ruim: 'verificar', na: '—' })[p.classe]));
+    });
+    D.tabela('Pressões ao longo da linha', ['Distância (m)', { rot: 'Ponto', esq: true }, 'Cota (m)',
+      'L.P. (m)', 'p permanente (mca)', 'p máxima (mca)', 'p mínima (mca)', 'PN (mca)',
+      { rot: 'Situação', esq: true }], linhas,
+      'Resultados calculados pelo programa.');
+
+    var crit = env.pontos.filter(function (p) { return p.classe === 'ruim'; });
+    if (crit.length) {
+      D.p('Foram identificados ' + crit.length + ' ponto(s) em que a pressão calculada extrapola os limites ' +
+          'adotados. A pré-avaliação do transitório considera a tubulação sem dispositivos de proteção; ' +
+          'nesses casos, o passo seguinte é o estudo específico do transitório e o dimensionamento da ' +
+          'proteção ' + D.usar('streeter') + '.');
+    }
+  };
+
+  /* ================================================================
+     Resumo das perdas
+     ================================================================ */
+
+  MEM.capituloResumo = function (D) {
+    var c = D.res.projeto, ctx = D.ctx;
+    D.capitulo('Resumo das perdas de carga e altura manométrica');
+
+    var linhas = [
+      h('tr', {}, h('td', { class: 'esq' }, 'Altura geométrica (Hg)'), h('td', {}, n(c.HgMax, 3))),
+      h('tr', {}, h('td', { class: 'esq' }, 'Perda de carga distribuída na sucção'), h('td', {}, n(c.hfSuccao, 3))),
+      h('tr', {}, h('td', { class: 'esq' }, 'Perda de carga localizada na sucção'), h('td', {}, n(c.hlSuccao, 3))),
+      h('tr', {}, h('td', { class: 'esq' }, 'Perda de carga distribuída no recalque'), h('td', {}, n(c.hfRecalque, 3))),
+      h('tr', {}, h('td', { class: 'esq' }, 'Perda de carga localizada no recalque'), h('td', {}, n(c.hlRecalque, 3))),
+      h('tr', { class: 'total' }, h('td', { class: 'esq' }, 'Altura manométrica total (Hm)'), h('td', {}, n(c.Hm, 3)))
+    ];
+    D.tabela('Composição da altura manométrica', [{ rot: 'Parcela', esq: true }, 'Valor (m)'], linhas,
+      'Resultados calculados pelo programa.');
+
+    D.aplicacao('Hm  =  ' + n(c.HgMax, 3) + '  +  ' + n(c.hfSuccao + c.hfRecalque, 3) + '  +  ' +
+                n(c.hlSuccao + c.hlRecalque, 3) + '  =  ' + n(c.Hm, 3) + ' mca');
+
+    var hTot = c.hSuccao + c.hRecalque;
+    D.p('As perdas de carga respondem por ' + n(c.Hm > 0 ? hTot / c.Hm * 100 : 0, 1) + ' % da altura ' +
+        'manométrica total, sendo ' + n(hTot > 0 ? (c.hfSuccao + c.hfRecalque) / hTot * 100 : 0, 1) +
+        ' % de perda distribuída e ' + n(hTot > 0 ? (c.hlSuccao + c.hlRecalque) / hTot * 100 : 0, 1) +
+        ' % de perda localizada. Com o nível de sucção máximo, a altura manométrica se reduz a ' +
+        n(c.HmMin, 2) + ' mca.');
+
+    /* cenários */
+    var linhasC = D.res.cenarios.map(function (x) {
+      return h('tr', { class: x.n === ctx.nOp ? 'destaque' : null },
+        h('td', {}, x.n + (x.n === ctx.nOp ? '  (projeto)' : '')),
+        h('td', {}, n(x.qTotal * 1000, 1)),
+        h('td', {}, n(x.qBomba * 1000, 1)),
+        h('td', {}, n(x.Hg, 2)),
+        h('td', {}, n(x.hSuccao + x.hRecalque, 2)),
+        h('td', {}, n(x.Hm, 2)),
+        h('td', {}, n(x.bhpCv, 1)),
+        h('td', {}, ne(x.motorCv)));
+    });
+    D.tabela('Cenários de operação por número de conjuntos',
+      ['Bombas', 'Q total (L/s)', 'Q por bomba (L/s)', 'Hg (m)', 'Perdas (m)', 'Hm (mca)',
+       'BHP por bomba (cv)', 'Motor (cv)'], linhasC,
+      'Resultados calculados pelo programa.');
+    D.p('A altura manométrica cresce com a vazão porque as perdas variam aproximadamente com o quadrado dela. ' +
+        'Nesta tabela a vazão por bomba é mantida constante, simplificação usual em pré-dimensionamento; ' +
+        'o comportamento real em paralelo depende da curva característica dos conjuntos.');
+  };
+
+  /* ================================================================
+     Bomba
+     ================================================================ */
+
+  MEM.capituloBomba = function (D) {
+    var st = D.st, ctx = D.ctx, c = D.res.projeto;
+    D.capitulo('Conjuntos elevatórios');
+    D.p('A potência hidráulica útil corresponde ao produto do peso específico do fluido pela vazão e pela ' +
+        'altura manométrica. A potência no eixo resulta da divisão pela eficiência do conjunto ' + D.usar('az') + '.');
+    D.formula('P  =  γ · Q · Hm / ( 75 · η )',
+      'P: potência no eixo (cv);  γ: peso específico do fluido (kgf/m³);  Q: vazão por bomba (m³/s);  Hm: altura manométrica (mca);  η: rendimento da bomba (decimal).');
+    D.aplicacao('γ  =  ' + n(ctx.gama, 0) + ' N/m³  a  ' + ne(st.fluido.temperatura) + ' °C',
+                'P  =  ' + n(ctx.qBomba * 1000, 2) + ' × ' + n(c.Hm, 2) + ' / ( 75 × ' +
+                n(st.bombas.rendBomba / 100, 2) + ' )  =  ' + n(c.bhpCv, 2) + ' cv  =  ' + n(c.bhpKw, 2) + ' kW');
+    D.p('Sobre a potência calculada foi aplicada folga de ' + n(c.folgaPct, 0) + ' %, resultando na adoção de ' +
+        'motor comercial de ' + ne(c.motorCv) + ' cv (' + n(c.motorKw, 1) + ' kW) por conjunto. ' +
+        'Com ' + ctx.nOp + ' conjunto(s) em operação simultânea, a potência instalada em funcionamento é de ' +
+        n(c.potTotalKw, 1) + ' kW.');
+
+    var linhas = [
+      h('tr', {}, h('td', { class: 'esq' }, 'Vazão por bomba'), h('td', {}, n(ctx.qBomba * 1000, 2) + ' L/s')),
+      h('tr', {}, h('td', { class: 'esq' }, 'Altura manométrica'), h('td', {}, n(c.Hm, 2) + ' mca')),
+      h('tr', {}, h('td', { class: 'esq' }, 'Rendimento adotado da bomba'), h('td', {}, ne(st.bombas.rendBomba) + ' %')),
+      h('tr', {}, h('td', { class: 'esq' }, 'Potência útil'), h('td', {}, n(c.potUtilCv, 2) + ' cv')),
+      h('tr', {}, h('td', { class: 'esq' }, 'Potência no eixo (BHP)'), h('td', {}, n(c.bhpCv, 2) + ' cv  (' + n(c.bhpKw, 2) + ' kW)')),
+      h('tr', {}, h('td', { class: 'esq' }, 'Folga aplicada'), h('td', {}, n(c.folgaPct, 0) + ' %')),
+      h('tr', { class: 'total' }, h('td', { class: 'esq' }, 'Motor comercial adotado'), h('td', {}, ne(c.motorCv) + ' cv  (' + n(c.motorKw, 1) + ' kW)')),
+      st.bombas.usarRendMotor ? h('tr', {}, h('td', { class: 'esq' }, 'Potência elétrica consumida por bomba'), h('td', {}, n(c.eletricaKw, 2) + ' kW')) : null,
+      h('tr', {}, h('td', { class: 'esq' }, 'Conjuntos instalados / em operação'), h('td', {}, ctx.nInst + ' / ' + ctx.nOp))
+    ].filter(Boolean);
+    D.tabela('Dimensionamento dos conjuntos elevatórios', [{ rot: 'Item', esq: true }, 'Valor'], linhas,
+      'Resultados calculados pelo programa; linha de motores comerciais conforme a norma IEC.');
+  };
+
+  /* ================================================================
+     NPSH
+     ================================================================ */
+
+  MEM.capituloNPSH = function (D) {
+    var st = D.st, ctx = D.ctx, c = D.res.projeto;
+    D.capitulo('NPSH disponível');
+    D.p('O NPSH disponível é uma propriedade da instalação e corresponde à energia absoluta disponível na ' +
+        'entrada da bomba, acima da pressão de vaporização do fluido. A instalação é viável quando o NPSH ' +
+        'disponível supera o NPSH requerido pela bomba, obtido na curva do fabricante, com margem de segurança ' +
+        D.usar('nbr12214') + ' ' + MEM.cit('tsutiya') + '.');
+    D.usar('tsutiya');
+    D.formula('NPSH_d  =  ( p_atm − p_v ) / γ  ±  z  −  hf,sucção',
+      'p_atm: pressão atmosférica local;  p_v: pressão de vapor do fluido na temperatura de trabalho;  z: desnível entre o nível de sucção e o eixo da bomba (positivo quando a bomba está afogada);  hf,sucção: perda de carga total na sucção.');
+    D.aplicacao('p_atm / γ  =  ' + n(ctx.patm, 3) + ' mca   (altitude de ' + ne(st.fluido.altitude) + ' m)',
+                'p_v / γ  =  ' + n(ctx.pvapor, 3) + ' mca   (a ' + ne(st.fluido.temperatura) + ' °C)',
+                'z  =  ' + n(st.cotas.nivelSuccaoMin, 2) + ' − ' + n(st.cotas.eixoBomba, 2) + '  =  ' +
+                  n(c.zSuccao, 2) + ' m   (bomba ' + (c.zSuccao >= 0 ? 'afogada' : 'aspirando') + ')',
+                'hf,sucção  =  ' + n(c.hSuccao, 4) + ' m',
+                'NPSH_d  =  ' + n(ctx.patm, 3) + ' − ' + n(ctx.pvapor, 3) + ' + (' + n(c.zSuccao, 2) + ') − ' +
+                  n(c.hSuccao, 4) + '  =  ' + n(c.npshd, 3) + ' mca');
+
+    if (st.curvaBomba && st.curvaBomba.npshr) {
+      var margem = c.npshd - Number(st.curvaBomba.npshr);
+      D.p('O NPSH requerido informado para a bomba é de ' + ne(st.curvaBomba.npshr) + ' mca, resultando em ' +
+          'margem de ' + n(margem, 2) + ' mca. ' +
+          (margem < 0.5 ? 'A margem é inferior a 0,5 mca, valor mínimo usualmente recomendado — a configuração ' +
+            'da sucção deve ser revista.' : 'A margem atende à recomendação usual de 0,5 a 1,0 mca.'));
+    } else {
+      D.p('O NPSH requerido deve ser obtido na curva característica da bomba selecionada e comparado ao valor ' +
+          'acima, adotando-se margem mínima da ordem de 0,5 a 1,0 mca.');
+    }
+
+    D.figura('Composição do NPSH disponível', PDA.Q.npsh(st, ctx, c),
+      'Elaborado pelo programa a partir dos dados do projeto.');
+  };
+
+  /* ================================================================
+     Curva do sistema e ponto de operação
+     ================================================================ */
+
+  MEM.capituloOperacao = function (D) {
+    var st = D.st, ctx = D.ctx, res = D.res;
+    var op = res.operacao, cv = res.curvaBomba;
+    D.capitulo('Curva do sistema e ponto de operação');
+    D.p('A curva do sistema representa a altura manométrica exigida pela instalação em função da vazão, para ' +
+        'os diâmetros e as singularidades adotados. O ponto de operação real é a interseção entre a curva do ' +
+        'sistema e a curva característica da bomba ' + D.usar('az') + '.');
+    D.formula('H_sistema(Q)  =  Hg  +  Σ hf(Q)  +  Σ hₗ(Q)', null);
+    D.p('A curva da bomba foi ajustada por mínimos quadrados sobre os pontos informados, na forma polinomial ' +
+        'de segundo grau usual para bombas centrífugas.');
+    D.formula('H_bomba(Q)  =  a₀  +  a₁ · Q  +  a₂ · Q²', null);
+    D.aplicacao('a₀  =  ' + n(cv.a0, 4) + '   a₁  =  ' + n(cv.a1, 4) + '   a₂  =  ' + n(cv.a2, 4) +
+                '   [H em mca, Q em m³/s]');
+
+    var linhasP = cv.pontos.map(function (p) {
+      return h('tr', {}, h('td', {}, n(p.q * 1000, 1)), h('td', {}, n(p.H, 2)),
+        h('td', {}, n(cv.H(p.q), 2)), h('td', {}, n(cv.H(p.q) - p.H, 3)));
+    });
+    D.tabela('Pontos da curva característica da bomba',
+      ['Q (L/s)', 'H informado (mca)', 'H ajustado (mca)', 'Desvio (mca)'], linhasP,
+      'Pontos informados a partir da curva do fabricante.');
+
+    D.aplicacao('Ponto de operação com ' + op.n + ' bomba(s):',
+                'Q  =  ' + n(op.qTotal * 1000, 2) + ' L/s no total,  ' + n(op.qBomba * 1000, 2) + ' L/s por bomba',
+                'H  =  ' + n(op.H, 2) + ' mca',
+                'P  =  ' + n(op.bhpCv, 2) + ' cv por bomba',
+                'Desvio em relação à vazão de projeto: ' + n(op.desvioQ, 1) + ' %');
+
+    D.figura('Curva do sistema e curva da bomba, com o ponto de operação',
+      PDA.F.graficoCurvas(st, ctx, res),
+      'Elaborado pelo programa a partir da curva informada e dos diâmetros adotados.');
+
+    if (res.operacaoPorN && res.operacaoPorN.length > 1) {
+      var linhasN = res.operacaoPorN.map(function (x, i) {
+        if (!x.op || x.op.erro) {
+          return h('tr', {}, h('td', {}, x.n), h('td', { class: 'esq', colspan: 5 }, x.op ? x.op.erro : '—'));
+        }
+        /* o ganho só faz sentido quando o cenário anterior também tem interseção */
+        var pre = i > 0 ? res.operacaoPorN[i - 1].op : null;
+        var temAnt = !!(pre && !pre.erro);
+        return h('tr', { class: x.n === ctx.nOp ? 'destaque' : null },
+          h('td', {}, x.n), h('td', {}, n(x.op.qTotal * 1000, 1)), h('td', {}, n(x.op.qBomba * 1000, 1)),
+          h('td', {}, n(x.op.H, 2)), h('td', {}, n(x.op.bhpCv, 1)),
+          h('td', {}, temAnt ? '+' + n((x.op.qTotal - pre.qTotal) * 1000, 1) : '—'));
+      });
+      D.tabela('Operação em paralelo', ['Bombas', 'Q total (L/s)', 'Q por bomba (L/s)', 'H (mca)',
+        'BHP por bomba (cv)', 'Ganho de vazão (L/s)'], linhasN,
+        'Resultados calculados pelo programa.');
+      D.p('Em associação em paralelo o ganho de vazão obtido ao acionar um conjunto adicional é sempre inferior ' +
+          'à vazão de uma bomba operando isoladamente, porque a altura exigida pelo sistema cresce com a vazão.');
+    }
+  };
+
+  /* ================================================================
+     Transitório
+     ================================================================ */
+
+  MEM.capituloTransitorio = function (D) {
+    var st = D.st, res = D.res;
+    D.capitulo('Transitório hidráulico — pré-avaliação');
+    D.p('A parada abrupta dos conjuntos ou o fechamento rápido de uma válvula provocam variação brusca da ' +
+        'velocidade e, em consequência, sobrepressões e subpressões que se propagam pela tubulação com ' +
+        'celeridade própria do conjunto fluido-tubo ' + D.usar('streeter') + '. A verificação a seguir é ' +
+        'preliminar e destina-se a conferir se a classe de pressão adotada possui folga.');
+    D.formula('a  =  1 / √[ ρ · ( 1/K  +  ψ · D / ( e · E ) ) ]',
+      'a: celeridade da onda (m/s);  ρ: massa específica do fluido (kg/m³);  K: módulo de elasticidade volumétrica da água, 2,19 GPa;  ψ: coeficiente de ancoragem longitudinal;  D: diâmetro interno (m);  e: espessura de parede (m);  E: módulo de elasticidade do material (Pa).');
+    var anc = PDA.H.ancoragem.filter(function (a) { return a.id === (st.golpe.ancoragem || 'juntas'); })[0];
+    D.p('Foi adotada a condição de ancoragem "' + (anc ? anc.rot.toLowerCase() : '—') + '" ' +
+        D.usar('halliwell') + '.');
+    D.formula('t_c  =  2 · L / a          Δh  =  a · Δv / g   (manobra rápida)',
+      't_c: tempo crítico de manobra (s);  Δv: variação de velocidade (m/s).');
+    D.formula('Δh  =  2 · L · v / ( g · t )   (manobra lenta)',
+      't: tempo de manobra (s). Aplicável quando t > t_c.');
+    D.usar('joukowsky');
+
+    res.golpe.forEach(function (g) {
+      D.aplicacao(g.rot + ':',
+        'a  =  ' + n(g.celeridade, 0) + ' m/s   (E = ' + n(g.E_GPa, 0) + ' GPa,  ν = ' + ne(g.nu) +
+          ',  ψ = ' + n(g.psi, 3) + ',  e = ' + n(g.eMm, 1) + ' mm)',
+        't_c  =  2 × ' + n(g.L, 0) + ' / ' + n(g.celeridade, 0) + '  =  ' + n(g.tempoCritico, 2) +
+          ' s    →   manobra ' + (g.manobraRapida ? 'RÁPIDA' : 'LENTA') + ' (t = ' + ne(g.tempoManobra) + ' s)',
+        'Δh  =  ' + n(g.dh, 1) + ' mca',
+        'pressão máxima  =  Hm + Δh  =  ' + n(g.pressaoMaxMca, 1) + ' mca' +
+          (g.pnMca ? '   |   admissível do tubo: ' + n(g.pnMca, 0) + ' mca' : ''));
+    });
+
+    var linhas = res.golpe.map(function (g) {
+      return h('tr', {},
+        h('td', { class: 'esq' }, g.rot),
+        h('td', {}, n(g.celeridade, 0)),
+        h('td', {}, n(g.tempoCritico, 2)),
+        h('td', { class: 'esq' }, g.manobraRapida ? 'rápida' : 'lenta'),
+        h('td', {}, n(g.dh, 1)),
+        h('td', {}, n(g.pressaoMaxMca, 1)),
+        h('td', {}, n(g.pressaoMinMca, 1)),
+        h('td', {}, g.pnMca ? n(g.pnMca, 0) : '—'),
+        h('td', { class: 'esq' }, g.atende === null ? 'PN não informado' : (g.atende ? 'atende' : 'NÃO atende')));
+    });
+    D.tabela('Pré-avaliação do transitório hidráulico',
+      [{ rot: 'Trecho', esq: true }, 'Celeridade (m/s)', 't_c (s)', { rot: 'Manobra', esq: true },
+       'Δh (mca)', 'p máx. (mca)', 'p mín. (mca)', 'PN (mca)', { rot: 'Situação', esq: true }], linhas,
+      'Resultados calculados pelo programa.');
+
+    D.p('ALCANCE DESTA VERIFICAÇÃO: o cálculo considera a tubulação sem dispositivos de proteção — não foram ' +
+        'considerados tanque de alívio, chaminé de equilíbrio, válvula antecipadora de onda, ventosa de duplo ' +
+        'efeito ou volante de inércia. Também não foram integradas as equações do transitório pelo método das ' +
+        'características, nem representadas as reflexões de onda nas mudanças de diâmetro e de material, nem ' +
+        'modelada a separação e o retorno da coluna líquida. Caso a sobrepressão exceda a classe de pressão da ' +
+        'tubulação, o encaminhamento adequado não é o aumento da espessura de parede, e sim o dimensionamento ' +
+        'da proteção mediante estudo específico ' + D.usar('streeter') + '.');
+  };
+
+  /* ================================================================
+     Introdução gerada a partir dos dados
+     ================================================================ */
+
+  MEM.introducaoPadrao = function (st, ctx, res) {
+    var c = res.projeto;
+    var fl = PDA.R.fluidos.filter(function (f) { return f.id === st.fluido.tipo; })[0];
+    var esgoto = ctx.familiaCriterio === 'esgoto';
+    var extensao = 0;
+    c.adutoras.forEach(function (r) { extensao += r.L; });
+    var mats = {};
+    c.adutoras.forEach(function (r) { if (r.tubo && r.tubo.cat) mats[r.tubo.cat.familia] = true; });
+    var listaMat = Object.keys(mats);
+
+    var p1 = 'O presente memorial apresenta o pré-dimensionamento hidráulico da ' +
+      (esgoto ? 'linha de recalque' : 'adutora') + ' do ' +
+      (st.projeto.nome ? '"' + st.projeto.nome + '"' : 'empreendimento em estudo') +
+      (st.projeto.local ? ', localizado em ' + st.projeto.local : '') + '. ' +
+      'O sistema foi concebido para transportar ' + (fl ? fl.rot.toLowerCase() : 'o fluido') +
+      ' a uma vazão de projeto de ' + n(ctx.qTotal * 1000, 1) + ' L/s (' + n(ctx.qTotal * 3600, 1) + ' m³/h), ' +
+      'por meio de ' + ctx.nInst + ' conjunto(s) elevatório(s), sendo ' + ctx.nOp +
+      ' em operação simultânea na condição de projeto.';
+
+    var p2 = 'A ' + (esgoto ? 'linha de recalque' : 'adutora') + ' possui extensão total de ' +
+      n(extensao, 0) + ' m' + (listaMat.length ? ', em ' + listaMat.join(' e ') : '') + ', vencendo ' +
+      'desnível geométrico de ' + n(c.HgMax, 2) + ' m entre a cota de partida (' +
+      n(PDA.C.cotaPartida(st), 2) + ' m) e a cota de chegada (' + n(st.cotas.nivelChegada, 2) + ' m). ' +
+      'Da condição adotada resulta altura manométrica total de ' + n(c.Hm, 2) + ' mca e potência de eixo de ' +
+      n(c.bhpCv, 1) + ' cv por conjunto, para a qual se adotam motores comerciais de ' + ne(c.motorCv) + ' cv.';
+
+    var p3 = 'O estudo compreende o dimensionamento das tubulações de sucção e recalque, a verificação das ' +
+      'velocidades e das perdas de carga, o cálculo da altura manométrica e da potência dos conjuntos, ' +
+      'a verificação do NPSH disponível e a pré-avaliação do regime transitório. ' +
+      'Os critérios, coeficientes e formulações adotados estão indicados ao longo do texto, com as ' +
+      'respectivas referências.';
+
+    return p1 + '\n\n' + p2 + '\n\n' + p3;
+  };
+
+  PDA.MEM = MEM;
+})(window.PDA = window.PDA || {});
+
+/* ===== 14-exportar.js ===== */
+/* ------------------------------------------------------------------
+ * Paginação e exportação do memorial.
+ *
+ * O documento é distribuído em páginas A4 medidas de verdade, o que
+ * permite numerar o sumário e os índices. Daí saem duas saídas: a
+ * impressão (PDF pelo próprio navegador) e um arquivo .doc que o Word
+ * e o LibreOffice abrem para edição.
+ * ------------------------------------------------------------------ */
+(function (PDA) {
+  'use strict';
+
+  var X = {};
+  var UI, h;
+
+  X.init = function () { UI = PDA.UI; h = UI.h; };
+
+  var MM = 96 / 25.4;              /* 1 mm em px a 96 dpi */
+  X.PAG = {
+    largura: 210, altura: 297,
+    margEsq: 25, margDir: 20, margSup: 20, margInf: 15,
+    cabecalho: 14, rodape: 10
+  };
+
+  X.larguraUtilMm = function () { return X.PAG.largura - X.PAG.margEsq - X.PAG.margDir; };
+  X.alturaUtilMm = function () {
+    return X.PAG.altura - X.PAG.margSup - X.PAG.margInf - X.PAG.cabecalho - X.PAG.rodape;
+  };
+
+  /* ================================================================
+     Medição
+     ================================================================ */
+
+  function abrirMedidor() {
+    var m = document.getElementById('doc-medidor');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'doc-medidor';
+      document.body.appendChild(m);
+    }
+    m.className = 'doc doc-medidor';
+    m.style.width = X.larguraUtilMm() * MM + 'px';
+    UI.limpar(m);
+    return m;
+  }
+
+  /* Altura ocupada pelo bloco, MARGENS INCLUÍDAS. Sem elas a soma fica
+     menor que o layout real e a última tabela da página estoura o rodapé. */
+  function medir(medidor, el) {
+    medidor.appendChild(el);
+    var cs = window.getComputedStyle(el);
+    var alt = el.getBoundingClientRect().height +
+              (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+    medidor.removeChild(el);
+    return alt;
+  }
+
+  /* ================================================================
+     Divisão de tabelas entre páginas
+     ================================================================ */
+
+  function dividirTabela(quadro, medidor, alturaPrimeira, alturaCheia) {
+    var clone = quadro.cloneNode(true);
+    medidor.appendChild(clone);
+    var cap = clone.querySelector('.doc-cap-tab');
+    var tab = clone.querySelector('table');
+    var fonte = clone.querySelector('.doc-fonte');
+    if (!tab) { medidor.removeChild(clone); return null; }
+
+    var thead = tab.querySelector('thead');
+    var linhas = Array.prototype.slice.call(tab.querySelectorAll('tbody tr'));
+    var alturas = linhas.map(function (tr) { return tr.getBoundingClientRect().height; });
+    medidor.removeChild(clone);
+
+    if (!linhas.length) return null;
+
+    /* Monta uma parte da tabela com as linhas indicadas. */
+    function montar(de, ate, continuacao, comFonte) {
+      var parte = quadro.cloneNode(false);
+      parte.removeAttribute('data-ref');
+      if (!continuacao && quadro.getAttribute('data-ref')) {
+        parte.setAttribute('data-ref', quadro.getAttribute('data-ref'));
+      }
+      if (cap) {
+        var c2 = cap.cloneNode(true);
+        if (continuacao) c2.textContent = cap.textContent + '  (continuação)';
+        parte.appendChild(c2);
+      }
+      var t2 = tab.cloneNode(false);
+      if (thead) t2.appendChild(thead.cloneNode(true));
+      var tb = document.createElement('tbody');
+      for (var k = de; k < ate; k++) tb.appendChild(linhas[k].cloneNode(true));
+      t2.appendChild(tb);
+      parte.appendChild(t2);
+      if (comFonte && fonte) parte.appendChild(fonte.cloneNode(true));
+      return parte;
+    }
+
+    /* O que a parte gasta além das próprias linhas: legenda, cabeçalho da
+       tabela, bordas e o espaçamento do quadro. Medido de verdade, senão a
+       parte "cabe" na conta e não cabe na página. */
+    function sobrecarga(continuacao, comFonte) {
+      return medir(medidor, montar(0, 1, continuacao, comFonte)) - alturas[0];
+    }
+    var sobreNormal = sobrecarga(false, false);
+    var sobreCont = sobrecarga(true, false);
+    var sobreUlt = sobrecarga(false, true) - sobrecarga(false, false);   /* só a fonte */
+
+    var partes = [], idx = 0, primeira = true;
+    var MIN_LINHAS = 2;
+    while (idx < linhas.length) {
+      var cont = partes.length > 0;
+      var disp = (primeira ? alturaPrimeira : alturaCheia) - (cont ? sobreCont : sobreNormal);
+      var n = 0, acc = 0;
+      while (idx + n < linhas.length && acc + alturas[idx + n] <= disp) { acc += alturas[idx + n]; n++; }
+      /* se termina a tabela nesta parte, a fonte entra e pode não caber mais */
+      if (idx + n >= linhas.length) {
+        while (n > 1 && acc + sobreUlt > disp) { n--; acc -= alturas[idx + n]; }
+      }
+      /* não coube nem o mínimo no resto da página: começa a tabela na próxima */
+      if (n < MIN_LINHAS && primeira) { primeira = false; continue; }
+      if (!n) n = 1;                                 /* linha maior que a página */
+
+      var ultima = idx + n >= linhas.length;
+      partes.push({ el: montar(idx, idx + n, cont, ultima), primeira: primeira });
+      idx += n;
+      primeira = false;
+    }
+    return partes;
+  }
+
+  /* ================================================================
+     Paginação
+     ================================================================ */
+
+  /* blocos: array de elementos. Devolve páginas (arrays de elementos). */
+  X.paginar = function (blocos) {
+    var medidor = abrirMedidor();
+    var H = X.alturaUtilMm() * MM - 4;   /* folga de 4 px contra arredondamento */
+    var paginas = [[]];
+    var atual = 0;
+
+    function novaPagina() { paginas.push([]); atual = 0; }
+    function vazia() { return !paginas[paginas.length - 1].length; }
+
+    /* um título não pode ficar sozinho no pé da página */
+    function ehTitulo(el) {
+      return el.classList && (el.classList.contains('doc-h1') || el.classList.contains('doc-h2'));
+    }
+    var MIN_APOS = 62;      /* espaço mínimo que precisa sobrar depois do título */
+
+    blocos.forEach(function (b) {
+      var alt = medir(medidor, b);
+      var restante = H - atual;
+
+      if (ehTitulo(b) && alt + MIN_APOS > restante && !vazia()) {
+        novaPagina();
+        restante = H;
+      }
+
+      if (alt <= restante) {
+        paginas[paginas.length - 1].push(b);
+        atual += alt;
+        return;
+      }
+
+      /* tabela grande: divide entre páginas */
+      if (b.classList && b.classList.contains('bloco-tabela') && alt > H * 0.2) {
+        var partes = dividirTabela(b, medidor, restante, H);
+        if (partes && partes.length) {
+          partes.forEach(function (p, i) {
+            if (i > 0 || !p.primeira) {
+              if (paginas[paginas.length - 1].length) novaPagina();
+            }
+            var hp = medir(medidor, p.el);
+            if (hp > H - atual && paginas[paginas.length - 1].length) novaPagina();
+            paginas[paginas.length - 1].push(p.el);
+            atual += hp;
+          });
+          return;
+        }
+      }
+
+      /* quebra de página normal */
+      if (paginas[paginas.length - 1].length) novaPagina();
+      paginas[paginas.length - 1].push(b);
+      atual += alt;
+      if (atual > H) atual = H;    /* bloco maior que a página: segue na próxima */
+    });
+
+    UI.limpar(medidor);
+    return paginas.filter(function (p) { return p.length; });
+  };
+
+  /* ================================================================
+     Montagem do documento paginado
+     ================================================================ */
+
+  X.montar = function (st, ctx, res) {
+    var D = PDA.MEM.documento(st, ctx, res);
+    var nFrente = 1;             /* páginas do sumário + índices */
+    var paginas, mapa, i;
+
+    for (i = 0; i < 6; i++) {
+      paginas = X.paginar(D.blocos.map(function (b) { return b.cloneNode(true); }));
+      /* capa (1) + páginas de sumário/índices (nFrente) ficam antes do corpo,
+         logo a primeira página do corpo é a de número nFrente + 2 */
+      mapa = X.mapear(paginas, 2 + nFrente);
+      var frente = X.paginar(X.blocosFrente(D, mapa).map(function (b) { return b.cloneNode(true); }));
+      if (frente.length === nFrente) break;
+      nFrente = frente.length;
+    }
+    var frenteFinal = X.paginar(X.blocosFrente(D, mapa).map(function (b) { return b.cloneNode(true); }));
+
+    return {
+      D: D,
+      capa: X.capa(st, ctx, res),
+      frente: frenteFinal,
+      corpo: paginas,
+      mapa: mapa,
+      total: 1 + frenteFinal.length + paginas.length
+    };
+  };
+
+  X.mapear = function (paginas, deslocamento) {
+    var mapa = {};
+    paginas.forEach(function (pag, i) {
+      pag.forEach(function (el) {
+        var refs = [];
+        if (el.getAttribute && el.getAttribute('data-ref')) refs.push(el.getAttribute('data-ref'));
+        var dentro = el.querySelectorAll ? el.querySelectorAll('[data-ref]') : [];
+        var k;
+        for (k = 0; k < dentro.length; k++) refs.push(dentro[k].getAttribute('data-ref'));
+        refs.forEach(function (r) { if (mapa[r] === undefined) mapa[r] = deslocamento + i; });
+      });
+    });
+    return mapa;
+  };
+
+  /* sumário, índice de figuras e índice de tabelas */
+  X.blocosFrente = function (D, mapa) {
+    var out = [];
+
+    function lista(titulo, itens, montar) {
+      if (!itens.length) return;
+      out.push(h('h1', { class: 'doc-h1 doc-h1-frente bloco' }, titulo));
+      itens.forEach(function (it) {
+        out.push(montar(it));
+      });
+    }
+
+    lista('Sumário', D.capitulos, function (cap) {
+      return h('div', { class: 'doc-sum bloco nivel' + cap.nivel },
+        h('span', { class: 'sum-txt' }, cap.num + '.  ' + cap.titulo),
+        h('span', { class: 'sum-pts' }),
+        h('span', { class: 'sum-pag' }, mapa[cap.id] === undefined ? '—' : String(mapa[cap.id])));
+    });
+
+    lista('Índice de figuras', D.figuras, function (f) {
+      return h('div', { class: 'doc-sum bloco nivel2' },
+        h('span', { class: 'sum-txt' }, 'Figura ' + f.num + ' — ' + f.titulo),
+        h('span', { class: 'sum-pts' }),
+        h('span', { class: 'sum-pag' }, mapa[f.id] === undefined ? '—' : String(mapa[f.id])));
+    });
+
+    lista('Índice de tabelas', D.tabelas, function (t) {
+      return h('div', { class: 'doc-sum bloco nivel2' },
+        h('span', { class: 'sum-txt' }, 'Tabela ' + t.num + ' — ' + t.titulo),
+        h('span', { class: 'sum-pts' }),
+        h('span', { class: 'sum-pag' }, mapa[t.id] === undefined ? '—' : String(mapa[t.id])));
+    });
+
+    return out;
+  };
+
+  X.capa = function (st, ctx, res) {
+    var esgoto = ctx.familiaCriterio === 'esgoto';
+    return h('div', { class: 'doc-capa' },
+      h('div', { class: 'capa-topo' }, PDA.M.marca(64, { larguraMax: 260 })),
+      h('div', { class: 'capa-meio' },
+        h('div', { class: 'capa-tipo' }, 'Memorial descritivo e de cálculo'),
+        h('h1', { class: 'capa-titulo' }, st.projeto.nome || 'Pré-dimensionamento de adutora'),
+        h('div', { class: 'capa-sub' },
+          'Pré-dimensionamento hidráulico de ' + (esgoto ? 'linha de recalque' : 'adutora')),
+        h('div', { class: 'capa-linha' })),
+      h('div', { class: 'capa-dados' },
+        st.projeto.local ? h('div', {}, h('b', {}, 'Local: '), st.projeto.local) : null,
+        st.projeto.responsavel ? h('div', {}, h('b', {}, 'Responsável técnico: '), st.projeto.responsavel) : null,
+        h('div', {}, h('b', {}, 'Vazão de projeto: '), UI.num(ctx.qTotal * 1000, 1) + ' L/s'),
+        h('div', {}, h('b', {}, 'Altura manométrica: '), UI.num(res.projeto.Hm, 2) + ' mca'),
+        st.projeto.data ? h('div', {}, h('b', {}, 'Data: '), st.projeto.data) : null),
+      h('div', { class: 'capa-rodape' }, PDA.App.dataHoraBR()));
+  };
+
+  /* páginas prontas para exibir e imprimir */
+  X.render = function (doc, st) {
+    var frag = document.createDocumentFragment();
+    var num = 1;
+
+    var capa = h('div', { class: 'pagina pagina-capa' }, doc.capa);
+    frag.appendChild(capa);
+    num++;
+
+    function pagina(blocos) {
+      var p = h('div', { class: 'pagina' },
+        h('div', { class: 'pag-cabecalho' },
+          h('span', { class: 'pc-marca' }, PDA.M.marca(20, { larguraMax: 120, semTexto: false })),
+          h('span', { class: 'pc-titulo' }, st.projeto.nome || 'Memorial de cálculo')),
+        h('div', { class: 'pag-corpo' }, blocos),
+        h('div', { class: 'pag-rodape' },
+          h('span', {}, 'Memorial descritivo e de cálculo' +
+            (st.projeto.local ? ' — ' + st.projeto.local : '')),
+          h('span', {}, num + ' / ' + doc.total)));
+      num++;
+      return p;
+    }
+
+    doc.frente.forEach(function (bl) { frag.appendChild(pagina(bl)); });
+    doc.corpo.forEach(function (bl) { frag.appendChild(pagina(bl)); });
+    return frag;
+  };
+
+  /* ================================================================
+     Pré-visualização
+     ================================================================ */
+
+  X.previa = function () {
+    var App = PDA.App;
+    var st = App.st;
+    var ctx = PDA.C.contexto(st, App.cats);
+    var res = PDA.C.resumo(st, App.cats);
+
+    var alvo = document.getElementById('doc-saida');
+    if (!alvo) {
+      alvo = document.createElement('div');
+      alvo.id = 'doc-saida';
+      document.body.appendChild(alvo);
+    }
+    alvo.className = 'doc';
+    UI.limpar(alvo);
+
+    var doc = X.montar(st, ctx, res);
+    alvo.appendChild(X.render(doc, st));
+    X.docAtual = doc;
+
+    var visor = h('div', { class: 'visor-doc' });
+    visor.appendChild(alvo);
+
+    UI.modal('Memorial descritivo e de cálculo', [
+      h('div', { class: 'linha', style: 'margin-bottom:10px' },
+        h('span', { class: 'nota' },
+          doc.total + ' páginas  ·  ' + doc.D.capitulos.filter(function (c) { return c.nivel === 1; }).length +
+          ' capítulos  ·  ' + doc.D.figuras.length + ' figuras  ·  ' + doc.D.tabelas.length + ' tabelas'),
+        h('button', { class: 'btn mini', type: 'button', 'data-acao': 'editarIntroducao' },
+          'Editar a introdução')),
+      visor
+    ], [
+      h('button', { class: 'btn', type: 'button', onclick: UI.fecharModal }, 'Fechar'),
+      h('button', { class: 'btn', type: 'button', 'data-acao': 'memorialWord' }, 'Baixar Word (.doc)'),
+      h('button', { class: 'btn primario', type: 'button', 'data-acao': 'memorialPdf' },
+        'Imprimir / salvar em PDF')
+    ]);
+  };
+
+  /* ================================================================
+     PDF (impressão do navegador)
+     ================================================================ */
+
+  X.pdf = function () {
+    var App = PDA.App;
+    var st = App.st;
+    var ctx = PDA.C.contexto(st, App.cats);
+    var res = PDA.C.resumo(st, App.cats);
+
+    /* A prévia guarda o documento dentro do modal; fechar o modal primeiro
+       evitaria imprimir folha em branco, por isso o alvo é recolocado no
+       corpo da página antes de montar. */
+    UI.fecharModal();
+
+    var alvo = document.getElementById('doc-saida');
+    if (!alvo) {
+      alvo = document.createElement('div');
+      alvo.id = 'doc-saida';
+    }
+    if (alvo.parentNode !== document.body) document.body.appendChild(alvo);
+    alvo.className = 'doc';
+    UI.limpar(alvo);
+    var doc = X.montar(st, ctx, res);
+    alvo.appendChild(X.render(doc, st));
+
+    document.documentElement.classList.add('imprimindo-doc');
+    window.print();
+    setTimeout(function () {
+      document.documentElement.classList.remove('imprimindo-doc');
+    }, 400);
+  };
+
+  /* ================================================================
+     Word (.doc que o Word e o LibreOffice abrem)
+     ================================================================ */
+
+  /* copia os estilos calculados para dentro do SVG, para ele sobreviver
+     fora da página */
+  function embutirEstilos(origem, destino) {
+    var props = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-dasharray',
+                 'stroke-linecap', 'stroke-linejoin', 'font-size', 'font-family',
+                 'font-weight', 'text-anchor', 'opacity'];
+    var cs = window.getComputedStyle(origem);
+    props.forEach(function (p) {
+      var v = cs.getPropertyValue(p);
+      if (v && v !== 'none' || p === 'fill' || p === 'stroke') destino.setAttribute(p, v);
+    });
+    var fo = origem.children, fd = destino.children, i;
+    for (i = 0; i < fo.length && i < fd.length; i++) embutirEstilos(fo[i], fd[i]);
+  }
+
+  X.svgParaImagem = function (svg, cb) {
+    var clone = svg.cloneNode(true);
+    embutirEstilos(svg, clone);
+    var caixa = svg.getBoundingClientRect();
+    var vb = (svg.getAttribute('viewBox') || '').split(/[\s,]+/);
+    var lw = vb.length === 4 ? Number(vb[2]) : (caixa.width || 600);
+    var lh = vb.length === 4 ? Number(vb[3]) : (caixa.height || 300);
+    clone.setAttribute('width', lw);
+    clone.setAttribute('height', lh);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+    var texto = new XMLSerializer().serializeToString(clone);
+    var uri = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(texto);
+
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var esc = 2;
+        var cv = document.createElement('canvas');
+        cv.width = lw * esc; cv.height = lh * esc;
+        var g = cv.getContext('2d');
+        g.fillStyle = '#ffffff';
+        g.fillRect(0, 0, cv.width, cv.height);
+        g.drawImage(img, 0, 0, cv.width, cv.height);
+        cb(cv.toDataURL('image/png'), lw, lh);
+      } catch (e) {
+        cb(uri, lw, lh);          /* se o canvas recusar, vai o próprio SVG */
+      }
+    };
+    img.onerror = function () { cb(uri, lw, lh); };
+    img.src = uri;
+  };
+
+  X.word = function () {
+    var App = PDA.App;
+    var st = App.st;
+    var ctx = PDA.C.contexto(st, App.cats);
+    var res = PDA.C.resumo(st, App.cats);
+
+    var D = PDA.MEM.documento(st, ctx, res);
+
+    /* container temporário, preciso dele na página para ler estilos do SVG */
+    var tmp = h('div', { class: 'doc doc-medidor' });
+    tmp.style.width = X.larguraUtilMm() * MM + 'px';
+    document.body.appendChild(tmp);
+    D.blocos.forEach(function (b) { tmp.appendChild(b); });
+
+    var svgs = Array.prototype.slice.call(tmp.querySelectorAll('svg'));
+    var pendentes = svgs.length;
+
+    function terminar() {
+      var corpo = tmp.innerHTML;
+      document.body.removeChild(tmp);
+
+      var sumario = D.capitulos.map(function (c) {
+        return '<p class=sum' + c.nivel + '>' + c.num + '. ' + escapar(c.titulo) + '</p>';
+      }).join('');
+      var idxFig = D.figuras.map(function (f) {
+        return '<p class=sum2>Figura ' + f.num + ' — ' + escapar(f.titulo) + '</p>';
+      }).join('');
+      var idxTab = D.tabelas.map(function (t) {
+        return '<p class=sum2>Tabela ' + t.num + ' — ' + escapar(t.titulo) + '</p>';
+      }).join('');
+
+      var capaHtml =
+        '<div class=capa>' +
+        (X.logoWord ? '<p><img src="' + X.logoWord + '" style="max-height:70px"></p>' : '') +
+        '<p class=capatipo>Memorial descritivo e de cálculo</p>' +
+        '<h1 class=capatit>' + escapar(st.projeto.nome || 'Pré-dimensionamento de adutora') + '</h1>' +
+        (st.projeto.local ? '<p class=capadado><b>Local:</b> ' + escapar(st.projeto.local) + '</p>' : '') +
+        (st.projeto.responsavel ? '<p class=capadado><b>Responsável técnico:</b> ' + escapar(st.projeto.responsavel) + '</p>' : '') +
+        '<p class=capadado><b>Vazão de projeto:</b> ' + UI.num(ctx.qTotal * 1000, 1) + ' L/s</p>' +
+        '<p class=capadado><b>Altura manométrica:</b> ' + UI.num(res.projeto.Hm, 2) + ' mca</p>' +
+        (st.projeto.data ? '<p class=capadado><b>Data:</b> ' + escapar(st.projeto.data) + '</p>' : '') +
+        '</div>';
+
+      var html =
+        '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+        'xmlns:w="urn:schemas-microsoft-com:office:word" ' +
+        'xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">' +
+        '<title>' + escapar(st.projeto.nome || 'Memorial') + '</title>' +
+        '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View>' +
+        '<w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->' +
+        '<style>' + X.cssWord() + '</style></head><body>' +
+        capaHtml +
+        '<div class=quebra></div><h1>Sumário</h1>' + sumario +
+        (idxFig ? '<div class=quebra></div><h1>Índice de figuras</h1>' + idxFig : '') +
+        (idxTab ? '<div class=quebra></div><h1>Índice de tabelas</h1>' + idxTab : '') +
+        '<p class=notarodape>As páginas do sumário e dos índices são renumeradas pelo editor de texto ao abrir ' +
+        'o arquivo. A versão em PDF, gerada pelo próprio programa, já traz a numeração correta.</p>' +
+        '<div class=quebra></div>' + corpo +
+        '</body></html>';
+
+      var blob = new Blob(['﻿' + html], { type: 'application/msword;charset=utf-8' });
+      var nome = (st.projeto.nome || 'memorial').replace(/[^\wÀ-ÿ .-]+/g, '').trim().slice(0, 60) || 'memorial';
+      X.baixar(nome + ' - memorial.doc', blob);
+      UI.toast('Memorial exportado. Abra no Word ou no LibreOffice para editar.');
+    }
+
+    /* logo da capa em imagem */
+    var marca = PDA.M.marca(64, { larguraMax: 260 });
+    tmp.appendChild(marca);
+    var svgMarca = marca.querySelector('svg');
+    var imgMarca = marca.querySelector('img');
+    X.logoWord = imgMarca ? imgMarca.src : null;
+
+    function converterSvgs() {
+      if (!pendentes) { terminar(); return; }
+      svgs.forEach(function (svg) {
+        X.svgParaImagem(svg, function (uri, lw, lh) {
+          var img = document.createElement('img');
+          img.src = uri;
+          img.style.width = Math.min(560, lw) + 'px';
+          if (svg.parentNode) svg.parentNode.replaceChild(img, svg);
+          pendentes--;
+          if (!pendentes) terminar();
+        });
+      });
+    }
+
+    if (svgMarca && !X.logoWord) {
+      X.svgParaImagem(svgMarca, function (uri) {
+        X.logoWord = uri;
+        marca.parentNode.removeChild(marca);
+        converterSvgs();
+      });
+    } else {
+      marca.parentNode.removeChild(marca);
+      converterSvgs();
+    }
+  };
+
+  function escapar(t) {
+    return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  X.cssWord = function () {
+    return '@page { size: A4; margin: ' + X.PAG.margSup + 'mm ' + X.PAG.margDir + 'mm ' +
+      X.PAG.margInf + 'mm ' + X.PAG.margEsq + 'mm; }' +
+      'body { font-family: "Times New Roman", serif; font-size: 11pt; color: #000; line-height: 1.4; }' +
+      'h1 { font-size: 14pt; margin: 18pt 0 8pt; page-break-before: always; page-break-after: avoid; }' +
+      'h1:first-of-type { page-break-before: auto; }' +
+      'h2 { font-size: 12pt; margin: 12pt 0 6pt; page-break-after: avoid; }' +
+      'p { margin: 0 0 6pt; text-align: justify; }' +
+      '.doc-formula { text-align: center; margin: 8pt 0; font-family: "Cambria Math", "Times New Roman", serif; }' +
+      '.formula-txt { font-size: 12pt; }' +
+      '.formula-leg { font-size: 9pt; color: #444; text-align: center; }' +
+      '.doc-aplicacao { margin: 6pt 0 6pt 18pt; font-family: Consolas, "Courier New", monospace; font-size: 9.5pt; }' +
+      'table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 4pt 0 6pt; }' +
+      'th, td { border: 0.5pt solid #999; padding: 2pt 4pt; text-align: right; }' +
+      'th { background: #eef2f6; font-weight: bold; text-align: center; }' +
+      'td.esq, th.esq { text-align: left; }' +
+      'tr.total td { font-weight: bold; background: #f4f6f8; }' +
+      'tr.destaque td { background: #eaf5f4; }' +
+      '.doc-cap-tab, .doc-cap-fig { font-size: 9.5pt; font-weight: bold; text-align: center; margin: 8pt 0 2pt; }' +
+      '.doc-cap-fig { margin-top: 2pt; }' +
+      '.doc-fonte { font-size: 8.5pt; color: #444; text-align: center; margin-bottom: 8pt; }' +
+      '.doc-fig { text-align: center; }' +
+      '.doc-nota { font-size: 9.5pt; color: #333; }' +
+      '.doc-ref { text-align: left; text-indent: 0; margin-bottom: 8pt; }' +
+      '.quebra { page-break-before: always; }' +
+      '.capa { text-align: center; margin-top: 60pt; }' +
+      '.capatipo { letter-spacing: 2pt; text-transform: uppercase; font-size: 10pt; }' +
+      '.capatit { font-size: 20pt; page-break-before: auto; margin: 18pt 0; }' +
+      '.capadado { text-align: center; font-size: 11pt; margin: 2pt 0; }' +
+      '.sum1 { margin: 3pt 0; font-weight: bold; }' +
+      '.sum2 { margin: 2pt 0 2pt 14pt; }' +
+      '.notarodape { font-size: 8.5pt; color: #555; margin-top: 12pt; }';
+  };
+
+  X.baixar = function (nome, blob) {
+    /* travessão e sinais de caminho fazem o navegador descartar o nome e
+       salvar o arquivo como "download" */
+    nome = String(nome).replace(/[‐-―]/g, '-')
+                       .replace(/[\\/:*?"<>|]+/g, '-')
+                       .replace(/\s+/g, ' ').trim() || 'memorial.doc';
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = nome;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  };
+
+  /* ================================================================
+     Edição da introdução
+     ================================================================ */
+
+  X.modalIntroducao = function () {
+    var App = PDA.App, st = App.st;
+    var ctx = PDA.C.contexto(st, App.cats);
+    var res = PDA.C.resumo(st, App.cats);
+    if (!st.memorial) st.memorial = { introducao: '', objetivo: '' };
+
+    var padrao = PDA.MEM.introducaoPadrao(st, ctx, res);
+    var ta = h('textarea', { rows: 12, style: 'font-size:13px;line-height:1.55' },
+      st.memorial.introducao || padrao);
+    var obj = h('textarea', { rows: 5, style: 'font-size:13px;line-height:1.55' },
+      st.memorial.objetivo || '');
+
+    UI.modal('Introdução do memorial', [
+      h('p', { class: 'nota' },
+        'O texto abaixo abre o memorial. O programa monta uma versão inicial a partir dos dados do projeto — ' +
+        'nome, local, fluido, vazão, extensão, materiais, desnível e potência — e você ajusta como quiser. ' +
+        'Separe os parágrafos com uma linha em branco.'),
+      h('div', { class: 'linha', style: 'margin:9px 0' },
+        h('button', {
+          class: 'btn', type: 'button', onclick: function () {
+            ta.value = PDA.MEM.introducaoPadrao(st, ctx, res);
+            UI.toast('Texto regerado a partir dos dados atuais do projeto.');
+          }
+        }, 'Regerar a partir dos dados do projeto')),
+      ta,
+      UI.sub('Objetivo (opcional)'),
+      h('p', { class: 'nota' },
+        'Se preenchido, entra como uma seção logo após a introdução.'),
+      obj
+    ], [
+      h('button', { class: 'btn', type: 'button', onclick: UI.fecharModal }, 'Cancelar'),
+      h('button', {
+        class: 'btn primario', type: 'button', onclick: function () {
+          st.memorial.introducao = ta.value.trim();
+          st.memorial.objetivo = obj.value.trim();
+          UI.fecharModal();
+          App.render();
+          UI.toast('Introdução gravada no projeto.');
+        }
+      }, 'Salvar')
+    ]);
+  };
+
+  PDA.X = X;
 })(window.PDA = window.PDA || {});
 </script>
 </body>

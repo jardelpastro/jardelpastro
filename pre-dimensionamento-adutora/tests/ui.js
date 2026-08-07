@@ -379,8 +379,13 @@ function titulo(t) { console.log('\n' + t); }
   ok('catálogo do usuário recuperado', catVolta >= 1, String(catVolta));
 
   titulo('20. Exportar projeto em arquivo');
-  const dl = page.waitForEvent('download', { timeout: 5000 });
   await page.locator('[data-acao="exportarProjeto"]').click();
+  await page.waitForSelector('.modal');
+  const txtExp = await page.locator('.modal').innerText();
+  ok('modal oferece o memorial', /Memorial descritivo e de cálculo/.test(txtExp));
+  ok('modal oferece o arquivo do projeto', /Arquivo do projeto/.test(txtExp));
+  const dl = page.waitForEvent('download', { timeout: 5000 });
+  await page.locator('.modal [data-acao="exportarArquivo"]').click();
   const arq = await dl;
   ok('download disparado', /\.adutora\.json$/.test(arq.suggestedFilename()), arq.suggestedFilename());
 
@@ -1075,6 +1080,231 @@ function titulo(t) { console.log('\n' + t); }
   ok('guardado com o nome informado',
      (await page.evaluate(() => window.PDA.E.biblioteca()))
        .some(r => r.nome === 'Projeto de teste'));
+
+  titulo('33. Logo: os três modos e o encaixe na caixa');
+  await page.locator('[data-acao="logo"]').click();
+  await page.waitForSelector('.modal');
+  const txtLogo = await page.locator('.modal').innerText();
+  ok('oferece o desenho padrão', /O desenho que já vem no programa/.test(txtLogo));
+  ok('oferece carregar um arquivo', /Um arquivo meu/.test(txtLogo));
+  ok('oferece ficar sem logo', /Sem logo/.test(txtLogo));
+  ok('mostra a prévia na tela e no papel',
+     (await page.locator('.modal .previa-caixa').count()) === 2);
+  ok('o padrão vem marcado', /● O desenho/.test(txtLogo));
+
+  /* uma logo bem comprida e uma bem alta têm de caber na mesma caixa */
+  async function medirMarca(w, hh) {
+    return await page.evaluate(async ([w, hh]) => {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = hh;
+      const g = c.getContext('2d');
+      g.fillStyle = '#0E2148'; g.fillRect(0, 0, w, hh);
+      const uri = c.toDataURL('image/png');
+      window.PDA.M.gravarLogo(uri);
+      window.PDA.App.montarMarca();
+      await new Promise(r => setTimeout(r, 250));
+      const img = document.querySelector('#marca img.marca-img');
+      if (!img) return null;
+      const r = img.getBoundingClientRect();
+      return { largura: r.width, altura: r.height, caixa: window.PDA.M.CAIXA.larguraTela };
+    }, [w, hh]);
+  }
+  const comprida = await medirMarca(1600, 120);
+  ok('logo comprida cabe na largura da caixa',
+     comprida && comprida.largura <= comprida.caixa + 1 && comprida.altura <= 39,
+     comprida && `${comprida.largura.toFixed(0)}×${comprida.altura.toFixed(0)}`);
+  const alta = await medirMarca(300, 900);
+  ok('logo alta cabe na altura da caixa',
+     alta && alta.altura <= 39 && alta.largura <= alta.caixa + 1,
+     alta && `${alta.largura.toFixed(0)}×${alta.altura.toFixed(0)}`);
+  const semDistorcer = alta && Math.abs((alta.largura / alta.altura) - (300 / 900)) < 0.05;
+  ok('a logo não é distorcida', !!semDistorcer);
+
+  const semLogo = await page.evaluate(async () => {
+    window.PDA.M.definirModo('nenhuma');
+    window.PDA.App.montarMarca();
+    await new Promise(r => setTimeout(r, 200));
+    const b = document.querySelector('#marca .marca-bloco');
+    return { vazia: !!(b && b.classList.contains('marca-vazia')), filhos: b ? b.children.length : -1 };
+  });
+  ok('modo "sem logo" deixa o cabeçalho limpo', semLogo.vazia && semLogo.filhos === 0);
+  await page.evaluate(async () => {
+    window.PDA.M.removerLogo();
+    window.PDA.App.montarMarca();
+    await new Promise(r => setTimeout(r, 200));
+  });
+  ok('apagar o arquivo devolve o desenho padrão',
+     (await page.evaluate(() => window.PDA.M.modo())) === 'padrao' &&
+     (await page.locator('#marca .marca-simbolo svg').count()) === 1);
+
+  titulo('34. Memorial descritivo e de cálculo');
+  await page.evaluate(() => window.PDA.UI.fecharModal());
+  await page.waitForTimeout(250);
+  await page.locator('[data-acao="exemplo"]').click();
+  await page.waitForSelector('.modal');
+  await page.locator('.modal button', { hasText: 'Linha de recalque de esgoto' }).click();
+  await page.waitForTimeout(500);
+  await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    st.projeto.nome = 'EEE Jardim Aeroporto';
+    st.projeto.local = 'Chapecó / SC';
+    st.projeto.responsavel = 'Eng. Jardel Pastro';
+    st.perfil = {
+      ativo: true, modo: 'acumulada', unidExt: 'm', pontos: [
+        { est: 0, cota: 126 }, { est: 1600, cota: 141 }, { est: 2400, cota: 168, rot: 'ponto alto' },
+        { est: 4000, cota: 144 }, { est: 6670, cota: 149 }]
+    };
+    st.adutoras[0].pnMcaOverride = 400;
+    st.curvaBomba = { ativo: true, unidQ: 'L/s', npshr: 6, pontos: [{ q: 0, H: 70 }, { q: 100, H: 66 }, { q: 200, H: 54 }, { q: 260, H: 42 }] };
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(400);
+
+  const doc = await page.evaluate(() => {
+    const P = window.PDA;
+    const ctx = P.C.contexto(P.App.st, P.App.cats);
+    const res = P.C.resumo(P.App.st, P.App.cats);
+    const doc = P.X.montar(P.App.st, ctx, res);
+    const alvo = document.createElement('div');
+    alvo.id = 'doc-teste'; alvo.className = 'doc';
+    document.body.appendChild(alvo);
+    alvo.appendChild(P.X.render(doc, P.App.st));
+
+    /* páginas em que cada referência realmente saiu */
+    const real = {};
+    const pgs = alvo.querySelectorAll('.pagina');
+    pgs.forEach((pg, i) => {
+      pg.querySelectorAll('[data-ref]').forEach(el => {
+        const k = el.getAttribute('data-ref');
+        if (real[k] === undefined) real[k] = i + 1;
+      });
+    });
+    const erradas = Object.keys(doc.mapa).filter(k => real[k] !== doc.mapa[k]);
+
+    /* nenhum bloco pode passar do rodapé */
+    let estouros = 0;
+    pgs.forEach(pg => {
+      const corpo = pg.querySelector('.pag-corpo');
+      if (!corpo) return;
+      const cb = corpo.getBoundingClientRect();
+      corpo.querySelectorAll(':scope > *').forEach(el => {
+        if (el.getBoundingClientRect().bottom > cb.bottom + 0.5) estouros++;
+      });
+    });
+
+    /* título não pode ser o último bloco de uma página */
+    let orfaos = 0;
+    pgs.forEach(pg => {
+      const corpo = pg.querySelector('.pag-corpo');
+      const ult = corpo && corpo.lastElementChild;
+      if (ult && (ult.classList.contains('doc-h1') || ult.classList.contains('doc-h2'))) orfaos++;
+    });
+
+    const t = alvo.textContent;
+    const r = {
+      paginas: pgs.length, total: doc.total, refs: Object.keys(doc.mapa).length,
+      erradas: erradas, estouros: estouros, orfaos: orfaos,
+      capa: !!alvo.querySelector('.pagina-capa'),
+      logoCapa: !!alvo.querySelector('.pagina-capa .marca-bloco'),
+      sumario: /Sumário/.test(t),
+      idxFiguras: /Índice de figuras/.test(t),
+      idxTabelas: /Índice de tabelas/.test(t),
+      introducao: /1\. Introdução/.test(t),
+      metodologia: /Metodologia de cálculo/.test(t),
+      biblio: /Referências bibliográficas/.test(t),
+      formulas: alvo.querySelectorAll('.doc-formula').length,
+      aplicacoes: alvo.querySelectorAll('.doc-aplicacao').length,
+      figuras: doc.D.figuras.length,
+      tabelas: doc.D.tabelas.length,
+      capitulos: doc.D.capitulos.filter(c => c.nivel === 1).length,
+      fonteK: /AZEVEDO NETTO/.test(t),
+      normaCitada: /NBR 12214/.test(t),
+      perfil: /Perfil da linha/.test(t),
+      curva: /Curva do sistema e ponto de operação/.test(t),
+      npsh: /NPSH disponível/.test(t),
+      virgula: !/=\s-?\d+\.\d/.test(t),
+      cabecalhos: alvo.querySelectorAll('.pag-cabecalho').length,
+      rodapes: alvo.querySelectorAll('.pag-rodape').length
+    };
+    alvo.remove();
+    return r;
+  });
+
+  ok('documento com várias páginas', doc.paginas > 12, String(doc.paginas));
+  ok('contagem total bate com as páginas montadas', doc.total === doc.paginas,
+     `${doc.total} × ${doc.paginas}`);
+  ok('capa com a marca', doc.capa && doc.logoCapa);
+  ok('tem sumário', doc.sumario);
+  ok('tem índice de figuras', doc.idxFiguras);
+  ok('tem índice de tabelas', doc.idxTabelas);
+  ok('números do sumário e dos índices conferem com as páginas reais',
+     doc.erradas.length === 0, doc.erradas.slice(0, 4).join(' | '));
+  ok('mapeia todas as chamadas', doc.refs > 30, String(doc.refs));
+  ok('nenhum bloco passa do rodapé', doc.estouros === 0, String(doc.estouros));
+  ok('nenhum título fica sozinho no pé da página', doc.orfaos === 0, String(doc.orfaos));
+  ok('traz introdução', doc.introducao);
+  ok('traz a metodologia', doc.metodologia);
+  ok('capítulos numerados', doc.capitulos >= 12, String(doc.capitulos));
+  ok('fórmulas apresentadas', doc.formulas >= 8, String(doc.formulas));
+  ok('fórmulas com os números substituídos', doc.aplicacoes >= 6, String(doc.aplicacoes));
+  ok('figuras numeradas', doc.figuras >= 3, String(doc.figuras));
+  ok('tabelas numeradas', doc.tabelas >= 15, String(doc.tabelas));
+  ok('cita a fonte dos coeficientes K', doc.fonteK);
+  ok('cita as normas ABNT', doc.normaCitada);
+  ok('capítulo do perfil da linha', doc.perfil);
+  ok('capítulo da curva do sistema com a bomba', doc.curva);
+  ok('capítulo do NPSH', doc.npsh);
+  ok('bibliografia ao final', doc.biblio);
+  ok('números com vírgula decimal', doc.virgula);
+  ok('cabeçalho e rodapé em todas as páginas',
+     doc.cabecalhos === doc.paginas - 1 && doc.rodapes === doc.paginas - 1,
+     `${doc.cabecalhos}/${doc.rodapes} de ${doc.paginas - 1}`);
+
+  titulo('34b. Prévia, PDF e Word do memorial');
+  await page.locator('[data-acao="exportarProjeto"]').click();
+  await page.waitForSelector('.modal');
+  await page.locator('.modal [data-acao="memorial"]').click();
+  await page.waitForTimeout(1200);
+  ok('prévia aberta com as páginas', (await page.locator('.visor-doc .pagina').count()) > 10);
+  ok('prévia oferece o PDF', (await page.locator('[data-acao="memorialPdf"]').count()) === 1);
+  ok('prévia oferece o Word', (await page.locator('[data-acao="memorialWord"]').count()) === 1);
+  ok('prévia deixa editar a introdução', (await page.locator('[data-acao="editarIntroducao"]').count()) === 1);
+
+  const dlDoc = page.waitForEvent('download', { timeout: 20000 });
+  await page.locator('[data-acao="memorialWord"]').click();
+  const arqDoc = await dlDoc;
+  ok('Word baixado', /\.doc$/.test(arqDoc.suggestedFilename()), arqDoc.suggestedFilename());
+
+  /* o botão de PDF monta o documento em #doc-saida e manda imprimir */
+  await page.evaluate(() => { window.__imprimiu = 0; window.print = () => { window.__imprimiu++; }; });
+  await page.locator('[data-acao="memorialPdf"]').click();
+  await page.waitForTimeout(1500);
+  ok('o botão de PDF chama a impressão', (await page.evaluate(() => window.__imprimiu)) === 1);
+  await page.evaluate(() => document.documentElement.classList.add('imprimindo-doc'));
+  await page.emulateMedia({ media: 'print' });
+  await page.waitForTimeout(250);
+  const pdfMem = await page.evaluate(() => {
+    return {
+      paginas: document.querySelectorAll('#doc-saida .pagina').length,
+      topo: (function (e) { return e ? e.getClientRects().length : -1; })(document.querySelector('header.topo')),
+      doc: (function (e) { return e ? e.getClientRects().length : -1; })(document.getElementById('doc-saida')),
+      corpo: document.body.children.length
+    };
+  });
+  ok('documento montado para impressão', pdfMem.paginas > 10, JSON.stringify(pdfMem));
+  ok('o documento não fica preso no modal fechado', pdfMem.doc > 0);
+  ok('modo de impressão do memorial esconde a interface', pdfMem.topo === 0 && pdfMem.doc > 0);
+  const pdfDoc = await page.pdf({ format: 'A4', printBackground: true });
+  ok('memorial sai em PDF', pdfDoc.length > 40000, (pdfDoc.length / 1024).toFixed(0) + ' kB');
+  await page.emulateMedia({ media: 'screen' });
+  await page.evaluate(() => {
+    document.documentElement.classList.remove('imprimindo-doc');
+    const s = document.getElementById('doc-saida');
+    if (s) s.remove();
+  });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => window.PDA.UI.fecharModal());
+  await page.waitForTimeout(300);
 
   titulo('25. Impressão fiel');
   await page.locator('[data-acao="exemplo"]').click();

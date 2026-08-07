@@ -33,6 +33,7 @@
   App.iniciar = function () {
     h = UI.h;
     PDA.F.init(); PDA.Res.init(); PDA.K.init(); PDA.Q.init(); PDA.Pf.init(); PDA.B.init();
+    PDA.MEM.init(); PDA.X.init();
     App.montarMarca();
 
     App.cats = PDA.E.carregarCatalogos();
@@ -517,7 +518,12 @@
       case 'abrirProjeto': PDA.B.abrir(); return;
       case 'importarProjeto': UI.fecharModal(); App.abrirArquivo(App.carregarProjeto); return;
       case 'salvarProjeto': App.guardarNaBiblioteca(); return;
-      case 'exportarProjeto': App.baixarProjeto(); return;
+      case 'exportarProjeto': App.modalExportar(); return;
+      case 'exportarArquivo': UI.fecharModal(); App.baixarProjeto(); return;
+      case 'memorial': UI.fecharModal(); PDA.X.previa(); return;
+      case 'memorialPdf': PDA.X.pdf(); return;
+      case 'memorialWord': PDA.X.word(); return;
+      case 'editarIntroducao': PDA.X.modalIntroducao(); return;
       case 'exemplo': PDA.B.abrir(); return;
       case 'exemploAgua':
         UI.fecharModal(); App.st = App.exemploAgua(); App.autoPreencherPNTodos();
@@ -920,52 +926,128 @@
     window.print();
   };
 
+  App.modalExportar = function () {
+    UI.modal('Exportar', [
+      h('div', { class: 'lista-opcoes' },
+        h('button', { class: 'btn opcao-logo', type: 'button', 'data-acao': 'memorial' },
+          h('b', {}, 'Memorial descritivo e de cálculo'),
+          h('div', { class: 'nota' },
+            'Documento completo em A4: capa, sumário, índice de figuras e de tabelas, introdução, ' +
+            'metodologia com as fórmulas e as fontes, memória de cálculo trecho a trecho com os valores ' +
+            'substituídos, tabelas de resultados, figuras e bibliografia. Sai em PDF pelo próprio navegador ' +
+            'ou em arquivo .doc para editar no Word.')),
+        h('button', { class: 'btn opcao-logo', type: 'button', 'data-acao': 'exportarArquivo' },
+          h('b', {}, 'Arquivo do projeto (.json)'),
+          h('div', { class: 'nota' },
+            'Todos os dados de entrada, para abrir em outro computador ou guardar junto ao processo. ' +
+            'Recupera-se por Abrir → "Abrir de arquivo".')))
+    ]);
+  };
+
   App.modalLogo = function () {
-    var atual = PDA.M.logoGravada();
-    var previa = h('div', { style: 'margin:11px 0;min-height:52px;display:flex;align-items:center;gap:11px' });
+    var modo = PDA.M.modo();
+    var previa = h('div', { class: 'previa-logo' });
+    var aviso = h('div', {});
+
     function mostrar() {
       UI.limpar(previa);
-      previa.appendChild(PDA.M.marca(42));
+      previa.appendChild(h('div', { class: 'previa-caixa' },
+        h('span', { class: 'previa-rot' }, 'no cabeçalho'),
+        PDA.M.marca(38)));
+      previa.appendChild(h('div', { class: 'previa-caixa papel' },
+        h('span', { class: 'previa-rot' }, 'no papel'),
+        PDA.M.marca(46, { larguraMax: PDA.M.CAIXA.larguraImpressao })));
+      if (PDA.M.modo() === 'nenhuma') {
+        previa.appendChild(h('p', { class: 'nota' }, 'Sem logo: o cabeçalho e o memorial saem só com o nome do projeto.'));
+      }
     }
-    mostrar();
+
+    function escolher(m) {
+      PDA.M.definirModo(m);
+      App.montarMarca();
+      App.render();
+      App.modalLogo();
+    }
+
+    function opcao(id, titulo, descricao, extra) {
+      var atual = PDA.M.modo() === id;
+      return h('button', {
+        class: 'btn opcao-logo' + (atual ? ' escolhida' : ''), type: 'button',
+        onclick: function () { if (!atual) escolher(id); }
+      }, h('b', {}, (atual ? '● ' : '○ ') + titulo),
+         h('div', { class: 'nota' }, descricao), extra || null);
+    }
 
     var entrada = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/svg+xml,image/webp' });
     entrada.addEventListener('change', function () {
       var f = entrada.files && entrada.files[0];
       if (!f) return;
       if (f.size > 900 * 1024) {
-        UI.toast('Arquivo muito grande (máx. 900 kB). Reduza a imagem e tente de novo.');
+        UI.toast('Arquivo muito grande (máximo 900 kB). Reduza a imagem e tente de novo.');
         return;
       }
       var fr = new FileReader();
       fr.onload = function () {
-        if (!PDA.M.gravarLogo(String(fr.result))) {
-          UI.toast('Não foi possível gravar a logo neste navegador.');
-          return;
-        }
-        App.montarMarca();
-        mostrar();
-        UI.toast('Logo carregada.');
+        var uri = String(fr.result);
+        PDA.M.medir(uri, function (m) {
+          if (!PDA.M.gravarLogo(uri)) {
+            UI.toast('Não foi possível gravar a logo neste navegador.');
+            return;
+          }
+          App.montarMarca(); App.render();
+          mostrar();
+          UI.limpar(aviso);
+          if (m) {
+            var alturaEfetiva = Math.min(38, PDA.M.CAIXA.larguraTela / m.proporcao);
+            if (m.proporcao > 7) {
+              UI.add(aviso, h('div', { class: 'aviso' },
+                'Esta logo é bem comprida (proporção ' + UI.num(m.proporcao, 1) + ':1). Ela cabe inteira na caixa, ' +
+                'mas fica com cerca de ' + UI.num(alturaEfetiva, 0) + ' px de altura. Se preferir mais destaque, ' +
+                'use uma versão mais compacta da marca — só o símbolo, ou símbolo e nome em duas linhas.'));
+            } else if (m.proporcao < 0.8) {
+              UI.add(aviso, h('div', { class: 'aviso' },
+                'Esta logo é mais alta que larga (proporção ' + UI.num(m.proporcao, 2) + ':1). Ela cabe inteira, ' +
+                'limitada pela altura da caixa. Uma versão horizontal costuma render melhor em cabeçalho.'));
+            } else {
+              UI.add(aviso, h('div', { class: 'aviso ok' },
+                'Logo carregada: ' + m.largura + ' × ' + m.altura + ' px. Cabe bem na caixa do cabeçalho.'));
+            }
+          }
+          UI.toast('Logo carregada.');
+        });
       };
       fr.readAsDataURL(f);
     });
 
+    mostrar();
+
     UI.modal('Logo do cabeçalho', [
       h('p', { class: 'nota' },
-        'O símbolo que aparece hoje é um desenho vetorial feito para acompanhar as cores da marca. ' +
-        'Carregue aqui o arquivo oficial (PNG com fundo transparente, JPG ou SVG) e ele substitui o desenho — ' +
-        'no cabeçalho e na impressão do memorial. Fica gravado neste navegador; em outro computador, ' +
-        'é preciso carregar de novo.'),
+        'A logo aparece no cabeçalho do programa e no topo de tudo o que é impresso ou exportado. ' +
+        'Qualquer imagem carregada é ajustada para caber na mesma caixa: uma logo comprida encolhe pela largura, ' +
+        'uma logo alta encolhe pela altura, e nenhuma delas distorce nem empurra o resto do cabeçalho.'),
       previa,
-      entrada,
-      h('p', { class: 'nota', style: 'margin-top:9px' },
-        'Prefira uma imagem com cerca de 400 px de largura e fundo transparente. Limite de 900 kB.'),
-      atual ? h('div', { style: 'margin-top:11px' },
+      aviso,
+      UI.sub('Qual usar'),
+      h('div', { class: 'lista-opcoes' },
+        opcao('padrao', 'O desenho que já vem no programa',
+          'Símbolo vetorial com as cores da marca. É o padrão e continua disponível mesmo depois de você carregar um arquivo.'),
+        opcao('usuario', 'Um arquivo meu',
+          PDA.M.logoGravada()
+            ? 'Uma logo já está carregada neste navegador. Carregue outra abaixo para substituir.'
+            : 'Carregue o arquivo oficial abaixo — PNG com fundo transparente, JPG, SVG ou WebP, até 900 kB.',
+          h('div', { style: 'margin-top:7px' }, entrada)),
+        opcao('nenhuma', 'Sem logo',
+          'O cabeçalho e o memorial saem apenas com o nome do projeto, sem imagem nenhuma.')),
+      PDA.M.logoGravada() ? h('div', { style: 'margin-top:11px' },
         h('button', {
           class: 'btn perigo', type: 'button', onclick: function () {
-            PDA.M.removerLogo(); App.montarMarca(); mostrar(); UI.toast('Logo removida.');
+            PDA.M.removerLogo(); App.montarMarca(); App.render(); App.modalLogo();
+            UI.toast('Arquivo removido; voltou o desenho padrão.');
           }
-        }, 'Remover a logo carregada e voltar ao desenho')) : null
+        }, 'Apagar o arquivo carregado')) : null,
+      h('p', { class: 'nota', style: 'margin-top:11px' },
+        'A escolha vale para este navegador. Em outro computador é preciso carregar de novo.')
     ]);
   };
 

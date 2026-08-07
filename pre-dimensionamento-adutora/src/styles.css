@@ -88,7 +88,11 @@ header.topo .versao { font-size: 11px; color: var(--texto-3); }
 .marca-bloco { display: flex; align-items: center; gap: 9px; color: var(--azul); }
 [data-tema="escuro"] .marca-bloco { color: #cfe0f5; }
 .marca-simbolo { display: block; line-height: 0; }
-.marca-img { display: block; width: auto; max-width: 240px; object-fit: contain; }
+/* qualquer logo cabe na mesma caixa: comprida encolhe pela largura,
+   alta encolhe pela altura, e nunca distorce nem empurra o cabeçalho */
+.marca-moldura { display: flex; align-items: center; justify-content: flex-start; overflow: hidden; }
+.marca-img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.marca-bloco.marca-vazia { display: none; }
 .marca-nome { display: flex; flex-direction: column; line-height: 1; font-family: Georgia, "Times New Roman", serif; }
 .marca-nome b { font-size: 19px; letter-spacing: .5px; color: var(--azul); }
 .marca-nome i { font-size: 10.5px; font-style: normal; letter-spacing: 1.6px; color: var(--teal); font-weight: 600; }
@@ -432,6 +436,27 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
   font-size: 13px; z-index: 200; box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
 }
 
+/* ---------------- escolha da logo ---------------- */
+
+.previa-logo { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+.previa-caixa {
+  border: 1px dashed var(--border-forte); border-radius: var(--r);
+  padding: 10px 12px 12px; background: var(--surface-2); min-width: 260px;
+}
+.previa-caixa.papel { background: #fff; }
+[data-tema="escuro"] .previa-caixa.papel { background: #f7f9fb; }
+[data-tema="escuro"] .previa-caixa.papel .marca-nome b { color: #0E2148; }
+[data-tema="escuro"] .previa-caixa.papel .marca-bloco { color: #0E2148; }
+.previa-rot {
+  display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--texto-3); margin-bottom: 7px;
+}
+
+.lista-opcoes { display: flex; flex-direction: column; gap: 8px; }
+button.btn.opcao-logo { text-align: left; padding: 10px 12px; }
+button.btn.opcao-logo.escolhida { border-color: var(--teal); background: var(--teal-claro); }
+button.btn.opcao-logo b { display: block; margin-bottom: 2px; }
+
 /* ---------------- fontes ---------------- */
 
 .fonte-item { border-left: 3px solid var(--azul); padding: 8px 12px; margin-bottom: 10px; background: var(--surface-2); border-radius: 0 4px 4px 0; }
@@ -547,4 +572,126 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
   main { padding: 10px; }
   nav.abas { top: 47px; }
   .grade { grid-template-columns: 1fr; }
+}
+
+/* ==================================================================
+   Memorial: documento paginado
+   ================================================================== */
+
+.doc {
+  font-family: "Times New Roman", Times, Georgia, serif;
+  color: #16202e;
+  font-size: 11pt;
+  line-height: 1.45;
+}
+.doc-medidor { position: absolute; left: -20000px; top: 0; visibility: hidden; }
+
+.doc .pagina {
+  width: 210mm;
+  height: 297mm;
+  background: #fff;
+  margin: 0 auto 10mm;
+  box-shadow: 0 2px 10px rgba(16, 30, 46, .18);
+  padding: 20mm 20mm 15mm 25mm;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.doc .pag-cabecalho {
+  height: 14mm; flex: none;
+  display: flex; align-items: center; gap: 8mm;
+  border-bottom: .6pt solid #b9c2cc;
+  color: #0E2148;
+}
+.doc .pag-cabecalho .pc-titulo { font-size: 9pt; color: #556273; margin-left: auto; text-align: right; }
+.doc .pag-corpo { flex: 1 1 auto; overflow: hidden; }
+.doc .pag-rodape {
+  height: 10mm; flex: none;
+  display: flex; align-items: center; justify-content: space-between;
+  border-top: .6pt solid #b9c2cc;
+  font-size: 8.5pt; color: #556273;
+}
+
+.doc .pag-corpo > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.doc .doc-h1 {
+  font-size: 14pt; font-weight: bold; color: #0E2148;
+  margin: 0; padding: 4pt 0 6pt;
+}
+.doc .doc-h1-frente { text-align: center; padding-bottom: 10pt; }
+.doc .doc-h2 { font-size: 12pt; font-weight: bold; color: #0E2148; margin: 0; padding: 10pt 0 4pt; }
+.doc .doc-p { margin: 0; padding-bottom: 6pt; text-align: justify; text-indent: 0; }
+.doc .doc-nota { font-size: 9.5pt; color: #333; margin: 0; padding-bottom: 6pt; text-align: justify; }
+.doc .doc-ref { margin: 0; padding-bottom: 7pt; text-align: left; font-size: 10.5pt; }
+
+.doc .doc-formula { margin: 0; padding: 7pt 0; text-align: center; }
+.doc .formula-txt {
+  font-size: 12pt; letter-spacing: .2px;
+  font-family: "Cambria Math", "Times New Roman", serif;
+}
+.doc .formula-leg { font-size: 8.5pt; color: #444; margin-top: 2pt; }
+.doc .doc-aplicacao {
+  margin: 0 0 0 10mm; padding: 5pt 0 7pt;
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 9pt; color: #16202e;
+}
+.doc .aplic-linha { margin: 1.5pt 0; }
+
+.doc .doc-quadro { margin: 0; padding: 6pt 0 9pt; }
+.doc .doc-cap-tab, .doc .doc-cap-fig {
+  font-size: 9.5pt; font-weight: bold; text-align: center; margin-bottom: 2pt;
+}
+.doc .doc-cap-fig { margin-top: 3pt; margin-bottom: 0; }
+.doc .doc-fonte { font-size: 8pt; color: #556273; text-align: center; margin-top: 2pt; }
+.doc .doc-fig { text-align: center; }
+.doc .doc-fig svg { max-width: 100%; height: auto; }
+
+.doc .doc-tabela { border-collapse: collapse; width: 100%; font-size: 8.6pt; }
+.doc .doc-tabela th, .doc .doc-tabela td {
+  border: .5pt solid #9aa5b1; padding: 1.6pt 3pt; text-align: right;
+}
+.doc .doc-tabela th { background: #eef2f6; text-align: center; font-weight: bold; }
+.doc .doc-tabela td.esq, .doc .doc-tabela th.esq { text-align: left; }
+.doc .doc-tabela tr.total td { font-weight: bold; background: #f4f6f8; }
+.doc .doc-tabela tr.destaque td { background: #eaf5f4; }
+
+.doc .doc-sum { display: flex; align-items: baseline; gap: 4px; margin: 0; padding: 2.5pt 0; font-size: 10.5pt; }
+.doc .doc-sum.nivel1 { font-weight: bold; }
+.doc .doc-sum.nivel2 { padding-left: 8mm; }
+.doc .sum-pts { flex: 1 1 auto; border-bottom: 1px dotted #8592a1; height: .8em; }
+.doc .sum-pag { flex: none; font-variant-numeric: tabular-nums; }
+
+.doc .pagina-capa { padding: 30mm 25mm; }
+.doc .doc-capa { display: flex; flex-direction: column; height: 100%; text-align: center; }
+.doc .capa-topo { display: flex; justify-content: center; }
+.doc .capa-meio { margin-top: 42mm; }
+.doc .capa-tipo {
+  text-transform: uppercase; letter-spacing: 3px; font-size: 10pt; color: #0E6F66; font-weight: bold;
+}
+.doc .capa-titulo { font-size: 22pt; color: #0E2148; margin: 8mm 0 4mm; line-height: 1.25; }
+.doc .capa-sub { font-size: 12pt; color: #556273; }
+.doc .capa-linha { width: 60mm; height: 2px; background: #14A5A0; margin: 8mm auto 0; }
+.doc .capa-dados { margin-top: auto; font-size: 11pt; line-height: 1.9; }
+.doc .capa-rodape { margin-top: 10mm; font-size: 9pt; color: #8592a1; }
+
+.visor-doc {
+  background: #48525e; background: #48525e; padding: 10mm 0;
+  max-height: 62vh; overflow: auto; border-radius: 4px;
+}
+.visor-doc .doc { transform: scale(.62); transform-origin: top center; }
+.visor-doc #doc-saida { width: 210mm; margin: 0 auto; }
+
+#doc-saida { display: none; }
+html.imprimindo-doc #doc-saida { display: block; }
+
+@media print {
+  html.imprimindo-doc body > * { display: none !important; }
+  html.imprimindo-doc #doc-saida { display: block !important; }
+  html.imprimindo-doc #cabecalho-impressao { display: none !important; }
+  html.imprimindo-doc { background: #fff; }
+  html.imprimindo-doc .doc .pagina {
+    box-shadow: none; margin: 0; page-break-after: always; break-after: page;
+  }
+  html.imprimindo-doc .doc .pagina:last-child { page-break-after: auto; break-after: auto; }
 }

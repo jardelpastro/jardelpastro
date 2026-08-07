@@ -28,9 +28,10 @@ Abre no navegador que já existe na máquina (Chrome, Edge, Firefox, Safari).
 O projeto em andamento é guardado sozinho a cada alteração. **Salvar** guarda o
 projeto na biblioteca do navegador; **Abrir** mostra essa biblioteca, com filtro e
 ordenação por projeto, local, responsável, data do projeto ou data de gravação —
-os exemplos ficam na mesma tela. Para levar de uma máquina a outra, **Exportar**
-gera um arquivo `.json` e "Abrir de arquivo" faz o caminho de volta.
-Atalhos: Ctrl+S guarda, Ctrl+O abre.
+os exemplos ficam na mesma tela. **Exportar** dá duas saídas: o *memorial
+descritivo e de cálculo* (em PDF ou em `.doc` para o Word) e o *arquivo do
+projeto* (`.json`), que leva o trabalho de uma máquina a outra — "Abrir de
+arquivo" faz o caminho de volta. Atalhos: Ctrl+S guarda, Ctrl+O abre.
 
 ## Por onde começar
 
@@ -167,8 +168,25 @@ diâmetros: Hazen-Williams, Colebrook-White iterativa, Swamee-Jain e
 Zigrang-Sylvester, lado a lado, com a diferença percentual na altura
 manométrica.
 
-**Memorial de cálculo** — premissas, formulação, tabela de trechos, resultado e
-ressalvas, pronto para imprimir ou salvar em PDF pelo próprio navegador.
+**Memorial descritivo e de cálculo** — documento completo em A4, gerado pelo
+botão **Exportar**, em PDF (pela impressão do próprio navegador) ou em arquivo
+`.doc` para editar no Word ou no LibreOffice. Traz capa, sumário, índice de
+figuras e índice de tabelas **com os números de página certos**, e em cada
+capítulo o mesmo encadeamento: descrição do que está sendo calculado com a fonte
+entre parênteses (norma ou literatura), a fórmula usada, a mesma fórmula com os
+números do projeto no lugar das letras, e a tabela-resumo com os resultados. Há
+um capítulo por conjunto de trechos (sucção, barrilete de recalque, adutora),
+cada um com a tabela de peças mostrando os coeficientes K e a fonte de onde
+vieram; depois o perfil da linha com a piezométrica e as envoltórias, o resumo
+das perdas e da altura manométrica, os conjuntos elevatórios, o NPSH disponível,
+a curva do sistema cruzada com a curva da bomba no ponto de operação, a
+pré-avaliação do transitório e a bibliografia. A introdução é redigida a partir
+dos dados do projeto (nome, local, fluido, vazão, extensão, material, desnível,
+potência) e pode ser editada ou reescrita no próprio programa — o botão *Editar
+a introdução* fica na prévia.
+
+A aba **Resultados** mantém o memorial curto de sempre, para conferência rápida
+na tela.
 
 **Cadastro de catálogos** — consulta de todos os catálogos da base com DE, e, DI,
 PN e área; cadastro de catálogos novos colando a tabela do fabricante
@@ -201,9 +219,11 @@ src/js/10-ui-resultados.js  resultados, piezométrica e memorial
 src/js/11-ui-catalogos.js   catálogos e fontes
 src/js/11b-ui-biblioteca.js biblioteca de projetos
 src/js/12-app.js            aplicação, ações, arquivos
+src/js/13-memorial.js       texto, fórmulas, tabelas e figuras do memorial
+src/js/14-exportar.js       paginação A4, sumário/índices, PDF e Word
 build.py                    gera dist/Pre-dimensionamento-Adutora.html
 tests/run.js                243 testes do núcleo de cálculo
-tests/ui.js                 236 testes de interface em navegador
+tests/ui.js                 283 testes de interface em navegador
 docs/AUDITORIA-PLANILHAS.md auditoria das planilhas de origem
 ```
 
@@ -242,10 +262,20 @@ superior. Confirme sempre no catálogo do fabricante.
 
 ## A logo
 
-O símbolo do cabeçalho é um desenho vetorial feito para acompanhar as cores da
-marca. O botão **Logo** carrega o arquivo oficial (PNG com fundo transparente,
-JPG ou SVG) e ele substitui o desenho, inclusive na impressão do memorial. Fica
-gravado no navegador daquele computador.
+O botão **Logo** oferece três opções:
+
+- **o desenho que já vem no programa** — símbolo vetorial com as cores da marca,
+  é o padrão e continua disponível mesmo depois de você carregar um arquivo;
+- **um arquivo meu** — PNG com fundo transparente, JPG, SVG ou WebP, até 900 kB;
+- **sem logo** — o cabeçalho e o memorial saem apenas com o nome do projeto.
+
+Qualquer imagem carregada é ajustada para caber na **mesma caixa** (230 px de
+largura por 38 px de altura na tela, 190 px no papel): uma logo comprida encolhe
+pela largura, uma logo alta encolhe pela altura, nenhuma delas distorce nem
+empurra o resto do cabeçalho. O modal mostra a prévia na tela e no papel e avisa
+quando a proporção da imagem a deixa pequena dentro da caixa. A escolha vale
+para o cabeçalho do programa, para a impressão das abas e para a capa e o
+cabeçalho do memorial, e fica gravada no navegador daquele computador.
 
 ## Alcance
 
