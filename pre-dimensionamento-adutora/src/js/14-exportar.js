@@ -15,15 +15,30 @@
   X.init = function () { UI = PDA.UI; h = UI.h; };
 
   var MM = 96 / 25.4;              /* 1 mm em px a 96 dpi */
+  /* margens da ABNT (NBR 14724): 3 cm em cima e à esquerda, 2 cm embaixo
+     e à direita. Com timbrado, as margens de cima e de baixo passam a ser
+     as informadas pelo usuário, para o texto não invadir a arte. */
   X.PAG = {
     largura: 210, altura: 297,
-    margEsq: 25, margDir: 20, margSup: 20, margInf: 15,
-    cabecalho: 14, rodape: 10
+    margEsq: 30, margDir: 20, margSup: 30, margInf: 20
   };
 
-  X.larguraUtilMm = function () { return X.PAG.largura - X.PAG.margEsq - X.PAG.margDir; };
+  X.margens = function () {
+    var t = PDA.M.timbrado && PDA.M.timbrado();
+    return {
+      esq: X.PAG.margEsq, dir: X.PAG.margDir,
+      sup: t ? t.margSup : X.PAG.margSup,
+      inf: t ? t.margInf : X.PAG.margInf
+    };
+  };
+
+  X.larguraUtilMm = function () {
+    var m = X.margens();
+    return X.PAG.largura - m.esq - m.dir;
+  };
   X.alturaUtilMm = function () {
-    return X.PAG.altura - X.PAG.margSup - X.PAG.margInf - X.PAG.cabecalho - X.PAG.rodape;
+    var m = X.margens();
+    return X.PAG.altura - m.sup - m.inf;
   };
 
   /* ================================================================
@@ -116,6 +131,8 @@
       if (idx + n >= linhas.length) {
         while (n > 1 && acc + sobreUlt > disp) { n--; acc -= alturas[idx + n]; }
       }
+      /* não deixa uma linha órfã na continuação */
+      if (linhas.length - (idx + n) === 1 && n > MIN_LINHAS) n--;
       /* não coube nem o mínimo no resto da página: começa a tabela na próxima */
       if (n < MIN_LINHAS && primeira) { primeira = false; continue; }
       if (!n) n = 1;                                 /* linha maior que a página */
@@ -151,6 +168,12 @@
     blocos.forEach(function (b) {
       var alt = medir(medidor, b);
       var restante = H - atual;
+
+      /* seção primária começa em folha nova (NBR 14724) */
+      if (b.classList && b.classList.contains('pagina-nova') && !vazia()) {
+        novaPagina();
+        restante = H;
+      }
 
       if (ehTitulo(b) && alt + MIN_APOS > restante && !vazia()) {
         novaPagina();
@@ -242,31 +265,33 @@
 
     function lista(titulo, itens, montar) {
       if (!itens.length) return;
-      out.push(h('h1', { class: 'doc-h1 doc-h1-frente bloco' }, titulo));
+      out.push(h('h1', { class: 'doc-h1 doc-h1-frente bloco pagina-nova' }, titulo));
       itens.forEach(function (it) {
         out.push(montar(it));
       });
     }
 
-    lista('Sumário', D.capitulos, function (cap) {
-      return h('div', { class: 'doc-sum bloco nivel' + cap.nivel },
-        h('span', { class: 'sum-txt' }, cap.num + '.  ' + cap.titulo),
-        h('span', { class: 'sum-pts' }),
-        h('span', { class: 'sum-pag' }, mapa[cap.id] === undefined ? '—' : String(mapa[cap.id])));
-    });
-
-    lista('Índice de figuras', D.figuras, function (f) {
+    /* ordem dos elementos pré-textuais da NBR 14724: listas de
+       ilustrações e de tabelas antes do sumário */
+    lista('LISTA DE FIGURAS', D.figuras, function (f) {
       return h('div', { class: 'doc-sum bloco nivel2' },
-        h('span', { class: 'sum-txt' }, 'Figura ' + f.num + ' — ' + f.titulo),
+        h('span', { class: 'sum-txt' }, 'Figura ' + f.num + ' – ' + f.titulo),
         h('span', { class: 'sum-pts' }),
         h('span', { class: 'sum-pag' }, mapa[f.id] === undefined ? '—' : String(mapa[f.id])));
     });
 
-    lista('Índice de tabelas', D.tabelas, function (t) {
+    lista('LISTA DE TABELAS', D.tabelas, function (t) {
       return h('div', { class: 'doc-sum bloco nivel2' },
-        h('span', { class: 'sum-txt' }, 'Tabela ' + t.num + ' — ' + t.titulo),
+        h('span', { class: 'sum-txt' }, 'Tabela ' + t.num + ' – ' + t.titulo),
         h('span', { class: 'sum-pts' }),
         h('span', { class: 'sum-pag' }, mapa[t.id] === undefined ? '—' : String(mapa[t.id])));
+    });
+
+    lista('SUMÁRIO', D.capitulos, function (cap) {
+      return h('div', { class: 'doc-sum bloco nivel' + cap.nivel },
+        h('span', { class: 'sum-txt' }, (cap.num ? cap.num + ' ' : '') + cap.titulo),
+        h('span', { class: 'sum-pts' }),
+        h('span', { class: 'sum-pag' }, mapa[cap.id] === undefined ? '—' : String(mapa[cap.id])));
     });
 
     return out;
@@ -275,7 +300,7 @@
   X.capa = function (st, ctx, res) {
     var esgoto = ctx.familiaCriterio === 'esgoto';
     return h('div', { class: 'doc-capa' },
-      h('div', { class: 'capa-topo' }, PDA.M.marca(64, { larguraMax: 260 })),
+      h('div', { class: 'capa-topo' }, PDA.M.marca(PDA.M.CAIXA.alturaCapa, { larguraMax: 330 })),
       h('div', { class: 'capa-meio' },
         h('div', { class: 'capa-tipo' }, 'Memorial descritivo e de cálculo'),
         h('h1', { class: 'capa-titulo' }, st.projeto.nome || 'Pré-dimensionamento de adutora'),
@@ -296,26 +321,35 @@
     var frag = document.createDocumentFragment();
     var num = 1;
 
-    var capa = h('div', { class: 'pagina pagina-capa' }, doc.capa);
+    var timbreCapa = PDA.M.timbrado && PDA.M.timbrado();
+    var capa = h('div', { class: 'pagina pagina-capa' },
+      timbreCapa ? h('img', { class: 'pag-timbrado', src: timbreCapa.imagem, alt: '' }) : null,
+      doc.capa);
     frag.appendChild(capa);
     num++;
 
-    function pagina(blocos) {
-      var p = h('div', { class: 'pagina' },
-        h('div', { class: 'pag-cabecalho' },
-          h('span', { class: 'pc-marca' }, PDA.M.marca(20, { larguraMax: 120, semTexto: false })),
-          h('span', { class: 'pc-titulo' }, st.projeto.nome || 'Memorial de cálculo')),
-        h('div', { class: 'pag-corpo' }, blocos),
-        h('div', { class: 'pag-rodape' },
-          h('span', {}, 'Memorial descritivo e de cálculo' +
-            (st.projeto.local ? ' — ' + st.projeto.local : '')),
-          h('span', {}, num + ' / ' + doc.total)));
+    var timbre = PDA.M.timbrado && PDA.M.timbrado();
+    var m = X.margens();
+
+    function fundo() {
+      if (!timbre) return null;
+      return h('img', { class: 'pag-timbrado', src: timbre.imagem, alt: '' });
+    }
+
+    /* A ABNT numera a partir da folha de rosto, mas só imprime o número
+       a partir da primeira folha textual, no canto superior direito. */
+    function pagina(blocos, numerar) {
+      var p = h('div', { class: 'pagina', style: 'padding:' + m.sup + 'mm ' + m.dir +
+                        'mm ' + m.inf + 'mm ' + m.esq + 'mm' },
+        fundo(),
+        numerar ? h('div', { class: 'pag-num' }, String(num)) : null,
+        h('div', { class: 'pag-corpo' }, blocos));
       num++;
       return p;
     }
 
-    doc.frente.forEach(function (bl) { frag.appendChild(pagina(bl)); });
-    doc.corpo.forEach(function (bl) { frag.appendChild(pagina(bl)); });
+    doc.frente.forEach(function (bl) { frag.appendChild(pagina(bl, false)); });
+    doc.corpo.forEach(function (bl) { frag.appendChild(pagina(bl, true)); });
     return frag;
   };
 
@@ -468,13 +502,13 @@
       document.body.removeChild(tmp);
 
       var sumario = D.capitulos.map(function (c) {
-        return '<p class=sum' + c.nivel + '>' + c.num + '. ' + escapar(c.titulo) + '</p>';
+        return '<p class=sum' + c.nivel + '>' + (c.num ? c.num + ' ' : '') + escapar(c.titulo) + '</p>';
       }).join('');
       var idxFig = D.figuras.map(function (f) {
-        return '<p class=sum2>Figura ' + f.num + ' — ' + escapar(f.titulo) + '</p>';
+        return '<p class=sum2>Figura ' + f.num + ' – ' + escapar(f.titulo) + '</p>';
       }).join('');
       var idxTab = D.tabelas.map(function (t) {
-        return '<p class=sum2>Tabela ' + t.num + ' — ' + escapar(t.titulo) + '</p>';
+        return '<p class=sum2>Tabela ' + t.num + ' – ' + escapar(t.titulo) + '</p>';
       }).join('');
 
       var capaHtml =
@@ -498,9 +532,9 @@
         '<w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->' +
         '<style>' + X.cssWord() + '</style></head><body>' +
         capaHtml +
+        (idxFig ? '<div class=quebra></div><h1>Lista de figuras</h1>' + idxFig : '') +
+        (idxTab ? '<div class=quebra></div><h1>Lista de tabelas</h1>' + idxTab : '') +
         '<div class=quebra></div><h1>Sumário</h1>' + sumario +
-        (idxFig ? '<div class=quebra></div><h1>Índice de figuras</h1>' + idxFig : '') +
-        (idxTab ? '<div class=quebra></div><h1>Índice de tabelas</h1>' + idxTab : '') +
         '<p class=notarodape>As páginas do sumário e dos índices são renumeradas pelo editor de texto ao abrir ' +
         'o arquivo. A versão em PDF, gerada pelo próprio programa, já traz a numeração correta.</p>' +
         '<div class=quebra></div>' + corpo +
@@ -513,7 +547,7 @@
     }
 
     /* logo da capa em imagem */
-    var marca = PDA.M.marca(64, { larguraMax: 260 });
+    var marca = PDA.M.marca(PDA.M.CAIXA.alturaCapa, { larguraMax: 330 });
     tmp.appendChild(marca);
     var svgMarca = marca.querySelector('svg');
     var imgMarca = marca.querySelector('img');
@@ -550,37 +584,42 @@
   }
 
   X.cssWord = function () {
-    return '@page { size: A4; margin: ' + X.PAG.margSup + 'mm ' + X.PAG.margDir + 'mm ' +
-      X.PAG.margInf + 'mm ' + X.PAG.margEsq + 'mm; }' +
-      'body { font-family: "Times New Roman", serif; font-size: 11pt; color: #000; line-height: 1.4; }' +
-      'h1 { font-size: 14pt; margin: 18pt 0 8pt; page-break-before: always; page-break-after: avoid; }' +
+    var m = X.margens();
+    return '@page { size: A4; margin: ' + m.sup + 'mm ' + m.dir + 'mm ' + m.inf + 'mm ' + m.esq + 'mm; }' +
+      'body { font-family: Arial, sans-serif; font-size: 12pt; color: #000; line-height: 1.2; }' +
+      'h1 { font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 0 0 8pt; ' +
+        'page-break-before: always; page-break-after: avoid; }' +
       'h1:first-of-type { page-break-before: auto; }' +
-      'h2 { font-size: 12pt; margin: 12pt 0 6pt; page-break-after: avoid; }' +
-      'p { margin: 0 0 6pt; text-align: justify; }' +
-      '.doc-formula { text-align: center; margin: 8pt 0; font-family: "Cambria Math", "Times New Roman", serif; }' +
-      '.formula-txt { font-size: 12pt; }' +
-      '.formula-leg { font-size: 9pt; color: #444; text-align: center; }' +
-      '.doc-aplicacao { margin: 6pt 0 6pt 18pt; font-family: Consolas, "Courier New", monospace; font-size: 9.5pt; }' +
-      'table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 4pt 0 6pt; }' +
-      'th, td { border: 0.5pt solid #999; padding: 2pt 4pt; text-align: right; }' +
-      'th { background: #eef2f6; font-weight: bold; text-align: center; }' +
+      'h2 { font-size: 12pt; font-weight: bold; margin: 10pt 0 6pt; page-break-after: avoid; }' +
+      'p { margin: 0 0 6pt; text-align: justify; text-indent: 12.5mm; }' +
+      '.doc-formula { text-align: center; margin: 8pt 0; text-indent: 0; }' +
+      '.formula-leg { font-size: 12pt; text-align: justify; text-indent: 0; margin: 0 0 6pt; }' +
+      '.doc-aplicacao { margin: 4pt 0 8pt 12.5mm; text-indent: 0; }' +
+      '.doc-alineas { margin: 0 0 6pt 12.5mm; }' +
+      '.doc-alineas li { text-align: justify; margin-bottom: 3pt; }' +
+      'table { border-collapse: collapse; width: 100%; font-size: 10pt; margin: 3pt 0 4pt; }' +
+      'th, td { border: 0; padding: 1.6mm 2mm; text-align: right; height: 6mm; }' +
+      'thead th { border-top: 1pt solid #000; border-bottom: 0.75pt solid #000; font-weight: bold; ' +
+        'text-align: center; }' +
+      'tbody tr:last-child td { border-bottom: 1pt solid #000; }' +
       'td.esq, th.esq { text-align: left; }' +
-      'tr.total td { font-weight: bold; background: #f4f6f8; }' +
-      'tr.destaque td { background: #eaf5f4; }' +
-      '.doc-cap-tab, .doc-cap-fig { font-size: 9.5pt; font-weight: bold; text-align: center; margin: 8pt 0 2pt; }' +
-      '.doc-cap-fig { margin-top: 2pt; }' +
-      '.doc-fonte { font-size: 8.5pt; color: #444; text-align: center; margin-bottom: 8pt; }' +
-      '.doc-fig { text-align: center; }' +
-      '.doc-nota { font-size: 9.5pt; color: #333; }' +
-      '.doc-ref { text-align: left; text-indent: 0; margin-bottom: 8pt; }' +
+      'tr.total td { font-weight: bold; border-top: 0.75pt solid #000; }' +
+      'tr.destaque td { background: #ececec; }' +
+      '.doc-cap-tab, .doc-cap-fig { font-size: 10pt; font-weight: bold; text-align: left; ' +
+        'text-indent: 0; margin: 8pt 0 3pt; }' +
+      '.doc-fonte { font-size: 10pt; text-align: left; text-indent: 0; margin: 3pt 0 10pt; }' +
+      '.doc-fig { text-align: center; text-indent: 0; }' +
+      '.doc-nota { font-size: 10pt; text-indent: 0; }' +
+      '.doc-ref { text-align: left; text-indent: 0; margin-bottom: 11pt; line-height: 1.0; }' +
       '.quebra { page-break-before: always; }' +
       '.capa { text-align: center; margin-top: 60pt; }' +
-      '.capatipo { letter-spacing: 2pt; text-transform: uppercase; font-size: 10pt; }' +
-      '.capatit { font-size: 20pt; page-break-before: auto; margin: 18pt 0; }' +
-      '.capadado { text-align: center; font-size: 11pt; margin: 2pt 0; }' +
-      '.sum1 { margin: 3pt 0; font-weight: bold; }' +
-      '.sum2 { margin: 2pt 0 2pt 14pt; }' +
-      '.notarodape { font-size: 8.5pt; color: #555; margin-top: 12pt; }';
+      '.capa p, .capa h1 { text-indent: 0; text-align: center; }' +
+      '.capatipo { letter-spacing: 2pt; text-transform: uppercase; font-size: 12pt; font-weight: bold; }' +
+      '.capatit { font-size: 16pt; page-break-before: auto; margin: 18pt 0; }' +
+      '.capadado { text-align: center; font-size: 12pt; margin: 2pt 0; }' +
+      '.sum1 { margin: 3pt 0; font-weight: bold; text-transform: uppercase; text-indent: 0; }' +
+      '.sum2 { margin: 2pt 0 2pt 8mm; text-indent: 0; }' +
+      '.notarodape { font-size: 10pt; margin-top: 12pt; text-indent: 0; }';
   };
 
   X.baixar = function (nome, blob) {

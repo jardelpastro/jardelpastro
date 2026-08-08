@@ -74,6 +74,7 @@
     this.capitulos = [];
     this.figuras = [];
     this.tabelas = [];
+    this.equacoes = 0;
     this.fontesUsadas = {};
     this.nCap = 0;
   }
@@ -83,11 +84,19 @@
   Doc.prototype.capitulo = function (titulo) {
     this.nCap++;
     var id = 'cap' + this.nCap;
-    var el = h('h1', { class: 'doc-h1 bloco', 'data-ref': id }, this.nCap + '. ' + titulo);
+    var el = h('h1', { class: 'doc-h1 bloco pagina-nova', 'data-ref': id }, this.nCap + ' ' + titulo);
     this.capitulos.push({ id: id, num: String(this.nCap), titulo: titulo, nivel: 1 });
     this.add(el);
     this.nSub = 0;
     return el;
+  };
+
+  /* seções pós-textuais (referências) não recebem indicativo numérico */
+  Doc.prototype.capituloSemNumero = function (titulo) {
+    var id = 'cap0' + this.capitulos.length;
+    this.capitulos.push({ id: id, num: '', titulo: titulo, nivel: 1 });
+    this.nSub = 0;
+    return this.add(h('h1', { class: 'doc-h1 bloco pagina-nova', 'data-ref': id }, titulo));
   };
 
   Doc.prototype.secao = function (titulo) {
@@ -95,7 +104,7 @@
     var num = this.nCap + '.' + this.nSub;
     var id = 'sec' + num.replace('.', '_');
     this.capitulos.push({ id: id, num: num, titulo: titulo, nivel: 2 });
-    return this.add(h('h2', { class: 'doc-h2 bloco', 'data-ref': id }, num + '. ' + titulo));
+    return this.add(h('h2', { class: 'doc-h2 bloco', 'data-ref': id }, num + ' ' + titulo));
   };
 
   Doc.prototype.p = function () {
@@ -109,20 +118,52 @@
     return this.add(h('p', { class: 'doc-nota bloco' }, txt));
   };
 
-  /* fórmula simbólica, centralizada e numerada */
-  Doc.prototype.formula = function (txt, legenda) {
+  /* Fórmula simbólica: composta de verdade — fração com barra, radical
+     com barra sobre o radicando, expoentes e índices — centralizada e
+     numerada entre parênteses na margem direita (NBR 14724). */
+  Doc.prototype.formula = function (codigo, legenda, op) {
+    op = op || {};
+    var corpo = h('div', { class: 'formula-corpo' });
+    (Array.isArray(codigo) ? codigo : [codigo]).forEach(function (c) {
+      corpo.appendChild(PDA.FX.svg(c, { tam: 17 }));
+    });
+    var num = '';
+    if (!op.semNumero) { this.equacoes++; num = '(' + this.equacoes + ')'; }
     var el = h('div', { class: 'doc-formula bloco-junto' },
-      h('div', { class: 'formula-txt' }, txt),
-      legenda ? h('div', { class: 'formula-leg' }, legenda) : null);
-    return this.add(el);
+      corpo,
+      h('div', { class: 'formula-num' }, num));
+    this.add(el);
+    if (legenda) {
+      this.add(h('p', { class: 'formula-leg bloco', html: 'em que ' + PDA.FX.emTexto(legenda) }));
+    }
+    return this.equacoes;
   };
 
-  /* aplicação numérica: a mesma fórmula com os valores no lugar das letras */
+  /* Aplicação numérica: a mesma fórmula com os valores no lugar das
+     letras, com as linhas alinhadas pelo sinal de igual. */
   Doc.prototype.aplicacao = function () {
     var linhas = [], i;
     for (i = 0; i < arguments.length; i++) if (arguments[i]) linhas.push(arguments[i]);
-    return this.add(h('div', { class: 'doc-aplicacao bloco-junto' },
-      linhas.map(function (l) { return h('div', { class: 'aplic-linha' }, l); })));
+    if (!linhas.length) return null;
+    var bloco = h('div', { class: 'doc-aplicacao bloco-junto' });
+    var textos = [], rotulos = [];
+    linhas.forEach(function (l) {
+      if (typeof l === 'object' && l.rot) rotulos.push(l);
+      else textos.push(String(l));
+    });
+    rotulos.forEach(function (l) { bloco.appendChild(h('p', { class: 'doc-p sem-recuo' }, l.rot)); });
+    if (textos.length) bloco.appendChild(PDA.FX.bloco(textos, { tam: 15 }));
+    return this.add(bloco);
+  };
+
+  /* alíneas da NBR 6024: letra minúscula seguida de parêntese, texto
+     iniciado por minúscula e terminado em ponto e vírgula */
+  Doc.prototype.alineas = function (itens) {
+    var letras = 'abcdefghijklmnopqrstuvwxyz';
+    return this.add(h('ul', { class: 'doc-alineas bloco' },
+      itens.map(function (t, i) {
+        return h('li', {}, letras.charAt(i) + ') ' + t + (i === itens.length - 1 ? '.' : ';'));
+      })));
   };
 
   Doc.prototype.tabela = function (titulo, cabs, linhas, fonte) {
@@ -136,7 +177,7 @@
       }))),
       h('tbody', {}, linhas));
     return this.add(h('div', { class: 'doc-quadro bloco-tabela', 'data-ref': id },
-      h('div', { class: 'doc-cap-tab' }, 'Tabela ' + num + ' — ' + titulo),
+      h('div', { class: 'doc-cap-tab' }, 'Tabela ' + num + ' – ' + titulo),
       tab,
       fonte ? h('div', { class: 'doc-fonte' }, 'Fonte: ' + fonte) : null));
   };
@@ -146,8 +187,8 @@
     var id = 'fig' + num;
     this.figuras.push({ id: id, num: num, titulo: titulo });
     return this.add(h('div', { class: 'doc-quadro bloco-junto', 'data-ref': id },
+      h('div', { class: 'doc-cap-fig' }, 'Figura ' + num + ' – ' + titulo),
       h('div', { class: 'doc-fig' }, el),
-      h('div', { class: 'doc-cap-fig' }, 'Figura ' + num + ' — ' + titulo),
       fonte ? h('div', { class: 'doc-fonte' }, 'Fonte: ' + fonte) : null));
   };
 
@@ -223,28 +264,32 @@
     D.p('O dimensionamento hidráulico foi conduzido pelo balanço de energia entre o nível de sucção e o ponto ' +
         'de chegada. A altura manométrica total corresponde à soma da altura geométrica com as perdas de carga ' +
         'distribuídas e localizadas em todos os trechos percorridos pelo escoamento ' + D.usar('az') + '.');
-    D.formula('Hm  =  Hg  +  Σ hf  +  Σ hₗ',
-      'Hm: altura manométrica total (mca);  Hg: altura geométrica (m);  hf: perda de carga distribuída (m);  hₗ: perda de carga localizada (m).');
+    D.formula('Hm = Hg + \\Sigma hf + \\Sigma h_l',
+      'Hm é a altura manométrica total (mca); Hg, a altura geométrica (m); hf, a perda de carga distribuída (m); ' +
+      'e h\u2097, a perda de carga localizada (m).');
 
     D.secao('Perda de carga distribuída');
     if (usaHW) {
       D.p('A perda de carga distribuída foi obtida pela fórmula empírica de Hazen-Williams ' + D.usar('az') +
           ', aplicável a água em temperatura ambiente, condutos de 50 a 3500 mm e velocidades de até cerca de ' +
           '3 m/s. O coeficiente C sintetiza a rugosidade da parede e a idade do tubo.');
-      D.formula('J  =  ' + ne(st.calculo.hwK) + ' · Q^' + ne(st.calculo.hwExpQ) +
-                ' · C^−' + ne(st.calculo.hwExpQ) + ' · D^−' + ne(st.calculo.hwExpD),
-        'J: perda de carga unitária (m/m);  Q: vazão (m³/s);  C: coeficiente de Hazen-Williams (adimensional);  D: diâmetro interno (m).');
+      D.formula('J = ' + ne(st.calculo.hwK) + ' \\cdot \\frac{Q^{' + ne(st.calculo.hwExpQ) + '}}' +
+                '{C^{' + ne(st.calculo.hwExpQ) + '} \\cdot D^{' + ne(st.calculo.hwExpD) + '}}',
+        'J é a perda de carga unitária (m/m); Q, a vazão (m³/s); C, o coeficiente de Hazen-Williams ' +
+        '(adimensional); e D, o diâmetro interno (m).');
     } else {
       D.p('A perda de carga distribuída foi obtida pela fórmula universal de Darcy-Weisbach, com o fator de ' +
           'atrito determinado pela equação de Colebrook-White ' + D.usar('colebrook') +
           ', resolvida por iteração. Essa formulação vale para qualquer regime turbulento e trabalha com a ' +
           'rugosidade absoluta equivalente da parede ' + D.usar('porto') + '.');
-      D.formula('J  =  f · v² / (2 · g · D)',
-        'J: perda de carga unitária (m/m);  f: fator de atrito (adimensional);  v: velocidade média (m/s);  g: aceleração da gravidade, 9,80665 m/s²;  D: diâmetro interno (m).');
-      D.formula('1 / √f  =  − 2 · log₁₀ [ ε / (3,7 · D)  +  2,51 / (Re · √f) ]',
-        'ε: rugosidade absoluta equivalente (m);  Re: número de Reynolds (adimensional).');
-      D.formula('Re  =  v · D / ν',
-        'ν: viscosidade cinemática do fluido (m²/s), calculada em função da temperatura.');
+      D.formula('J = \\frac{f \\cdot v^2}{2 \\cdot g \\cdot D}',
+        'J é a perda de carga unitária (m/m); f, o fator de atrito (adimensional); v, a velocidade média (m/s); ' +
+        'g, a aceleração da gravidade, 9,80665 m/s²; e D, o diâmetro interno (m).');
+      D.formula('\\frac{1}{\\sqrt{f}} = -2 \\cdot \\log_{10} [ \\frac{\\varepsilon}{3,7 \\cdot D} + ' +
+                '\\frac{2,51}{Re \\cdot \\sqrt{f}} ]',
+        '\u03b5 é a rugosidade absoluta equivalente da parede (m); e Re, o número de Reynolds (adimensional).');
+      D.formula('Re = \\frac{v \\cdot D}{\\nu}',
+        '\u03bd é a viscosidade cinemática do fluido (m²/s), calculada em função da temperatura.');
       if (st.calculo.metodo === 'swamee') {
         D.p('Na condição adotada, o fator de atrito foi obtido pela aproximação explícita de Swamee-Jain ' +
             D.usar('swamee') + ', cujo desvio em relação à solução iterativa de Colebrook-White é inferior a 1,5 % ' +
@@ -261,8 +306,8 @@
     D.p('As perdas localizadas foram calculadas pelo método dos coeficientes de perda de carga, peça a peça, ' +
         'com a velocidade do próprio trecho — ou com a velocidade no diâmetro da peça, quando informado ' +
         'diâmetro distinto do tubo ' + D.usar('az') + '.');
-    D.formula('hₗ  =  K · v² / (2 · g)',
-      'hₗ: perda de carga localizada (m);  K: coeficiente de perda da peça (adimensional).');
+    D.formula('h_l = K \\cdot \\frac{v^2}{2 \\cdot g}',
+      'h\u2097 é a perda de carga localizada (m); e K, o coeficiente de perda da peça (adimensional).');
 
     D.secao('Coeficientes de rugosidade adotados');
     D.p('Os coeficientes de rugosidade foram adotados em função do material do tubo e da faixa de idade ou ' +
@@ -329,13 +374,18 @@
 
     /* ---------------- considerações finais ---------------- */
     D.capitulo('Considerações finais');
-    D.p('Os resultados apresentados correspondem a um PRÉ-dimensionamento: definem a ordem de grandeza do ' +
+    D.p('Os resultados apresentados correspondem a um pré-dimensionamento: definem a ordem de grandeza do ' +
         'diâmetro, da altura manométrica e da potência dos conjuntos, e apontam os pontos que exigem atenção. ' +
-        'O projeto executivo permanece condicionado à obtenção da curva característica da bomba, à verificação ' +
-        'do ponto de operação real, à conferência do NPSH requerido pelo fabricante e à análise do regime ' +
-        'transitório com os respectivos dispositivos de proteção ' + D.usar('nbr12214') + ' ' +
-        MEM.cit('nbr12215') + '.');
+        'O projeto executivo permanece condicionado às verificações relacionadas a seguir ' +
+        D.usar('nbr12214') + ' ' + MEM.cit('nbr12215') + ':');
     D.usar('nbr12215');
+    D.alineas([
+      'obtenção da curva característica da bomba junto ao fabricante e confirmação do ponto de operação real',
+      'conferência do NPSH requerido pela bomba selecionada, com a margem de segurança recomendada',
+      'análise do regime transitório com os dispositivos de proteção e o método das características',
+      'confirmação das dimensões, das classes de pressão e da disponibilidade dos tubos nos catálogos vigentes',
+      'levantamento topográfico de detalhe da diretriz e verificação das interferências'
+    ]);
 
     var pend = PDA.Res.coletarAvisos(st, ctx, res);
     if (pend.length) {
@@ -353,9 +403,10 @@
     }
 
     /* ---------------- bibliografia ---------------- */
-    D.capitulo('Referências bibliográficas');
-    D.p('As referências abaixo correspondem às fontes efetivamente utilizadas nas formulações, nos coeficientes ' +
-        'e nos critérios adotados neste memorial. Recomenda-se conferir a edição vigente das normas citadas.');
+    D.capituloSemNumero('Referências');
+    D.p('As referências relacionadas a seguir correspondem às fontes efetivamente utilizadas nas formulações, ' +
+        'nos coeficientes e nos critérios adotados neste memorial. Recomenda-se conferir a edição vigente das ' +
+        'normas citadas.');
     var chaves = Object.keys(D.fontesUsadas);
     /* acrescenta as normas dos catálogos de tubo empregados */
     var mapaCat = { nbr7675: 'nbr7675', nbr8682: 'nbr8682', iso4427: 'nbr15561', nbr7665: 'nbr7665',
@@ -429,23 +480,29 @@
           'Extensão de ' + n(r.L, 1) + ' m e vazão de ' + n(r.Q * 1000, 1) + ' L/s' +
           (r.nBombas ? ' (' + r.nBombas + ' bomba(s))' : '') + '.');
 
-      D.formula('v  =  Q / A  =  4 · Q / (π · D²)', null);
-      D.aplicacao('A  =  π × ' + n(dm, 4) + '² / 4  =  ' + n(A, 5) + ' m²',
-                  'v  =  4 × ' + n(r.Q, 4) + ' / (π × ' + n(dm, 4) + '²)  =  ' + n(r.v, 3) + ' m/s');
+      D.formula('v = \\frac{Q}{A} = \\frac{4 \\cdot Q}{\\pi \\cdot D^2}',
+        'v é a velocidade média (m/s); Q, a vazão do trecho (m³/s); A, a área da seção (m²); ' +
+        'e D, o diâmetro interno (m).', { semNumero: D.equacoes > 6 });
+      D.aplicacao('A = \\frac{\\pi \\cdot ' + n(dm, 4) + '^2}{4} = ' + n(A, 5) + '\\ \\text{m}^2',
+                  'v = \\frac{4 \\cdot ' + n(r.Q, 4) + '}{\\pi \\cdot ' + n(dm, 4) + '^2} = ' +
+                  n(r.v, 3) + '\\ \\text{m/s}');
 
       if (usaHW) {
-        D.aplicacao('J  =  ' + ne(st.calculo.hwK) + ' × ' + n(r.Q, 4) + '^' + ne(st.calculo.hwExpQ) +
-                    ' × ' + n(t.C, 0) + '^−' + ne(st.calculo.hwExpQ) + ' × ' + n(dm, 4) + '^−' + ne(st.calculo.hwExpD),
-                    'J  =  ' + n(r.J, 5) + ' m/m  =  ' + n(r.J * 1000, 2) + ' m/km');
+        D.aplicacao('J = ' + ne(st.calculo.hwK) + ' \\cdot \\frac{' + n(r.Q, 4) + '^{' + ne(st.calculo.hwExpQ) +
+                    '}}{' + n(t.C, 0) + '^{' + ne(st.calculo.hwExpQ) + '} \\cdot ' + n(dm, 4) + '^{' +
+                    ne(st.calculo.hwExpD) + '}} = ' + n(r.J, 5) + '\\ \\text{m/m} = ' +
+                    n(r.J * 1000, 2) + '\\ \\text{m/km}');
       } else {
-        D.aplicacao('Re  =  ' + n(r.v, 3) + ' × ' + n(dm, 4) + ' / ' + n(ctx.ni * 1e6, 3) + '×10⁻⁶  =  ' +
-                    n(r.Re / 1000, 0) + ' × 10³',
-                    'ε / D  =  ' + n(t.epsMm, 4) + ' / ' + n(t.diMm, 1) + '  =  ' + (t.epsMm / t.diMm).toExponential(2).replace('.', ','),
-                    'f  =  ' + n(r.f, 5) + '   (regime ' + (r.regime || 'turbulento') + ')',
-                    'J  =  ' + n(r.f, 5) + ' × ' + n(r.v, 3) + '² / (2 × ' + n(g, 3) + ' × ' + n(dm, 4) + ')  =  ' +
-                    n(r.J, 5) + ' m/m  =  ' + n(r.J * 1000, 2) + ' m/km');
+        D.aplicacao('Re = \\frac{' + n(r.v, 3) + ' \\cdot ' + n(dm, 4) + '}{' + n(ctx.ni * 1e6, 3) +
+                    ' \\cdot 10^{-6}} = ' + n(r.Re / 1000, 0) + ' \\cdot 10^3',
+                    '\\frac{\\varepsilon}{D} = \\frac{' + n(t.epsMm, 4) + '}{' + n(t.diMm, 1) + '} = ' +
+                    (t.epsMm / t.diMm).toExponential(2).replace('.', ',').replace('e-', ' \\cdot 10^{-') + '}',
+                    'f = ' + n(r.f, 5) + '\\qquad \\text{(regime ' + (r.regime || 'turbulento') + ')}',
+                    'J = \\frac{' + n(r.f, 5) + ' \\cdot ' + n(r.v, 3) + '^2}{2 \\cdot ' + n(g, 3) +
+                    ' \\cdot ' + n(dm, 4) + '} = ' + n(r.J, 5) + '\\ \\text{m/m} = ' +
+                    n(r.J * 1000, 2) + '\\ \\text{m/km}');
       }
-      D.aplicacao('hf  =  J × L  =  ' + n(r.J, 5) + ' × ' + n(r.L, 1) + '  =  ' + n(r.hf, 3) + ' m');
+      D.aplicacao('hf = J \\cdot L = ' + n(r.J, 5) + ' \\cdot ' + n(r.L, 1) + ' = ' + n(r.hf, 3) + '\\ \\text{m}');
 
       if (r.pecas && r.pecas.length) {
         var somaK = 0, somaH = 0;
@@ -463,16 +520,19 @@
         linhasP.push(h('tr', { class: 'total' },
           h('td', { class: 'esq' }, 'Total'), h('td', {}, ''), h('td', {}, ''),
           h('td', {}, n(somaK, 2)), h('td', {}, ''), h('td', {}, ''), h('td', {}, n(somaH, 4))));
-        D.tabela('Peças e conexões — ' + r.rot,
+        D.p('As peças e conexões lançadas no trecho, os coeficientes de perda adotados e a fonte de onde ' +
+            'foram tomados constam da Tabela ' + (D.tabelas.length + 1) + '.');
+        D.tabela('Peças e conexões – ' + r.rot,
           [{ rot: 'Peça', esq: true }, 'Quant.', 'K unitário', 'ΣK', 'DI (mm)', 'v (m/s)', 'hₗ (m)'],
           linhasP, PDA.P.fontePecas.az.replace(/\.$/, '') + '.');
         D.usar('az');
-        D.aplicacao('Σhₗ  =  ΣK × v² / (2 · g)  =  ' + n(somaK, 2) + ' × ' + n(r.v, 3) +
-                    '² / (2 × ' + n(g, 3) + ')  =  ' + n(r.hl, 3) + ' m');
+        D.aplicacao('\\Sigma h_l = \\Sigma K \\cdot \\frac{v^2}{2 \\cdot g} = ' + n(somaK, 2) +
+                    ' \\cdot \\frac{' + n(r.v, 3) + '^2}{2 \\cdot ' + n(g, 3) + '} = ' +
+                    n(r.hl, 3) + '\\ \\text{m}');
       }
 
-      D.aplicacao('h total do trecho  =  hf + Σhₗ  =  ' + n(r.hf, 3) + ' + ' + n(r.hl, 3) +
-                  '  =  ' + n(r.htotal, 3) + ' m');
+      D.aplicacao('h_{total} = hf + \\Sigma h_l = ' + n(r.hf, 3) + ' + ' + n(r.hl, 3) +
+                  ' = ' + n(r.htotal, 3) + '\\ \\text{m}');
 
       var cl = PDA.C.classificar(r.v, r.J, crit);
       D.p('Verificação: velocidade de ' + n(r.v, 2) + ' m/s e perda unitária de ' + n(r.J * 1000, 2) +
@@ -502,7 +562,7 @@
       h('td', {}, n(somaL, 1)), h('td', {}, ''), h('td', {}, ''), h('td', {}, ''),
       h('td', {}, n(somaHf, 3)), h('td', {}, n(somaHl, 3)), h('td', {}, n(somaHf + somaHl, 3))));
 
-    D.tabela('Resumo — ' + titulo,
+    D.tabela('Resumo – ' + titulo,
       [{ rot: 'Trecho', esq: true }, { rot: 'Diâmetro', esq: true }, 'DI (mm)', 'L (m)', 'Q (L/s)',
        'v (m/s)', 'J (m/km)', 'hf (m)', 'Σhₗ (m)', 'h total (m)'], linhas,
       'Resultados calculados pelo programa.');
@@ -518,7 +578,7 @@
           h('td', {}, n(l.htotal, 3)),
           h('td', { class: 'esq' }, ({ bom: 'adequado', atencao: 'atenção', ruim: 'inadequado', na: '—' })[l.classe]));
       });
-      D.tabela('Comparação de diâmetros — ' + validos[0].rot,
+      D.tabela('Comparação de diâmetros – ' + validos[0].rot,
         [{ rot: 'Diâmetro', esq: true }, 'DI (mm)', 'v (m/s)', 'J (m/km)', 'h total (m)', { rot: 'Situação', esq: true }],
         lc, 'Varredura do catálogo, com os critérios de velocidade e perda unitária adotados.');
       D.p('O diâmetro de Bresse, tomado como referência de ordem de grandeza, resulta entre ' +
@@ -543,11 +603,14 @@
         'elevatória e decai linearmente até zero no ponto de chegada, onde o nível do reservatório é fixo ' +
         D.usar('porto') + ' ' + MEM.cit('nbr12215') + '.');
     D.usar('nbr12215');
-    D.formula('p_máx(x)  =  LP(x)  +  Δh · (1 − x/L)  −  cota(x)',
-      'LP: linha piezométrica em regime permanente (m);  Δh: sobrepressão na elevatória (mca);  x: distância desde a elevatória (m);  L: extensão total (m).');
-    D.aplicacao('Δh adotado na elevatória  =  ' + n(env.dh, 2) + ' mca',
-                'Maior pressão  =  ' + n(env.criticoMax.pMax, 2) + ' mca, na distância ' + n(env.criticoMax.x, 0) + ' m',
-                'Menor pressão  =  ' + n(env.criticoMin.pMin, 2) + ' mca, na distância ' + n(env.criticoMin.x, 0) + ' m');
+    D.formula('p_{max}(x) = LP(x) + \\Delta h \\cdot ( 1 - \\frac{x}{L} ) - cota(x)',
+      'LP(x) é a linha piezométrica em regime permanente (m); \u0394h, a sobrepressão na elevatória (mca); ' +
+      'x, a distância desde a elevatória (m); e L, a extensão total da linha (m).');
+    D.aplicacao('\\Delta h = ' + n(env.dh, 2) + '\\ \\text{mca}',
+                'p_{max} = ' + n(env.criticoMax.pMax, 2) + '\\ \\text{mca}\\qquad \\text{(x = ' +
+                n(env.criticoMax.x, 0) + ' m)}',
+                'p_{min} = ' + n(env.criticoMin.pMin, 2) + '\\ \\text{mca}\\qquad \\text{(x = ' +
+                n(env.criticoMin.x, 0) + ' m)}');
 
     D.figura('Perfil da linha com a piezométrica e as envoltórias de pressão',
       PDA.Pf.grafico(st, ctx, res),
@@ -598,8 +661,8 @@
     D.tabela('Composição da altura manométrica', [{ rot: 'Parcela', esq: true }, 'Valor (m)'], linhas,
       'Resultados calculados pelo programa.');
 
-    D.aplicacao('Hm  =  ' + n(c.HgMax, 3) + '  +  ' + n(c.hfSuccao + c.hfRecalque, 3) + '  +  ' +
-                n(c.hlSuccao + c.hlRecalque, 3) + '  =  ' + n(c.Hm, 3) + ' mca');
+    D.aplicacao('Hm = ' + n(c.HgMax, 3) + ' + ' + n(c.hfSuccao + c.hfRecalque, 3) + ' + ' +
+                n(c.hlSuccao + c.hlRecalque, 3) + ' = ' + n(c.Hm, 3) + '\\ \\text{mca}');
 
     var hTot = c.hSuccao + c.hRecalque;
     D.p('As perdas de carga respondem por ' + n(c.Hm > 0 ? hTot / c.Hm * 100 : 0, 1) + ' % da altura ' +
@@ -638,11 +701,14 @@
     D.capitulo('Conjuntos elevatórios');
     D.p('A potência hidráulica útil corresponde ao produto do peso específico do fluido pela vazão e pela ' +
         'altura manométrica. A potência no eixo resulta da divisão pela eficiência do conjunto ' + D.usar('az') + '.');
-    D.formula('P  =  γ · Q · Hm / ( 75 · η )',
-      'P: potência no eixo (cv);  γ: peso específico do fluido (kgf/m³);  Q: vazão por bomba (m³/s);  Hm: altura manométrica (mca);  η: rendimento da bomba (decimal).');
-    D.aplicacao('γ  =  ' + n(ctx.gama, 0) + ' N/m³  a  ' + ne(st.fluido.temperatura) + ' °C',
-                'P  =  ' + n(ctx.qBomba * 1000, 2) + ' × ' + n(c.Hm, 2) + ' / ( 75 × ' +
-                n(st.bombas.rendBomba / 100, 2) + ' )  =  ' + n(c.bhpCv, 2) + ' cv  =  ' + n(c.bhpKw, 2) + ' kW');
+    D.formula('P = \\frac{\\gamma \\cdot Q \\cdot Hm}{75 \\cdot \\eta}',
+      'P é a potência no eixo (cv); \u03b3, o peso específico do fluido (kgf/m³); Q, a vazão por bomba (m³/s); ' +
+      'Hm, a altura manométrica (mca); e \u03b7, o rendimento da bomba (decimal).');
+    D.aplicacao('\\gamma = ' + n(ctx.gama, 0) + '\\ \\text{N/m}^3 \\qquad \\text{(a ' +
+                ne(st.fluido.temperatura) + ' °C)}',
+                'P = \\frac{' + n(ctx.qBomba * 1000, 2) + ' \\cdot ' + n(c.Hm, 2) + '}{75 \\cdot ' +
+                n(st.bombas.rendBomba / 100, 2) + '} = ' + n(c.bhpCv, 2) + '\\ \\text{cv} = ' +
+                n(c.bhpKw, 2) + '\\ \\text{kW}');
     D.p('Sobre a potência calculada foi aplicada folga de ' + n(c.folgaPct, 0) + ' %, resultando na adoção de ' +
         'motor comercial de ' + ne(c.motorCv) + ' cv (' + n(c.motorKw, 1) + ' kW) por conjunto. ' +
         'Com ' + ctx.nOp + ' conjunto(s) em operação simultânea, a potência instalada em funcionamento é de ' +
@@ -675,15 +741,20 @@
         'disponível supera o NPSH requerido pela bomba, obtido na curva do fabricante, com margem de segurança ' +
         D.usar('nbr12214') + ' ' + MEM.cit('tsutiya') + '.');
     D.usar('tsutiya');
-    D.formula('NPSH_d  =  ( p_atm − p_v ) / γ  ±  z  −  hf,sucção',
-      'p_atm: pressão atmosférica local;  p_v: pressão de vapor do fluido na temperatura de trabalho;  z: desnível entre o nível de sucção e o eixo da bomba (positivo quando a bomba está afogada);  hf,sucção: perda de carga total na sucção.');
-    D.aplicacao('p_atm / γ  =  ' + n(ctx.patm, 3) + ' mca   (altitude de ' + ne(st.fluido.altitude) + ' m)',
-                'p_v / γ  =  ' + n(ctx.pvapor, 3) + ' mca   (a ' + ne(st.fluido.temperatura) + ' °C)',
-                'z  =  ' + n(st.cotas.nivelSuccaoMin, 2) + ' − ' + n(st.cotas.eixoBomba, 2) + '  =  ' +
-                  n(c.zSuccao, 2) + ' m   (bomba ' + (c.zSuccao >= 0 ? 'afogada' : 'aspirando') + ')',
-                'hf,sucção  =  ' + n(c.hSuccao, 4) + ' m',
-                'NPSH_d  =  ' + n(ctx.patm, 3) + ' − ' + n(ctx.pvapor, 3) + ' + (' + n(c.zSuccao, 2) + ') − ' +
-                  n(c.hSuccao, 4) + '  =  ' + n(c.npshd, 3) + ' mca');
+    D.formula('NPSH_d = \\frac{p_{atm} - p_v}{\\gamma} \\pm z - hf_{suc}',
+      'p_{atm} é a pressão atmosférica local; p_v, a pressão de vapor do fluido na temperatura de trabalho; ' +
+      'z, o desnível entre o nível de sucção e o eixo da bomba, positivo quando a bomba está afogada; ' +
+      'e hf_{suc}, a perda de carga total na sucção.');
+    D.aplicacao('\\frac{p_{atm}}{\\gamma} = ' + n(ctx.patm, 3) + '\\ \\text{mca} \\qquad ' +
+                  '\\text{(altitude de ' + ne(st.fluido.altitude) + ' m)}',
+                '\\frac{p_v}{\\gamma} = ' + n(ctx.pvapor, 3) + '\\ \\text{mca} \\qquad \\text{(a ' +
+                  ne(st.fluido.temperatura) + ' °C)}',
+                'z = ' + n(st.cotas.nivelSuccaoMin, 2) + ' - ' + n(st.cotas.eixoBomba, 2) + ' = ' +
+                  n(c.zSuccao, 2) + '\\ \\text{m} \\qquad \\text{(bomba ' +
+                  (c.zSuccao >= 0 ? 'afogada' : 'aspirando') + ')}',
+                'hf_{suc} = ' + n(c.hSuccao, 4) + '\\ \\text{m}',
+                'NPSH_d = ' + n(ctx.patm, 3) + ' - ' + n(ctx.pvapor, 3) + ' + ( ' + n(c.zSuccao, 2) + ' ) - ' +
+                  n(c.hSuccao, 4) + ' = ' + n(c.npshd, 3) + '\\ \\text{mca}');
 
     if (st.curvaBomba && st.curvaBomba.npshr) {
       var margem = c.npshd - Number(st.curvaBomba.npshr);
@@ -711,12 +782,12 @@
     D.p('A curva do sistema representa a altura manométrica exigida pela instalação em função da vazão, para ' +
         'os diâmetros e as singularidades adotados. O ponto de operação real é a interseção entre a curva do ' +
         'sistema e a curva característica da bomba ' + D.usar('az') + '.');
-    D.formula('H_sistema(Q)  =  Hg  +  Σ hf(Q)  +  Σ hₗ(Q)', null);
+    D.formula('H_{sistema}(Q) = Hg + \\Sigma hf(Q) + \\Sigma h_l(Q)', null);
     D.p('A curva da bomba foi ajustada por mínimos quadrados sobre os pontos informados, na forma polinomial ' +
         'de segundo grau usual para bombas centrífugas.');
-    D.formula('H_bomba(Q)  =  a₀  +  a₁ · Q  +  a₂ · Q²', null);
-    D.aplicacao('a₀  =  ' + n(cv.a0, 4) + '   a₁  =  ' + n(cv.a1, 4) + '   a₂  =  ' + n(cv.a2, 4) +
-                '   [H em mca, Q em m³/s]');
+    D.formula('H_{bomba}(Q) = a_0 + a_1 \\cdot Q + a_2 \\cdot Q^2', null);
+    D.aplicacao('a_0 = ' + n(cv.a0, 4) + '\\qquad a_1 = ' + n(cv.a1, 4) + '\\qquad a_2 = ' + n(cv.a2, 4),
+                { rot: 'com H em mca e Q em m³/s.' });
 
     var linhasP = cv.pontos.map(function (p) {
       return h('tr', {}, h('td', {}, n(p.q * 1000, 1)), h('td', {}, n(p.H, 2)),
@@ -726,11 +797,12 @@
       ['Q (L/s)', 'H informado (mca)', 'H ajustado (mca)', 'Desvio (mca)'], linhasP,
       'Pontos informados a partir da curva do fabricante.');
 
-    D.aplicacao('Ponto de operação com ' + op.n + ' bomba(s):',
-                'Q  =  ' + n(op.qTotal * 1000, 2) + ' L/s no total,  ' + n(op.qBomba * 1000, 2) + ' L/s por bomba',
-                'H  =  ' + n(op.H, 2) + ' mca',
-                'P  =  ' + n(op.bhpCv, 2) + ' cv por bomba',
-                'Desvio em relação à vazão de projeto: ' + n(op.desvioQ, 1) + ' %');
+    D.aplicacao({ rot: 'Ponto de operação com ' + op.n + ' bomba(s):' },
+                'Q = ' + n(op.qTotal * 1000, 2) + '\\ \\text{L/s} \\qquad \\text{(' +
+                  n(op.qBomba * 1000, 2) + ' L/s por bomba)}',
+                'H = ' + n(op.H, 2) + '\\ \\text{mca}',
+                'P = ' + n(op.bhpCv, 2) + '\\ \\text{cv por bomba}',
+                '\\Delta Q = ' + n(op.desvioQ, 1) + '\\ \\text{% em relação à vazão de projeto}');
 
     D.figura('Curva do sistema e curva da bomba, com o ponto de operação',
       PDA.F.graficoCurvas(st, ctx, res),
@@ -763,31 +835,35 @@
 
   MEM.capituloTransitorio = function (D) {
     var st = D.st, res = D.res;
-    D.capitulo('Transitório hidráulico — pré-avaliação');
+    D.capitulo('Transitório hidráulico – pré-avaliação');
     D.p('A parada abrupta dos conjuntos ou o fechamento rápido de uma válvula provocam variação brusca da ' +
         'velocidade e, em consequência, sobrepressões e subpressões que se propagam pela tubulação com ' +
         'celeridade própria do conjunto fluido-tubo ' + D.usar('streeter') + '. A verificação a seguir é ' +
         'preliminar e destina-se a conferir se a classe de pressão adotada possui folga.');
-    D.formula('a  =  1 / √[ ρ · ( 1/K  +  ψ · D / ( e · E ) ) ]',
-      'a: celeridade da onda (m/s);  ρ: massa específica do fluido (kg/m³);  K: módulo de elasticidade volumétrica da água, 2,19 GPa;  ψ: coeficiente de ancoragem longitudinal;  D: diâmetro interno (m);  e: espessura de parede (m);  E: módulo de elasticidade do material (Pa).');
+    D.formula('a = \\frac{1}{\\sqrt{\\rho \\cdot ( \\frac{1}{K} + \\frac{\\psi \\cdot D}{e \\cdot E} )}}',
+      'a é a celeridade da onda (m/s); \u03c1, a massa específica do fluido (kg/m³); K, o módulo de ' +
+      'elasticidade volumétrica da água, 2,19 GPa; \u03c8, o coeficiente de ancoragem longitudinal; ' +
+      'D, o diâmetro interno (m); e, a espessura de parede (m); e E, o módulo de elasticidade do material (Pa).');
     var anc = PDA.H.ancoragem.filter(function (a) { return a.id === (st.golpe.ancoragem || 'juntas'); })[0];
     D.p('Foi adotada a condição de ancoragem "' + (anc ? anc.rot.toLowerCase() : '—') + '" ' +
         D.usar('halliwell') + '.');
-    D.formula('t_c  =  2 · L / a          Δh  =  a · Δv / g   (manobra rápida)',
-      't_c: tempo crítico de manobra (s);  Δv: variação de velocidade (m/s).');
-    D.formula('Δh  =  2 · L · v / ( g · t )   (manobra lenta)',
-      't: tempo de manobra (s). Aplicável quando t > t_c.');
+    D.formula('t_c = \\frac{2 \\cdot L}{a} \\qquad \\Delta h = \\frac{a \\cdot \\Delta v}{g}',
+      't_c é o tempo crítico de manobra (s); e \u0394v, a variação de velocidade (m/s). ' +
+      'Vale para manobra rápida, isto é, quando o tempo de manobra é menor que t_c.');
+    D.formula('\\Delta h = \\frac{2 \\cdot L \\cdot v}{g \\cdot t}',
+      't é o tempo de manobra (s). Vale para manobra lenta, quando t é maior que t_c.');
     D.usar('joukowsky');
 
     res.golpe.forEach(function (g) {
-      D.aplicacao(g.rot + ':',
-        'a  =  ' + n(g.celeridade, 0) + ' m/s   (E = ' + n(g.E_GPa, 0) + ' GPa,  ν = ' + ne(g.nu) +
-          ',  ψ = ' + n(g.psi, 3) + ',  e = ' + n(g.eMm, 1) + ' mm)',
-        't_c  =  2 × ' + n(g.L, 0) + ' / ' + n(g.celeridade, 0) + '  =  ' + n(g.tempoCritico, 2) +
-          ' s    →   manobra ' + (g.manobraRapida ? 'RÁPIDA' : 'LENTA') + ' (t = ' + ne(g.tempoManobra) + ' s)',
-        'Δh  =  ' + n(g.dh, 1) + ' mca',
-        'pressão máxima  =  Hm + Δh  =  ' + n(g.pressaoMaxMca, 1) + ' mca' +
-          (g.pnMca ? '   |   admissível do tubo: ' + n(g.pnMca, 0) + ' mca' : ''));
+      D.aplicacao({ rot: g.rot + ':' },
+        'a = ' + n(g.celeridade, 0) + '\\ \\text{m/s} \\qquad \\text{(E = ' + n(g.E_GPa, 0) +
+          ' GPa; \u03bd = ' + ne(g.nu) + '; \u03c8 = ' + n(g.psi, 3) + '; e = ' + n(g.eMm, 1) + ' mm)}',
+        't_c = \\frac{2 \\cdot ' + n(g.L, 0) + '}{' + n(g.celeridade, 0) + '} = ' + n(g.tempoCritico, 2) +
+          '\\ \\text{s} \\qquad \\text{(manobra ' + (g.manobraRapida ? 'rápida' : 'lenta') +
+          ', com t = ' + ne(g.tempoManobra) + ' s)}',
+        '\\Delta h = ' + n(g.dh, 1) + '\\ \\text{mca}',
+        'p_{max} = Hm + \\Delta h = ' + n(g.pressaoMaxMca, 1) + '\\ \\text{mca}' +
+          (g.pnMca ? '\\qquad \\text{(admissível do tubo: ' + n(g.pnMca, 0) + ' mca)}' : ''));
     });
 
     var linhas = res.golpe.map(function (g) {

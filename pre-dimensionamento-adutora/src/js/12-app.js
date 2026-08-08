@@ -52,7 +52,7 @@
     var alvo = document.getElementById('marca');
     if (!alvo) return;
     UI.limpar(alvo);
-    alvo.appendChild(PDA.M.marca(38));
+    alvo.appendChild(PDA.M.marca(PDA.M.CAIXA.alturaTela));
   };
 
   /* ================================================================
@@ -186,7 +186,7 @@
     d('Folha', aba ? aba.rot : '');
     d('Impresso em', App.dataHoraBR());
 
-    alvo.appendChild(PDA.M.marca(46));
+    alvo.appendChild(PDA.M.marca(PDA.M.CAIXA.alturaTela + 6, { larguraMax: PDA.M.CAIXA.larguraImpressao }));
     alvo.appendChild(h('div', { class: 'dados' },
       h('h1', {}, st.projeto.nome || 'Pré-dimensionamento de adutora / linha de recalque'),
       h('div', { class: 'linha-dados' }, dados)));
@@ -953,10 +953,10 @@
       UI.limpar(previa);
       previa.appendChild(h('div', { class: 'previa-caixa' },
         h('span', { class: 'previa-rot' }, 'no cabeçalho'),
-        PDA.M.marca(38)));
+        PDA.M.marca(PDA.M.CAIXA.alturaTela)));
       previa.appendChild(h('div', { class: 'previa-caixa papel' },
         h('span', { class: 'previa-rot' }, 'no papel'),
-        PDA.M.marca(46, { larguraMax: PDA.M.CAIXA.larguraImpressao })));
+        PDA.M.marca(PDA.M.CAIXA.alturaTela + 6, { larguraMax: PDA.M.CAIXA.larguraImpressao })));
       if (PDA.M.modo() === 'nenhuma') {
         previa.appendChild(h('p', { class: 'nota' }, 'Sem logo: o cabeçalho e o memorial saem só com o nome do projeto.'));
       }
@@ -998,7 +998,7 @@
           mostrar();
           UI.limpar(aviso);
           if (m) {
-            var alturaEfetiva = Math.min(38, PDA.M.CAIXA.larguraTela / m.proporcao);
+            var alturaEfetiva = Math.min(PDA.M.CAIXA.alturaTela, PDA.M.CAIXA.larguraTela / m.proporcao);
             if (m.proporcao > 7) {
               UI.add(aviso, h('div', { class: 'aviso' },
                 'Esta logo é bem comprida (proporção ' + UI.num(m.proporcao, 1) + ':1). Ela cabe inteira na caixa, ' +
@@ -1021,7 +1021,77 @@
 
     mostrar();
 
-    UI.modal('Logo do cabeçalho', [
+    /* ---- timbrado ---- */
+    var timbre = PDA.M.timbrado();
+    var previaTimb = h('div', { class: 'previa-timbrado' });
+    var avisoTimb = h('div', {});
+
+    function mostrarTimbrado() {
+      UI.limpar(previaTimb);
+      var t = PDA.M.timbrado();
+      if (!t) {
+        UI.add(previaTimb, h('p', { class: 'nota' },
+          'Sem timbrado: as páginas do memorial saem em branco, com as margens da ABNT ' +
+          '(3 cm em cima e à esquerda, 2 cm embaixo e à direita) e o número no canto superior direito.'));
+        return;
+      }
+      UI.add(previaTimb,
+        h('div', { class: 'timb-folha' },
+          h('img', { src: t.imagem, alt: 'Timbrado' }),
+          h('div', {
+            class: 'timb-mancha',
+            style: 'top:' + (t.margSup / 297 * 100) + '%;bottom:' + (t.margInf / 297 * 100) +
+                   '%;left:' + (30 / 210 * 100) + '%;right:' + (20 / 210 * 100) + '%'
+          }, h('span', {}, 'texto'))),
+        h('p', { class: 'nota' },
+          'A área marcada é onde o texto entra. Original de ' + t.largura + ' × ' + t.altura +
+          ' px, guardado reduzido para A4 a 150 dpi (' + UI.num(t.bytes / 1024, 0) + ' kB).'));
+    }
+
+    var entradaTimb = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp' });
+    entradaTimb.addEventListener('change', function () {
+      var f = entradaTimb.files && entradaTimb.files[0];
+      if (!f) return;
+      UI.limpar(avisoTimb);
+      UI.add(avisoTimb, h('div', { class: 'aviso' }, 'Reduzindo a imagem…'));
+      var fr = new FileReader();
+      fr.onload = function () {
+        PDA.M.reduzirParaA4(String(fr.result), function (t) {
+          UI.limpar(avisoTimb);
+          if (!t) { UI.add(avisoTimb, h('div', { class: 'aviso' }, 'Não foi possível ler a imagem.')); return; }
+          var ant = PDA.M.timbrado();
+          t.margSup = ant ? ant.margSup : 35;
+          t.margInf = ant ? ant.margInf : 25;
+          if (!PDA.M.gravarTimbrado(t)) {
+            UI.add(avisoTimb, h('div', { class: 'aviso' },
+              'A imagem reduzida ainda não coube no armazenamento do navegador. ' +
+              'Salve o timbrado em JPG antes de carregar.'));
+            return;
+          }
+          App.modalLogo();
+          UI.toast('Timbrado carregado (' + UI.num(t.bytes / 1024, 0) + ' kB).');
+        });
+      };
+      fr.readAsDataURL(f);
+    });
+
+    function campoMargem(rot, chave, valor) {
+      var inp = h('input', { type: 'number', step: '0.5', min: '10', max: '80', value: String(valor) });
+      inp.addEventListener('change', function () {
+        var t = PDA.M.timbrado();
+        if (!t) return;
+        var v = parseFloat(String(inp.value).replace(',', '.'));
+        if (!(v > 0)) return;
+        t[chave] = v;
+        PDA.M.gravarTimbrado(t);
+        mostrarTimbrado();
+      });
+      return h('label', { class: 'campo' }, h('span', {}, rot), inp);
+    }
+
+    mostrarTimbrado();
+
+    UI.modal('Logo e timbrado', [
       h('p', { class: 'nota' },
         'A logo aparece no cabeçalho do programa e no topo de tudo o que é impresso ou exportado. ' +
         'Qualquer imagem carregada é ajustada para caber na mesma caixa: uma logo comprida encolhe pela largura, ' +
@@ -1047,7 +1117,26 @@
           }
         }, 'Apagar o arquivo carregado')) : null,
       h('p', { class: 'nota', style: 'margin-top:11px' },
-        'A escolha vale para este navegador. Em outro computador é preciso carregar de novo.')
+        'A escolha vale para este navegador. Em outro computador é preciso carregar de novo.'),
+
+      UI.sub('Papel timbrado do memorial'),
+      h('p', { class: 'nota' },
+        'O timbrado entra como fundo de todas as páginas do memorial, inclusive da capa. ' +
+        'O arquivo original não precisa ser reduzido antes: o programa o converte para uma folha ' +
+        'A4 a 150 dpi, o que costuma deixar algumas centenas de kilobytes em vez das dezenas de megabytes ' +
+        'do original. Nada é enviado para fora — a conversão acontece no próprio navegador.'),
+      previaTimb,
+      avisoTimb,
+      h('div', { style: 'margin-top:8px' }, entradaTimb),
+      timbre ? h('div', { class: 'linha', style: 'margin-top:9px;gap:12px;align-items:flex-end' },
+        campoMargem('Margem superior (mm)', 'margSup', timbre.margSup),
+        campoMargem('Margem inferior (mm)', 'margInf', timbre.margInf),
+        h('button', {
+          class: 'btn perigo', type: 'button', onclick: function () {
+            PDA.M.removerTimbrado(); App.render(); App.modalLogo();
+            UI.toast('Timbrado removido; o memorial volta às margens da ABNT.');
+          }
+        }, 'Remover o timbrado')) : null
     ]);
   };
 

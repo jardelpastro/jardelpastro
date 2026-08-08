@@ -446,6 +446,19 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
 /* ---------------- escolha da logo ---------------- */
 
 .previa-logo { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+.previa-timbrado { margin-top: 8px; }
+.timb-folha {
+  position: relative; width: 132px; aspect-ratio: 210 / 297; margin: 0 0 7px;
+  border: 1px solid var(--borda); background: #fff; overflow: hidden;
+}
+.timb-folha img { width: 100%; height: 100%; object-fit: fill; display: block; }
+.timb-mancha {
+  position: absolute; border: 1px dashed var(--teal-vivo);
+  background: rgba(20, 165, 160, .10);
+  display: flex; align-items: center; justify-content: center;
+}
+.timb-mancha span { font-size: 9px; color: var(--teal-escuro, #0E6F66); }
+
 .previa-caixa {
   border: 1px dashed var(--border-forte); border-radius: var(--r);
   padding: 10px 12px 12px; background: var(--surface-2); min-width: 260px;
@@ -503,7 +516,7 @@ button.btn.opcao-logo b { display: block; margin-bottom: 2px; }
     border-bottom: 2px solid var(--azul);
   }
   #cabecalho-impressao .marca-bloco { color: var(--azul); }
-  #cabecalho-impressao .marca-img { max-height: 46px; }
+  #cabecalho-impressao .marca-img { max-height: 52px; }
   #cabecalho-impressao .dados { flex: 1; }
   #cabecalho-impressao .dados h1 { font-size: 12pt; margin: 0; }
   #cabecalho-impressao .dados .linha-dados {
@@ -585,11 +598,16 @@ button.btn.opcao-logo b { display: block; margin-bottom: 2px; }
    Memorial: documento paginado
    ================================================================== */
 
+/* ------------------------------------------------------------------
+   Memorial em A4, formatado conforme a ABNT (NBR 14724, 6024, 6027,
+   6023 e 10520), com uma exceção pedida pelo usuário: entrelinhas 1,2
+   no lugar de 1,5.
+   ------------------------------------------------------------------ */
 .doc {
-  font-family: "Times New Roman", Times, Georgia, serif;
-  color: #16202e;
-  font-size: 11pt;
-  line-height: 1.45;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #000;
+  font-size: 12pt;
+  line-height: 1.2;
 }
 .doc-medidor { position: absolute; left: -20000px; top: 0; visibility: hidden; }
 
@@ -599,88 +617,122 @@ button.btn.opcao-logo b { display: block; margin-bottom: 2px; }
   background: #fff;
   margin: 0 auto 10mm;
   box-shadow: 0 2px 10px rgba(16, 30, 46, .18);
-  padding: 20mm 20mm 15mm 25mm;
+  /* margens ABNT: 3 cm em cima e à esquerda, 2 cm embaixo e à direita */
+  padding: 30mm 20mm 20mm 30mm;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
   box-sizing: border-box;
 }
-.doc .pag-cabecalho {
-  height: 14mm; flex: none;
-  display: flex; align-items: center; gap: 8mm;
-  border-bottom: .6pt solid #b9c2cc;
-  color: #0E2148;
+/* timbrado do escritório, quando carregado */
+.doc .pagina .pag-timbrado {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: fill; z-index: 0;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
-.doc .pag-cabecalho .pc-titulo { font-size: 9pt; color: #556273; margin-left: auto; text-align: right; }
+.doc .pagina > .pag-corpo, .doc .pagina > .doc-capa { position: relative; z-index: 1; }
+
+/* número da página: canto superior direito, a 2 cm da borda (NBR 14724) */
+.doc .pag-num {
+  position: absolute; top: 20mm; right: 20mm; z-index: 2;
+  font-size: 10pt; color: #000; line-height: 1;
+}
 .doc .pag-corpo { flex: 1 1 auto; overflow: hidden; }
-.doc .pag-rodape {
-  height: 10mm; flex: none;
-  display: flex; align-items: center; justify-content: space-between;
-  border-top: .6pt solid #b9c2cc;
-  font-size: 8.5pt; color: #556273;
-}
-
 .doc .pag-corpo > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+
+/* --- títulos (NBR 6024): indicativo, um espaço, título --- */
 .doc .doc-h1 {
-  font-size: 14pt; font-weight: bold; color: #0E2148;
-  margin: 0; padding: 4pt 0 6pt;
+  font-size: 12pt; font-weight: bold; color: #000; text-transform: uppercase;
+  margin: 0; padding: 0 0 8pt; text-align: left;
 }
-.doc .doc-h1-frente { text-align: center; padding-bottom: 10pt; }
-.doc .doc-h2 { font-size: 12pt; font-weight: bold; color: #0E2148; margin: 0; padding: 10pt 0 4pt; }
-.doc .doc-p { margin: 0; padding-bottom: 6pt; text-align: justify; text-indent: 0; }
-.doc .doc-nota { font-size: 9.5pt; color: #333; margin: 0; padding-bottom: 6pt; text-align: justify; }
-.doc .doc-ref { margin: 0; padding-bottom: 7pt; text-align: left; font-size: 10.5pt; }
+.doc .doc-h1-frente { text-align: center; padding-bottom: 12pt; }
+.doc .doc-h2 {
+  font-size: 12pt; font-weight: bold; color: #000;
+  margin: 0; padding: 10pt 0 6pt;
+}
+.doc .doc-h3 {
+  font-size: 12pt; font-weight: normal; font-style: italic; color: #000;
+  margin: 0; padding: 8pt 0 5pt;
+}
 
-.doc .doc-formula { margin: 0; padding: 7pt 0; text-align: center; }
-.doc .formula-txt {
-  font-size: 12pt; letter-spacing: .2px;
-  font-family: "Cambria Math", "Times New Roman", serif;
+/* --- texto --- */
+.doc .doc-p {
+  margin: 0; padding-bottom: 6pt; text-align: justify;
+  text-indent: 12.5mm;                      /* recuo de primeira linha */
+  hyphens: auto;
 }
-.doc .formula-leg { font-size: 8.5pt; color: #444; margin-top: 2pt; }
-.doc .doc-aplicacao {
-  margin: 0 0 0 10mm; padding: 5pt 0 7pt;
-  font-family: ui-monospace, Consolas, "Courier New", monospace;
-  font-size: 9pt; color: #16202e;
+.doc .doc-p.sem-recuo { text-indent: 0; }
+.doc .doc-alineas { margin: 0; padding: 0 0 6pt 12.5mm; list-style: none; }
+.doc .doc-alineas li { text-align: justify; padding: 0 0 3pt 6mm; text-indent: -6mm; }
+.doc .doc-nota { font-size: 10pt; margin: 0; padding-bottom: 6pt; text-align: justify; }
+.doc .doc-ref {
+  margin: 0; padding-bottom: 11pt; text-align: left; font-size: 12pt;
+  line-height: 1.0;                          /* referências em espaço simples */
 }
-.doc .aplic-linha { margin: 1.5pt 0; }
 
-.doc .doc-quadro { margin: 0; padding: 6pt 0 9pt; }
+/* --- equações: centralizadas, com o número entre parênteses à direita --- */
+.doc .doc-formula {
+  margin: 0; padding: 8pt 0; display: flex; align-items: center; gap: 6mm;
+}
+.doc .doc-formula .formula-corpo { flex: 1 1 auto; text-align: center; }
+.doc .doc-formula .formula-num { flex: none; font-size: 12pt; }
+.doc .formula-svg { max-width: 100%; height: auto; vertical-align: middle; }
+.doc .formula-leg { font-size: 12pt; margin: 0; padding: 0 0 6pt; text-align: justify; }
+.doc .doc-aplicacao { margin: 0; padding: 4pt 0 8pt 12.5mm; }
+
+/* --- ilustrações e tabelas --- */
+.doc .doc-quadro { margin: 0; padding: 6pt 0 10pt; }
 .doc .doc-cap-tab, .doc .doc-cap-fig {
-  font-size: 9.5pt; font-weight: bold; text-align: center; margin-bottom: 2pt;
+  font-size: 10pt; font-weight: bold; text-align: left; margin-bottom: 3pt;
 }
-.doc .doc-cap-fig { margin-top: 3pt; margin-bottom: 0; }
-.doc .doc-fonte { font-size: 8pt; color: #556273; text-align: center; margin-top: 2pt; }
+.doc .doc-fonte { font-size: 10pt; text-align: left; margin-top: 3pt; }
 .doc .doc-fig { text-align: center; }
-.doc .doc-fig svg { max-width: 100%; height: auto; }
+.doc .doc-fig svg, .doc .doc-fig img { max-width: 100%; height: auto; }
 
-.doc .doc-tabela { border-collapse: collapse; width: 100%; font-size: 8.6pt; }
-.doc .doc-tabela th, .doc .doc-tabela td {
-  border: .5pt solid #9aa5b1; padding: 1.6pt 3pt; text-align: right;
+/* tabela no padrão IBGE/ABNT: fechada em cima e embaixo, sem traços
+   verticais; largura total da mancha; corpo 10 pt; linhas de 0,6 cm */
+.doc .doc-tabela {
+  border-collapse: collapse; width: 100%; font-size: 10pt;
+  border-top: 1pt solid #000; border-bottom: 1pt solid #000;
 }
-.doc .doc-tabela th { background: #eef2f6; text-align: center; font-weight: bold; }
+.doc .doc-tabela th, .doc .doc-tabela td {
+  border: 0; padding: 1.6mm 2mm; text-align: right; height: 6mm;
+  vertical-align: middle; line-height: 1.15;
+}
+.doc .doc-tabela thead th {
+  border-bottom: .75pt solid #000; font-weight: bold; text-align: center;
+  background: transparent; color: #000;
+}
 .doc .doc-tabela td.esq, .doc .doc-tabela th.esq { text-align: left; }
-.doc .doc-tabela tr.total td { font-weight: bold; background: #f4f6f8; }
-.doc .doc-tabela tr.destaque td { background: #eaf5f4; }
+.doc .doc-tabela tr.total td { font-weight: bold; border-top: .75pt solid #000; }
+.doc .doc-tabela tr.destaque td { background: #ececec;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.doc .doc-tabela td, .doc .doc-tabela th { color: #000; }
 
-.doc .doc-sum { display: flex; align-items: baseline; gap: 4px; margin: 0; padding: 2.5pt 0; font-size: 10.5pt; }
-.doc .doc-sum.nivel1 { font-weight: bold; }
+/* --- sumário e listas (NBR 6027) --- */
+.doc .doc-sum {
+  display: flex; align-items: baseline; gap: 4px; margin: 0;
+  padding: 3pt 0; font-size: 12pt;
+}
+.doc .doc-sum.nivel1 { font-weight: bold; text-transform: uppercase; }
 .doc .doc-sum.nivel2 { padding-left: 8mm; }
-.doc .sum-pts { flex: 1 1 auto; border-bottom: 1px dotted #8592a1; height: .8em; }
+.doc .sum-pts { flex: 1 1 auto; border-bottom: 1px dotted #555; height: .8em; }
 .doc .sum-pag { flex: none; font-variant-numeric: tabular-nums; }
 
-.doc .pagina-capa { padding: 30mm 25mm; }
+/* --- capa --- */
+.doc .pagina-capa { padding: 30mm 20mm 20mm 30mm; }
 .doc .doc-capa { display: flex; flex-direction: column; height: 100%; text-align: center; }
 .doc .capa-topo { display: flex; justify-content: center; }
-.doc .capa-meio { margin-top: 42mm; }
+.doc .capa-meio { margin-top: 38mm; }
 .doc .capa-tipo {
-  text-transform: uppercase; letter-spacing: 3px; font-size: 10pt; color: #0E6F66; font-weight: bold;
+  text-transform: uppercase; letter-spacing: 2px; font-size: 12pt; font-weight: bold;
 }
-.doc .capa-titulo { font-size: 22pt; color: #0E2148; margin: 8mm 0 4mm; line-height: 1.25; }
-.doc .capa-sub { font-size: 12pt; color: #556273; }
-.doc .capa-linha { width: 60mm; height: 2px; background: #14A5A0; margin: 8mm auto 0; }
-.doc .capa-dados { margin-top: auto; font-size: 11pt; line-height: 1.9; }
-.doc .capa-rodape { margin-top: 10mm; font-size: 9pt; color: #8592a1; }
+.doc .capa-titulo { font-size: 16pt; font-weight: bold; margin: 10mm 0 5mm; line-height: 1.3; }
+.doc .capa-sub { font-size: 12pt; }
+.doc .capa-linha { width: 60mm; height: 1pt; background: #000; margin: 8mm auto 0; }
+.doc .capa-dados { margin-top: auto; font-size: 12pt; line-height: 1.6; }
+.doc .capa-rodape { margin-top: 10mm; font-size: 10pt; }
 
 .visor-doc {
   background: #48525e; background: #48525e; padding: 10mm 0;
@@ -764,7 +816,7 @@ html.imprimindo-doc #doc-saida { display: block; }
      ajustada por object-fit: contain, então uma logo comprida encolhe pela
      largura e uma logo alta encolhe pela altura — nas duas situações ela cabe
      inteira, sem distorcer e sem empurrar o resto do cabeçalho. */
-  M.CAIXA = { larguraTela: 230, larguraImpressao: 190 };
+  M.CAIXA = { larguraTela: 250, larguraImpressao: 210, alturaTela: 46, alturaCapa: 96 };
 
   M.cores = {
     navy: '#0E2148',
@@ -898,6 +950,63 @@ html.imprimindo-doc #doc-saida { display: block; }
 
   M.removerLogo = function () {
     try { localStorage.removeItem(LS_LOGO); localStorage.setItem(LS_MODO, 'padrao'); } catch (e) {}
+  };
+
+  /* ------------------------------------------------------------------
+     Timbrado: a folha timbrada do escritório, usada como fundo de todas
+     as páginas do memorial. Guardada já reduzida ao tamanho de uma A4 a
+     150 dpi, porque o arquivo original costuma ter dezenas de megabytes
+     e não caberia no armazenamento do navegador.
+     ------------------------------------------------------------------ */
+
+  var LS_TIMB = 'pda.timbrado.v1';
+  M.TIMBRADO_PX = { largura: 1240, altura: 1754 };      /* A4 a 150 dpi */
+
+  M.timbrado = function () {
+    try {
+      var s = localStorage.getItem(LS_TIMB);
+      if (!s) return null;
+      var t = JSON.parse(s);
+      if (!t || !t.imagem) return null;
+      if (!(t.margSup > 0)) t.margSup = 35;
+      if (!(t.margInf > 0)) t.margInf = 25;
+      return t;
+    } catch (e) { return null; }
+  };
+
+  M.gravarTimbrado = function (t) {
+    try { localStorage.setItem(LS_TIMB, JSON.stringify(t)); return true; } catch (e) { return false; }
+  };
+
+  M.removerTimbrado = function () {
+    try { localStorage.removeItem(LS_TIMB); } catch (e) {}
+  };
+
+  M.margensTimbrado = function (sup, inf) {
+    var t = M.timbrado();
+    if (!t) return false;
+    t.margSup = sup; t.margInf = inf;
+    return M.gravarTimbrado(t);
+  };
+
+  /* Reduz a imagem para o tamanho de uma folha A4 a 150 dpi e devolve um
+     data URI leve, que cabe no armazenamento do navegador. */
+  M.reduzirParaA4 = function (dataUri, cb) {
+    var img = new Image();
+    img.onload = function () {
+      var L = M.TIMBRADO_PX.largura, A = M.TIMBRADO_PX.altura;
+      var cv = document.createElement('canvas');
+      cv.width = L; cv.height = A;
+      var g = cv.getContext('2d');
+      g.fillStyle = '#fff';
+      g.fillRect(0, 0, L, A);
+      g.drawImage(img, 0, 0, L, A);
+      var jpg = cv.toDataURL('image/jpeg', 0.86);
+      cb({ imagem: jpg, largura: img.naturalWidth, altura: img.naturalHeight,
+           bytes: Math.round(jpg.length * 0.75) });
+    };
+    img.onerror = function () { cb(null); };
+    img.src = dataUri;
   };
 
   /* Mede a imagem carregada e devolve a proporção, para avisar quando a logo
@@ -4172,6 +4281,544 @@ html.imprimindo-doc #doc-saida { display: block; }
   PDA.Q = Q;
 })(window.PDA = window.PDA || {});
 
+/* ===== 08c-formula.js ===== */
+/* ------------------------------------------------------------------
+ * Composição de fórmulas com cara de fórmula.
+ *
+ * Um compositor matemático pequeno: recebe um código parecido com o do
+ * LaTeX ( \frac{a}{b}, \sqrt{x}, a^2, \pi, \cdot ) e devolve um SVG com
+ * fração de barra horizontal, radical com barra sobre o radicando,
+ * expoentes, índices e parênteses que crescem com o conteúdo.
+ *
+ * Sai em SVG por dois motivos: fica nítido em qualquer zoom na impressão
+ * em PDF e vira imagem na exportação para o Word pelo mesmo caminho já
+ * usado nos gráficos.
+ * ------------------------------------------------------------------ */
+(function (PDA) {
+  'use strict';
+
+  var FX = {};
+  var NS = 'http://www.w3.org/2000/svg';
+  var FONTE = 'Arial, Helvetica, sans-serif';
+
+  FX.TAM = 15;                       /* corpo padrão das fórmulas, em px */
+
+  /* ================================================================
+     Símbolos
+     ================================================================ */
+
+  var SIM = {
+    cdot: '·', times: '×', div: '÷', pm: '±', mp: '∓', ast: '∗',
+    le: '≤', leq: '≤', ge: '≥', geq: '≥', ne: '≠', neq: '≠', approx: '≅',
+    sim: '~', equiv: '≡', to: '→', rightarrow: '→', infty: '∞', partial: '∂',
+    alpha: 'α', beta: 'β', gamma: 'γ', Gamma: 'Γ', delta: 'δ', Delta: 'Δ',
+    epsilon: 'ε', varepsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ', Theta: 'Θ',
+    kappa: 'κ', lambda: 'λ', Lambda: 'Λ', mu: 'μ', nu: 'ν', xi: 'ξ',
+    pi: 'π', Pi: 'Π', rho: 'ρ', sigma: 'σ', Sigma: 'Σ', tau: 'τ',
+    phi: 'φ', varphi: 'φ', Phi: 'Φ', chi: 'χ', psi: 'ψ', Psi: 'Ψ',
+    omega: 'ω', Omega: 'Ω',
+    prime: '′', degree: '°', percent: '%', angstrom: 'Å',
+    quad: ' ', qquad: '  '
+  };
+
+  /* funções e operadores escritos em redondo, como manda a convenção */
+  var FUNCOES = ['log', 'ln', 'exp', 'sen', 'sin', 'cos', 'tan', 'tg',
+                 'max', 'min', 'med', 'sqrt'];
+
+  /* ================================================================
+     Medição de texto
+     ================================================================ */
+
+  var cache = {};
+  var medidor = null, alvo = null;
+
+  function abrirMedidor() {
+    if (medidor && medidor.parentNode) return;
+    medidor = document.createElementNS(NS, 'svg');
+    medidor.setAttribute('width', '10');
+    medidor.setAttribute('height', '10');
+    medidor.setAttribute('aria-hidden', 'true');
+    medidor.style.cssText = 'position:fixed;left:-9999px;top:0;visibility:hidden';
+    alvo = document.createElementNS(NS, 'text');
+    alvo.setAttribute('font-family', FONTE);
+    medidor.appendChild(alvo);
+    document.body.appendChild(medidor);
+  }
+
+  function medir(txt, tam, italico) {
+    if (!txt) return 0;
+    var k = tam + (italico ? 'i' : 'n') + txt;
+    if (cache[k] !== undefined) return cache[k];
+    abrirMedidor();
+    alvo.setAttribute('font-size', tam);
+    alvo.setAttribute('font-style', italico ? 'italic' : 'normal');
+    alvo.textContent = txt;
+    var w = 0;
+    try { w = alvo.getComputedTextLength(); } catch (e) { w = 0; }
+    if (!w) w = txt.length * tam * 0.52;      /* medida indisponível: estima */
+    cache[k] = w;
+    return w;
+  }
+
+  /* ================================================================
+     Leitura do código
+     ================================================================ */
+
+  function tokenizar(src) {
+    var t = [], i = 0, c;
+    while (i < src.length) {
+      c = src.charAt(i);
+      if (c === '\\') {
+        var m = /^\\([a-zA-Z]+|.)/.exec(src.slice(i));
+        if (!m) { i++; continue; }
+        t.push({ tipo: 'cmd', v: m[1] });
+        i += m[0].length;
+      } else if ('{}^_[]'.indexOf(c) >= 0) {
+        t.push({ tipo: c, v: c });
+        i++;
+      } else if (c === ' ') {
+        t.push({ tipo: 'esp', v: ' ' });
+        i++;
+      } else {
+        t.push({ tipo: 'ch', v: c });
+        i++;
+      }
+    }
+    return t;
+  }
+
+  function Leitor(tokens) { this.t = tokens; this.i = 0; }
+  Leitor.prototype.fim = function () { return this.i >= this.t.length; };
+  Leitor.prototype.olhar = function () { return this.t[this.i]; };
+  Leitor.prototype.pegar = function () { return this.t[this.i++]; };
+
+  /* Lê um grupo { ... } ou um único átomo. */
+  function lerGrupo(L) {
+    while (!L.fim() && L.olhar().tipo === 'esp') L.pegar();
+    if (L.fim()) return { t: 'linha', filhos: [] };
+    if (L.olhar().tipo === '{') {
+      L.pegar();
+      var filhos = lerLinha(L, '}');
+      if (!L.fim() && L.olhar().tipo === '}') L.pegar();
+      return { t: 'linha', filhos: filhos };
+    }
+    return lerAtomo(L);
+  }
+
+  /* conteúdo de \text{...} lido cru, sem interpretar nada: o que está ali
+     é texto corrido, com parênteses, barras e acentos. */
+  function lerBruto(L) {
+    while (!L.fim() && L.olhar().tipo === 'esp') L.pegar();
+    if (L.fim() || L.olhar().tipo !== '{') {
+      var t = L.pegar();
+      return t ? t.v : '';
+    }
+    L.pegar();
+    var s = '', nivel = 1, tk;
+    while (!L.fim()) {
+      tk = L.pegar();
+      if (tk.tipo === '{') nivel++;
+      else if (tk.tipo === '}') { nivel--; if (!nivel) break; }
+      s += tk.tipo === 'cmd' ? (SIM[tk.v] || tk.v) : tk.v;
+    }
+    return s;
+  }
+
+  function lerColchete(L) {
+    if (L.fim() || L.olhar().tipo !== '[') return null;
+    L.pegar();
+    var filhos = lerLinha(L, ']');
+    if (!L.fim() && L.olhar().tipo === ']') L.pegar();
+    return { t: 'linha', filhos: filhos };
+  }
+
+  var ABRE = { '(': ')', '[': ']', '\\{': '\\}' };
+
+  function lerAtomo(L) {
+    var tk = L.pegar();
+    if (!tk) return null;
+
+    if (tk.tipo === 'cmd') {
+      var c = tk.v;
+      if (c === 'frac' || c === 'dfrac') {
+        return { t: 'frac', num: lerGrupo(L), den: lerGrupo(L) };
+      }
+      if (c === 'sqrt') {
+        var idx = lerColchete(L);
+        return { t: 'raiz', rad: lerGrupo(L), idx: idx };
+      }
+      if (c === 'text' || c === 'mathrm' || c === 'operatorname') {
+        return { t: 'txt', s: lerBruto(L), it: false };
+      }
+      if (c === 'left' || c === 'right') {
+        return { t: 'ignora' };
+      }
+      if (c === ' ') return { t: 'esp', w: 0.33 };
+      if (c === ',') return { t: 'esp', w: 0.17 };
+      if (c === ';') return { t: 'esp', w: 0.28 };
+      if (FUNCOES.indexOf(c) >= 0) return { t: 'txt', s: c, it: false };
+      if (SIM[c]) {
+        var classe = null;
+        if ('cdot times div pm mp ast'.split(' ').indexOf(c) >= 0) classe = 'bin';
+        else if ('le leq ge geq ne neq approx equiv to rightarrow'.split(' ').indexOf(c) >= 0) classe = 'rel';
+        return { t: 'txt', s: SIM[c], it: false, op: classe };
+      }
+      return { t: 'txt', s: c, it: false };
+    }
+
+    /* espaço solto não conta: o espaçamento vem da classe do operador,
+       como em qualquer composição matemática. Use \  para forçar um. */
+    if (tk.tipo === 'esp') return { t: 'esp', w: 0 };
+
+    if (tk.tipo === '{') {
+      var f = lerLinha(L, '}');
+      if (!L.fim() && L.olhar().tipo === '}') L.pegar();
+      return { t: 'linha', filhos: f };
+    }
+
+    var ch = tk.v;
+    if (ABRE[ch]) {
+      /* junta tudo até o fecha correspondente, para o parêntese crescer */
+      var dentro = lerLinha(L, ABRE[ch]);
+      if (!L.fim() && L.olhar().v === ABRE[ch]) L.pegar();
+      return { t: 'delim', abre: ch, fecha: ABRE[ch], corpo: { t: 'linha', filhos: dentro } };
+    }
+    if (/[0-9]/.test(ch)) {
+      var s = ch;
+      while (!L.fim() && /^[0-9.,]$/.test(L.olhar().v) && L.olhar().tipo === 'ch') s += L.pegar().v;
+      return { t: 'txt', s: s, it: false };
+    }
+    if (/[A-Za-z]/.test(ch)) return { t: 'txt', s: ch, it: true };
+    if (ch === "'") return { t: 'txt', s: '′', it: false };
+    if ('=<>≤≥≠≅→±'.indexOf(ch) >= 0) return { t: 'txt', s: ch, it: false, op: 'rel' };
+    if ('+-·×÷∓'.indexOf(ch) >= 0) return { t: 'txt', s: ch === '-' ? '−' : ch, it: false, op: 'bin' };
+    return { t: 'txt', s: ch, it: false };
+  }
+
+  function lerLinha(L, parar) {
+    var filhos = [];
+    while (!L.fim()) {
+      var tk = L.olhar();
+      if (parar && (tk.v === parar || tk.tipo === parar)) break;
+      if (tk.tipo === '}' || tk.tipo === ']') break;
+
+      if (tk.tipo === '^' || tk.tipo === '_') {
+        L.pegar();
+        var alvoAnt = filhos.length ? filhos[filhos.length - 1] : { t: 'linha', filhos: [] };
+        if (alvoAnt.t !== 'script') {
+          alvoAnt = { t: 'script', base: alvoAnt, sup: null, sub: null };
+          if (filhos.length) filhos[filhos.length - 1] = alvoAnt; else filhos.push(alvoAnt);
+        }
+        if (tk.tipo === '^') alvoAnt.sup = lerGrupo(L); else alvoAnt.sub = lerGrupo(L);
+        continue;
+      }
+      var a = lerAtomo(L);
+      if (a && a.t !== 'ignora') filhos.push(a);
+    }
+    return filhos;
+  }
+
+  function textoDe(no) {
+    if (!no) return '';
+    if (no.t === 'txt') return no.s;
+    if (no.t === 'esp') return ' ';
+    if (no.t === 'linha') return no.filhos.map(textoDe).join('');
+    return '';
+  }
+
+  FX.ler = function (codigo) {
+    return { t: 'linha', filhos: lerLinha(new Leitor(tokenizar(String(codigo)))) };
+  };
+
+  /* ================================================================
+     Composição: cada nó vira uma caixa com largura, altura acima da
+     linha de base (a) e altura abaixo (d)
+     ================================================================ */
+
+  function el(tag, at) {
+    var e = document.createElementNS(NS, tag), k;
+    for (k in at) if (at[k] !== null && at[k] !== undefined) e.setAttribute(k, at[k]);
+    return e;
+  }
+
+  function caixaTexto(s, tam, italico, op) {
+    var w = medir(s, tam, italico);
+    /* respiro à volta dos operadores, conforme a classe */
+    var margem = op === 'rel' ? tam * 0.20 : (op === 'bin' ? tam * 0.14 : (op ? tam * 0.14 : 0));
+    return {
+      w: w + 2 * margem, a: tam * 0.74, d: tam * 0.23,
+      desenhar: function (g, x, y) {
+        var t = el('text', {
+          x: x + margem, y: y, 'font-size': tam, 'font-family': FONTE,
+          'font-style': italico ? 'italic' : 'normal', fill: 'currentColor'
+        });
+        t.textContent = s;
+        g.appendChild(t);
+      }
+    };
+  }
+
+  function caixaVazia(w) {
+    return { w: w, a: 0, d: 0, desenhar: function () {} };
+  }
+
+  function caixaLinha(caixas) {
+    var w = 0, a = 0, d = 0;
+    caixas.forEach(function (c) { w += c.w; a = Math.max(a, c.a); d = Math.max(d, c.d); });
+    return {
+      w: w, a: a, d: d,
+      desenhar: function (g, x, y) {
+        var cx = x;
+        caixas.forEach(function (c) { c.desenhar(g, cx, y); cx += c.w; });
+      }
+    };
+  }
+
+  function caixaFrac(num, den, tam) {
+    var eixo = 0.27 * tam;                    /* altura da barra sobre a base */
+    var reg = Math.max(1, 0.055 * tam);       /* espessura da barra */
+    var folga = 0.20 * tam;
+    var lado = 0.24 * tam;
+    var w = Math.max(num.w, den.w) + 2 * lado;
+    var subirNum = eixo + reg / 2 + folga + num.d;
+    var descerDen = -eixo + reg / 2 + folga + den.a;
+    return {
+      w: w, a: subirNum + num.a, d: descerDen + den.d,
+      desenhar: function (g, x, y) {
+        num.desenhar(g, x + (w - num.w) / 2, y - subirNum);
+        den.desenhar(g, x + (w - den.w) / 2, y + descerDen);
+        g.appendChild(el('line', {
+          x1: x + reg, y1: y - eixo, x2: x + w - reg, y2: y - eixo,
+          stroke: 'currentColor', 'stroke-width': reg, 'stroke-linecap': 'round'
+        }));
+      }
+    };
+  }
+
+  function caixaRaiz(rad, idx, tam) {
+    var reg = Math.max(1, 0.05 * tam);
+    var folga = 0.16 * tam;                   /* espaço entre a barra e o radicando */
+    var alt = rad.a + rad.d + folga;
+    var larg = 0.52 * tam;                    /* largura do sinal de radical */
+    var recuo = idx ? Math.max(0, idx.w - larg * 0.45) : 0;
+    var pad = 0.16 * tam;
+    var a = rad.a + folga + reg;
+    return {
+      w: recuo + larg + rad.w + pad, a: a, d: rad.d,
+      desenhar: function (g, x, y) {
+        var x0 = x + recuo;
+        var topo = y - a;
+        var base = y + rad.d;
+        var d = 'M ' + (x0) + ' ' + (topo + alt * 0.58) +
+                ' L ' + (x0 + larg * 0.26) + ' ' + (topo + alt * 0.48) +
+                ' L ' + (x0 + larg * 0.52) + ' ' + base +
+                ' L ' + (x0 + larg) + ' ' + (topo + reg / 2) +
+                ' L ' + (x0 + larg + rad.w + pad) + ' ' + (topo + reg / 2);
+        g.appendChild(el('path', {
+          d: d, fill: 'none', stroke: 'currentColor', 'stroke-width': reg,
+          'stroke-linejoin': 'miter', 'stroke-linecap': 'square'
+        }));
+        rad.desenhar(g, x0 + larg + pad / 2, y);
+        if (idx) idx.desenhar(g, x, topo + alt * 0.46);
+      }
+    };
+  }
+
+  function caixaScript(base, sup, sub, tam) {
+    var ts = Math.max(7, tam * 0.68);
+    var subir = sup ? Math.max(0.44 * tam, base.a - 0.36 * ts) : 0;
+    var descer = sub ? Math.max(0.20 * tam, base.d + 0.18 * ts) : 0;
+    var wl = Math.max(sup ? sup.w : 0, sub ? sub.w : 0);
+    var folga = 0.04 * tam;
+    return {
+      w: base.w + wl + folga,
+      a: Math.max(base.a, sup ? subir + sup.a : 0),
+      d: Math.max(base.d, sub ? descer + sub.d : 0),
+      desenhar: function (g, x, y) {
+        base.desenhar(g, x, y);
+        if (sup) sup.desenhar(g, x + base.w + folga, y - subir);
+        if (sub) sub.desenhar(g, x + base.w + folga, y + descer);
+      }
+    };
+  }
+
+  function caixaDelim(abre, fecha, corpo, tam) {
+    var alt = Math.max(corpo.a + corpo.d, tam * 0.95);
+    var meio = (corpo.a - corpo.d) / 2;
+    var esc = alt / (tam * 0.95);
+    var w = tam * (abre === '[' ? 0.30 : 0.32) * Math.min(1.7, Math.max(1, esc * 0.75));
+    var reg = Math.max(1, 0.05 * tam);
+    var pad = tam * 0.06;
+
+    function tracar(g, x, y, dir) {
+      var topo = y - meio - alt / 2, base = y - meio + alt / 2;
+      var d;
+      if (abre === '[') {
+        d = dir > 0
+          ? 'M ' + (x + w * 0.85) + ' ' + topo + ' L ' + (x + w * 0.25) + ' ' + topo +
+            ' L ' + (x + w * 0.25) + ' ' + base + ' L ' + (x + w * 0.85) + ' ' + base
+          : 'M ' + (x + w * 0.15) + ' ' + topo + ' L ' + (x + w * 0.75) + ' ' + topo +
+            ' L ' + (x + w * 0.75) + ' ' + base + ' L ' + (x + w * 0.15) + ' ' + base;
+      } else {
+        d = dir > 0
+          ? 'M ' + (x + w * 0.82) + ' ' + topo + ' Q ' + (x + w * 0.12) + ' ' + (y - meio) +
+            ' ' + (x + w * 0.82) + ' ' + base
+          : 'M ' + (x + w * 0.18) + ' ' + topo + ' Q ' + (x + w * 0.88) + ' ' + (y - meio) +
+            ' ' + (x + w * 0.18) + ' ' + base;
+      }
+      g.appendChild(el('path', {
+        d: d, fill: 'none', stroke: 'currentColor', 'stroke-width': reg,
+        'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+      }));
+    }
+
+    return {
+      w: 2 * (w + pad) + corpo.w,
+      a: Math.max(corpo.a, alt / 2 + meio), d: Math.max(corpo.d, alt / 2 - meio),
+      desenhar: function (g, x, y) {
+        tracar(g, x, y, 1);
+        corpo.desenhar(g, x + w + pad, y);
+        tracar(g, x + w + pad + corpo.w + pad, y, -1);
+      }
+    };
+  }
+
+  function compor(no, tam) {
+    if (!no) return caixaVazia(0);
+    switch (no.t) {
+      case 'linha':
+        if (!no.filhos.length) return caixaVazia(0);
+        return caixaLinha(no.filhos.map(function (f) { return compor(f, tam); }));
+      case 'txt':
+        return caixaTexto(no.s, tam, no.it, no.op);
+      case 'esp':
+        return caixaVazia(no.w * tam);
+      case 'frac':
+        return caixaFrac(compor(no.num, tam * 0.98), compor(no.den, tam * 0.98), tam);
+      case 'raiz':
+        return caixaRaiz(compor(no.rad, tam), no.idx ? compor(no.idx, tam * 0.6) : null, tam);
+      case 'script':
+        return caixaScript(compor(no.base, tam),
+                           no.sup ? compor(no.sup, tam * 0.68) : null,
+                           no.sub ? compor(no.sub, tam * 0.68) : null, tam);
+      case 'delim':
+        return caixaDelim(no.abre, no.fecha, compor(no.corpo, tam), tam);
+      default:
+        return caixaVazia(0);
+    }
+  }
+
+  FX.caixa = function (codigo, tam) {
+    return compor(FX.ler(codigo), tam || FX.TAM);
+  };
+
+  /* ================================================================
+     Saída em SVG
+     ================================================================ */
+
+  function montar(caixas, tam, op) {
+    op = op || {};
+    var pad = 2;
+    var entre = op.entreLinhas === undefined ? tam * 0.62 : op.entreLinhas;
+    var larg = 0, i, alturas = [], y = pad;
+
+    caixas.forEach(function (c) { larg = Math.max(larg, c.w); });
+
+    for (i = 0; i < caixas.length; i++) {
+      y += caixas[i].a;
+      alturas.push(y);
+      y += caixas[i].d;
+      if (i < caixas.length - 1) y += entre;
+    }
+    var alt = y + pad;
+    larg = Math.max(larg + 2 * pad, 1);
+
+    var svg = el('svg', {
+      xmlns: NS, viewBox: '0 0 ' + arred(larg) + ' ' + arred(alt),
+      width: arred(larg), height: arred(alt), role: 'img', class: 'formula-svg'
+    });
+    var g = el('g', {});
+    svg.appendChild(g);
+    caixas.forEach(function (c, k) {
+      var x = pad;
+      if (op.alinhar === 'centro') x = (larg - c.w) / 2;
+      else if (op.deslocamentos) x = pad + op.deslocamentos[k];
+      c.desenhar(g, x, alturas[k]);
+    });
+    return svg;
+  }
+
+  function arred(v) { return Math.round(v * 100) / 100; }
+
+  /* Uma fórmula em uma linha. */
+  FX.svg = function (codigo, op) {
+    op = op || {};
+    var tam = op.tam || FX.TAM;
+    return montar([FX.caixa(codigo, tam)], tam, { alinhar: op.alinhar || 'centro' });
+  };
+
+  /* Várias linhas alinhadas pelo primeiro sinal de igual — é assim que
+     uma memória de cálculo fica legível. */
+  FX.bloco = function (codigos, op) {
+    op = op || {};
+    var tam = op.tam || FX.TAM;
+    var partes = codigos.map(function (c) { return dividirNoIgual(String(c)); });
+    var esq = [], dir = [], maxEsq = 0;
+
+    partes.forEach(function (p) {
+      var e = p[0] === null ? null : FX.caixa(p[0], tam);
+      esq.push(e);
+      dir.push(FX.caixa(p[1], tam));
+      if (e) maxEsq = Math.max(maxEsq, e.w);
+    });
+
+    var caixas = [], desl = [];
+    partes.forEach(function (p, i) {
+      if (esq[i]) {
+        caixas.push(caixaLinha([esq[i], caixaVazia(maxEsq - esq[i].w), dir[i]]));
+        desl.push(0);
+      } else {
+        caixas.push(dir[i]);
+        desl.push(maxEsq);
+      }
+    });
+    return montar(caixas, tam, { alinhar: op.alinhar || 'esq', deslocamentos: desl });
+  };
+
+  /* separa "a = b = c" em ["a ", "= b = c"], respeitando chaves */
+  function dividirNoIgual(codigo) {
+    var nivel = 0, i, c;
+    for (i = 0; i < codigo.length; i++) {
+      c = codigo.charAt(i);
+      if (c === '\\') { i++; continue; }
+      if (c === '{' || c === '[' || c === '(') nivel++;
+      else if (c === '}' || c === ']' || c === ')') nivel--;
+      else if (c === '=' && nivel === 0) {
+        return [codigo.slice(0, i), codigo.slice(i)];
+      }
+    }
+    return [null, codigo];
+  }
+
+  FX.SIM = SIM;
+
+  /* Símbolos soltos no meio do texto corrido: converte p_{atm}, h_l,
+     \varepsilon e afins para HTML, para a legenda "em que ..." sair com a
+     mesma notação da fórmula. */
+  FX.emTexto = function (txt) {
+    var s = String(txt)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    s = s.replace(/\\([a-zA-Z]+)/g, function (m, c) { return SIM[c] || m; });
+    s = s.replace(/([A-Za-zÀ-ÿ\u0370-\u03ff\)])_\{([^}]*)\}/g, '$1<sub>$2</sub>');
+    s = s.replace(/([A-Za-zÀ-ÿ\u0370-\u03ff\)])\^\{([^}]*)\}/g, '$1<sup>$2</sup>');
+    s = s.replace(/([A-Za-zÀ-ÿ\u0370-\u03ff\)])_([A-Za-z0-9])/g, '$1<sub>$2</sub>');
+    s = s.replace(/([A-Za-zÀ-ÿ\u0370-\u03ff\)])\^([A-Za-z0-9])/g, '$1<sup>$2</sup>');
+    return s;
+  };
+
+  PDA.FX = FX;
+})(window.PDA = window.PDA || {});
+
 /* ===== 09-ui-forms.js ===== */
 /* ------------------------------------------------------------------
  * Painéis de entrada de dados
@@ -7023,7 +7670,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     var alvo = document.getElementById('marca');
     if (!alvo) return;
     UI.limpar(alvo);
-    alvo.appendChild(PDA.M.marca(38));
+    alvo.appendChild(PDA.M.marca(PDA.M.CAIXA.alturaTela));
   };
 
   /* ================================================================
@@ -7157,7 +7804,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     d('Folha', aba ? aba.rot : '');
     d('Impresso em', App.dataHoraBR());
 
-    alvo.appendChild(PDA.M.marca(46));
+    alvo.appendChild(PDA.M.marca(PDA.M.CAIXA.alturaTela + 6, { larguraMax: PDA.M.CAIXA.larguraImpressao }));
     alvo.appendChild(h('div', { class: 'dados' },
       h('h1', {}, st.projeto.nome || 'Pré-dimensionamento de adutora / linha de recalque'),
       h('div', { class: 'linha-dados' }, dados)));
@@ -7924,10 +8571,10 @@ html.imprimindo-doc #doc-saida { display: block; }
       UI.limpar(previa);
       previa.appendChild(h('div', { class: 'previa-caixa' },
         h('span', { class: 'previa-rot' }, 'no cabeçalho'),
-        PDA.M.marca(38)));
+        PDA.M.marca(PDA.M.CAIXA.alturaTela)));
       previa.appendChild(h('div', { class: 'previa-caixa papel' },
         h('span', { class: 'previa-rot' }, 'no papel'),
-        PDA.M.marca(46, { larguraMax: PDA.M.CAIXA.larguraImpressao })));
+        PDA.M.marca(PDA.M.CAIXA.alturaTela + 6, { larguraMax: PDA.M.CAIXA.larguraImpressao })));
       if (PDA.M.modo() === 'nenhuma') {
         previa.appendChild(h('p', { class: 'nota' }, 'Sem logo: o cabeçalho e o memorial saem só com o nome do projeto.'));
       }
@@ -7969,7 +8616,7 @@ html.imprimindo-doc #doc-saida { display: block; }
           mostrar();
           UI.limpar(aviso);
           if (m) {
-            var alturaEfetiva = Math.min(38, PDA.M.CAIXA.larguraTela / m.proporcao);
+            var alturaEfetiva = Math.min(PDA.M.CAIXA.alturaTela, PDA.M.CAIXA.larguraTela / m.proporcao);
             if (m.proporcao > 7) {
               UI.add(aviso, h('div', { class: 'aviso' },
                 'Esta logo é bem comprida (proporção ' + UI.num(m.proporcao, 1) + ':1). Ela cabe inteira na caixa, ' +
@@ -7992,7 +8639,77 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     mostrar();
 
-    UI.modal('Logo do cabeçalho', [
+    /* ---- timbrado ---- */
+    var timbre = PDA.M.timbrado();
+    var previaTimb = h('div', { class: 'previa-timbrado' });
+    var avisoTimb = h('div', {});
+
+    function mostrarTimbrado() {
+      UI.limpar(previaTimb);
+      var t = PDA.M.timbrado();
+      if (!t) {
+        UI.add(previaTimb, h('p', { class: 'nota' },
+          'Sem timbrado: as páginas do memorial saem em branco, com as margens da ABNT ' +
+          '(3 cm em cima e à esquerda, 2 cm embaixo e à direita) e o número no canto superior direito.'));
+        return;
+      }
+      UI.add(previaTimb,
+        h('div', { class: 'timb-folha' },
+          h('img', { src: t.imagem, alt: 'Timbrado' }),
+          h('div', {
+            class: 'timb-mancha',
+            style: 'top:' + (t.margSup / 297 * 100) + '%;bottom:' + (t.margInf / 297 * 100) +
+                   '%;left:' + (30 / 210 * 100) + '%;right:' + (20 / 210 * 100) + '%'
+          }, h('span', {}, 'texto'))),
+        h('p', { class: 'nota' },
+          'A área marcada é onde o texto entra. Original de ' + t.largura + ' × ' + t.altura +
+          ' px, guardado reduzido para A4 a 150 dpi (' + UI.num(t.bytes / 1024, 0) + ' kB).'));
+    }
+
+    var entradaTimb = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp' });
+    entradaTimb.addEventListener('change', function () {
+      var f = entradaTimb.files && entradaTimb.files[0];
+      if (!f) return;
+      UI.limpar(avisoTimb);
+      UI.add(avisoTimb, h('div', { class: 'aviso' }, 'Reduzindo a imagem…'));
+      var fr = new FileReader();
+      fr.onload = function () {
+        PDA.M.reduzirParaA4(String(fr.result), function (t) {
+          UI.limpar(avisoTimb);
+          if (!t) { UI.add(avisoTimb, h('div', { class: 'aviso' }, 'Não foi possível ler a imagem.')); return; }
+          var ant = PDA.M.timbrado();
+          t.margSup = ant ? ant.margSup : 35;
+          t.margInf = ant ? ant.margInf : 25;
+          if (!PDA.M.gravarTimbrado(t)) {
+            UI.add(avisoTimb, h('div', { class: 'aviso' },
+              'A imagem reduzida ainda não coube no armazenamento do navegador. ' +
+              'Salve o timbrado em JPG antes de carregar.'));
+            return;
+          }
+          App.modalLogo();
+          UI.toast('Timbrado carregado (' + UI.num(t.bytes / 1024, 0) + ' kB).');
+        });
+      };
+      fr.readAsDataURL(f);
+    });
+
+    function campoMargem(rot, chave, valor) {
+      var inp = h('input', { type: 'number', step: '0.5', min: '10', max: '80', value: String(valor) });
+      inp.addEventListener('change', function () {
+        var t = PDA.M.timbrado();
+        if (!t) return;
+        var v = parseFloat(String(inp.value).replace(',', '.'));
+        if (!(v > 0)) return;
+        t[chave] = v;
+        PDA.M.gravarTimbrado(t);
+        mostrarTimbrado();
+      });
+      return h('label', { class: 'campo' }, h('span', {}, rot), inp);
+    }
+
+    mostrarTimbrado();
+
+    UI.modal('Logo e timbrado', [
       h('p', { class: 'nota' },
         'A logo aparece no cabeçalho do programa e no topo de tudo o que é impresso ou exportado. ' +
         'Qualquer imagem carregada é ajustada para caber na mesma caixa: uma logo comprida encolhe pela largura, ' +
@@ -8018,7 +8735,26 @@ html.imprimindo-doc #doc-saida { display: block; }
           }
         }, 'Apagar o arquivo carregado')) : null,
       h('p', { class: 'nota', style: 'margin-top:11px' },
-        'A escolha vale para este navegador. Em outro computador é preciso carregar de novo.')
+        'A escolha vale para este navegador. Em outro computador é preciso carregar de novo.'),
+
+      UI.sub('Papel timbrado do memorial'),
+      h('p', { class: 'nota' },
+        'O timbrado entra como fundo de todas as páginas do memorial, inclusive da capa. ' +
+        'O arquivo original não precisa ser reduzido antes: o programa o converte para uma folha ' +
+        'A4 a 150 dpi, o que costuma deixar algumas centenas de kilobytes em vez das dezenas de megabytes ' +
+        'do original. Nada é enviado para fora — a conversão acontece no próprio navegador.'),
+      previaTimb,
+      avisoTimb,
+      h('div', { style: 'margin-top:8px' }, entradaTimb),
+      timbre ? h('div', { class: 'linha', style: 'margin-top:9px;gap:12px;align-items:flex-end' },
+        campoMargem('Margem superior (mm)', 'margSup', timbre.margSup),
+        campoMargem('Margem inferior (mm)', 'margInf', timbre.margInf),
+        h('button', {
+          class: 'btn perigo', type: 'button', onclick: function () {
+            PDA.M.removerTimbrado(); App.render(); App.modalLogo();
+            UI.toast('Timbrado removido; o memorial volta às margens da ABNT.');
+          }
+        }, 'Remover o timbrado')) : null
     ]);
   };
 
@@ -8172,6 +8908,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     this.capitulos = [];
     this.figuras = [];
     this.tabelas = [];
+    this.equacoes = 0;
     this.fontesUsadas = {};
     this.nCap = 0;
   }
@@ -8181,11 +8918,19 @@ html.imprimindo-doc #doc-saida { display: block; }
   Doc.prototype.capitulo = function (titulo) {
     this.nCap++;
     var id = 'cap' + this.nCap;
-    var el = h('h1', { class: 'doc-h1 bloco', 'data-ref': id }, this.nCap + '. ' + titulo);
+    var el = h('h1', { class: 'doc-h1 bloco pagina-nova', 'data-ref': id }, this.nCap + ' ' + titulo);
     this.capitulos.push({ id: id, num: String(this.nCap), titulo: titulo, nivel: 1 });
     this.add(el);
     this.nSub = 0;
     return el;
+  };
+
+  /* seções pós-textuais (referências) não recebem indicativo numérico */
+  Doc.prototype.capituloSemNumero = function (titulo) {
+    var id = 'cap0' + this.capitulos.length;
+    this.capitulos.push({ id: id, num: '', titulo: titulo, nivel: 1 });
+    this.nSub = 0;
+    return this.add(h('h1', { class: 'doc-h1 bloco pagina-nova', 'data-ref': id }, titulo));
   };
 
   Doc.prototype.secao = function (titulo) {
@@ -8193,7 +8938,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     var num = this.nCap + '.' + this.nSub;
     var id = 'sec' + num.replace('.', '_');
     this.capitulos.push({ id: id, num: num, titulo: titulo, nivel: 2 });
-    return this.add(h('h2', { class: 'doc-h2 bloco', 'data-ref': id }, num + '. ' + titulo));
+    return this.add(h('h2', { class: 'doc-h2 bloco', 'data-ref': id }, num + ' ' + titulo));
   };
 
   Doc.prototype.p = function () {
@@ -8207,20 +8952,52 @@ html.imprimindo-doc #doc-saida { display: block; }
     return this.add(h('p', { class: 'doc-nota bloco' }, txt));
   };
 
-  /* fórmula simbólica, centralizada e numerada */
-  Doc.prototype.formula = function (txt, legenda) {
+  /* Fórmula simbólica: composta de verdade — fração com barra, radical
+     com barra sobre o radicando, expoentes e índices — centralizada e
+     numerada entre parênteses na margem direita (NBR 14724). */
+  Doc.prototype.formula = function (codigo, legenda, op) {
+    op = op || {};
+    var corpo = h('div', { class: 'formula-corpo' });
+    (Array.isArray(codigo) ? codigo : [codigo]).forEach(function (c) {
+      corpo.appendChild(PDA.FX.svg(c, { tam: 17 }));
+    });
+    var num = '';
+    if (!op.semNumero) { this.equacoes++; num = '(' + this.equacoes + ')'; }
     var el = h('div', { class: 'doc-formula bloco-junto' },
-      h('div', { class: 'formula-txt' }, txt),
-      legenda ? h('div', { class: 'formula-leg' }, legenda) : null);
-    return this.add(el);
+      corpo,
+      h('div', { class: 'formula-num' }, num));
+    this.add(el);
+    if (legenda) {
+      this.add(h('p', { class: 'formula-leg bloco', html: 'em que ' + PDA.FX.emTexto(legenda) }));
+    }
+    return this.equacoes;
   };
 
-  /* aplicação numérica: a mesma fórmula com os valores no lugar das letras */
+  /* Aplicação numérica: a mesma fórmula com os valores no lugar das
+     letras, com as linhas alinhadas pelo sinal de igual. */
   Doc.prototype.aplicacao = function () {
     var linhas = [], i;
     for (i = 0; i < arguments.length; i++) if (arguments[i]) linhas.push(arguments[i]);
-    return this.add(h('div', { class: 'doc-aplicacao bloco-junto' },
-      linhas.map(function (l) { return h('div', { class: 'aplic-linha' }, l); })));
+    if (!linhas.length) return null;
+    var bloco = h('div', { class: 'doc-aplicacao bloco-junto' });
+    var textos = [], rotulos = [];
+    linhas.forEach(function (l) {
+      if (typeof l === 'object' && l.rot) rotulos.push(l);
+      else textos.push(String(l));
+    });
+    rotulos.forEach(function (l) { bloco.appendChild(h('p', { class: 'doc-p sem-recuo' }, l.rot)); });
+    if (textos.length) bloco.appendChild(PDA.FX.bloco(textos, { tam: 15 }));
+    return this.add(bloco);
+  };
+
+  /* alíneas da NBR 6024: letra minúscula seguida de parêntese, texto
+     iniciado por minúscula e terminado em ponto e vírgula */
+  Doc.prototype.alineas = function (itens) {
+    var letras = 'abcdefghijklmnopqrstuvwxyz';
+    return this.add(h('ul', { class: 'doc-alineas bloco' },
+      itens.map(function (t, i) {
+        return h('li', {}, letras.charAt(i) + ') ' + t + (i === itens.length - 1 ? '.' : ';'));
+      })));
   };
 
   Doc.prototype.tabela = function (titulo, cabs, linhas, fonte) {
@@ -8234,7 +9011,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       }))),
       h('tbody', {}, linhas));
     return this.add(h('div', { class: 'doc-quadro bloco-tabela', 'data-ref': id },
-      h('div', { class: 'doc-cap-tab' }, 'Tabela ' + num + ' — ' + titulo),
+      h('div', { class: 'doc-cap-tab' }, 'Tabela ' + num + ' – ' + titulo),
       tab,
       fonte ? h('div', { class: 'doc-fonte' }, 'Fonte: ' + fonte) : null));
   };
@@ -8244,8 +9021,8 @@ html.imprimindo-doc #doc-saida { display: block; }
     var id = 'fig' + num;
     this.figuras.push({ id: id, num: num, titulo: titulo });
     return this.add(h('div', { class: 'doc-quadro bloco-junto', 'data-ref': id },
+      h('div', { class: 'doc-cap-fig' }, 'Figura ' + num + ' – ' + titulo),
       h('div', { class: 'doc-fig' }, el),
-      h('div', { class: 'doc-cap-fig' }, 'Figura ' + num + ' — ' + titulo),
       fonte ? h('div', { class: 'doc-fonte' }, 'Fonte: ' + fonte) : null));
   };
 
@@ -8321,28 +9098,32 @@ html.imprimindo-doc #doc-saida { display: block; }
     D.p('O dimensionamento hidráulico foi conduzido pelo balanço de energia entre o nível de sucção e o ponto ' +
         'de chegada. A altura manométrica total corresponde à soma da altura geométrica com as perdas de carga ' +
         'distribuídas e localizadas em todos os trechos percorridos pelo escoamento ' + D.usar('az') + '.');
-    D.formula('Hm  =  Hg  +  Σ hf  +  Σ hₗ',
-      'Hm: altura manométrica total (mca);  Hg: altura geométrica (m);  hf: perda de carga distribuída (m);  hₗ: perda de carga localizada (m).');
+    D.formula('Hm = Hg + \\Sigma hf + \\Sigma h_l',
+      'Hm é a altura manométrica total (mca); Hg, a altura geométrica (m); hf, a perda de carga distribuída (m); ' +
+      'e h\u2097, a perda de carga localizada (m).');
 
     D.secao('Perda de carga distribuída');
     if (usaHW) {
       D.p('A perda de carga distribuída foi obtida pela fórmula empírica de Hazen-Williams ' + D.usar('az') +
           ', aplicável a água em temperatura ambiente, condutos de 50 a 3500 mm e velocidades de até cerca de ' +
           '3 m/s. O coeficiente C sintetiza a rugosidade da parede e a idade do tubo.');
-      D.formula('J  =  ' + ne(st.calculo.hwK) + ' · Q^' + ne(st.calculo.hwExpQ) +
-                ' · C^−' + ne(st.calculo.hwExpQ) + ' · D^−' + ne(st.calculo.hwExpD),
-        'J: perda de carga unitária (m/m);  Q: vazão (m³/s);  C: coeficiente de Hazen-Williams (adimensional);  D: diâmetro interno (m).');
+      D.formula('J = ' + ne(st.calculo.hwK) + ' \\cdot \\frac{Q^{' + ne(st.calculo.hwExpQ) + '}}' +
+                '{C^{' + ne(st.calculo.hwExpQ) + '} \\cdot D^{' + ne(st.calculo.hwExpD) + '}}',
+        'J é a perda de carga unitária (m/m); Q, a vazão (m³/s); C, o coeficiente de Hazen-Williams ' +
+        '(adimensional); e D, o diâmetro interno (m).');
     } else {
       D.p('A perda de carga distribuída foi obtida pela fórmula universal de Darcy-Weisbach, com o fator de ' +
           'atrito determinado pela equação de Colebrook-White ' + D.usar('colebrook') +
           ', resolvida por iteração. Essa formulação vale para qualquer regime turbulento e trabalha com a ' +
           'rugosidade absoluta equivalente da parede ' + D.usar('porto') + '.');
-      D.formula('J  =  f · v² / (2 · g · D)',
-        'J: perda de carga unitária (m/m);  f: fator de atrito (adimensional);  v: velocidade média (m/s);  g: aceleração da gravidade, 9,80665 m/s²;  D: diâmetro interno (m).');
-      D.formula('1 / √f  =  − 2 · log₁₀ [ ε / (3,7 · D)  +  2,51 / (Re · √f) ]',
-        'ε: rugosidade absoluta equivalente (m);  Re: número de Reynolds (adimensional).');
-      D.formula('Re  =  v · D / ν',
-        'ν: viscosidade cinemática do fluido (m²/s), calculada em função da temperatura.');
+      D.formula('J = \\frac{f \\cdot v^2}{2 \\cdot g \\cdot D}',
+        'J é a perda de carga unitária (m/m); f, o fator de atrito (adimensional); v, a velocidade média (m/s); ' +
+        'g, a aceleração da gravidade, 9,80665 m/s²; e D, o diâmetro interno (m).');
+      D.formula('\\frac{1}{\\sqrt{f}} = -2 \\cdot \\log_{10} [ \\frac{\\varepsilon}{3,7 \\cdot D} + ' +
+                '\\frac{2,51}{Re \\cdot \\sqrt{f}} ]',
+        '\u03b5 é a rugosidade absoluta equivalente da parede (m); e Re, o número de Reynolds (adimensional).');
+      D.formula('Re = \\frac{v \\cdot D}{\\nu}',
+        '\u03bd é a viscosidade cinemática do fluido (m²/s), calculada em função da temperatura.');
       if (st.calculo.metodo === 'swamee') {
         D.p('Na condição adotada, o fator de atrito foi obtido pela aproximação explícita de Swamee-Jain ' +
             D.usar('swamee') + ', cujo desvio em relação à solução iterativa de Colebrook-White é inferior a 1,5 % ' +
@@ -8359,8 +9140,8 @@ html.imprimindo-doc #doc-saida { display: block; }
     D.p('As perdas localizadas foram calculadas pelo método dos coeficientes de perda de carga, peça a peça, ' +
         'com a velocidade do próprio trecho — ou com a velocidade no diâmetro da peça, quando informado ' +
         'diâmetro distinto do tubo ' + D.usar('az') + '.');
-    D.formula('hₗ  =  K · v² / (2 · g)',
-      'hₗ: perda de carga localizada (m);  K: coeficiente de perda da peça (adimensional).');
+    D.formula('h_l = K \\cdot \\frac{v^2}{2 \\cdot g}',
+      'h\u2097 é a perda de carga localizada (m); e K, o coeficiente de perda da peça (adimensional).');
 
     D.secao('Coeficientes de rugosidade adotados');
     D.p('Os coeficientes de rugosidade foram adotados em função do material do tubo e da faixa de idade ou ' +
@@ -8427,13 +9208,18 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     /* ---------------- considerações finais ---------------- */
     D.capitulo('Considerações finais');
-    D.p('Os resultados apresentados correspondem a um PRÉ-dimensionamento: definem a ordem de grandeza do ' +
+    D.p('Os resultados apresentados correspondem a um pré-dimensionamento: definem a ordem de grandeza do ' +
         'diâmetro, da altura manométrica e da potência dos conjuntos, e apontam os pontos que exigem atenção. ' +
-        'O projeto executivo permanece condicionado à obtenção da curva característica da bomba, à verificação ' +
-        'do ponto de operação real, à conferência do NPSH requerido pelo fabricante e à análise do regime ' +
-        'transitório com os respectivos dispositivos de proteção ' + D.usar('nbr12214') + ' ' +
-        MEM.cit('nbr12215') + '.');
+        'O projeto executivo permanece condicionado às verificações relacionadas a seguir ' +
+        D.usar('nbr12214') + ' ' + MEM.cit('nbr12215') + ':');
     D.usar('nbr12215');
+    D.alineas([
+      'obtenção da curva característica da bomba junto ao fabricante e confirmação do ponto de operação real',
+      'conferência do NPSH requerido pela bomba selecionada, com a margem de segurança recomendada',
+      'análise do regime transitório com os dispositivos de proteção e o método das características',
+      'confirmação das dimensões, das classes de pressão e da disponibilidade dos tubos nos catálogos vigentes',
+      'levantamento topográfico de detalhe da diretriz e verificação das interferências'
+    ]);
 
     var pend = PDA.Res.coletarAvisos(st, ctx, res);
     if (pend.length) {
@@ -8451,9 +9237,10 @@ html.imprimindo-doc #doc-saida { display: block; }
     }
 
     /* ---------------- bibliografia ---------------- */
-    D.capitulo('Referências bibliográficas');
-    D.p('As referências abaixo correspondem às fontes efetivamente utilizadas nas formulações, nos coeficientes ' +
-        'e nos critérios adotados neste memorial. Recomenda-se conferir a edição vigente das normas citadas.');
+    D.capituloSemNumero('Referências');
+    D.p('As referências relacionadas a seguir correspondem às fontes efetivamente utilizadas nas formulações, ' +
+        'nos coeficientes e nos critérios adotados neste memorial. Recomenda-se conferir a edição vigente das ' +
+        'normas citadas.');
     var chaves = Object.keys(D.fontesUsadas);
     /* acrescenta as normas dos catálogos de tubo empregados */
     var mapaCat = { nbr7675: 'nbr7675', nbr8682: 'nbr8682', iso4427: 'nbr15561', nbr7665: 'nbr7665',
@@ -8527,23 +9314,29 @@ html.imprimindo-doc #doc-saida { display: block; }
           'Extensão de ' + n(r.L, 1) + ' m e vazão de ' + n(r.Q * 1000, 1) + ' L/s' +
           (r.nBombas ? ' (' + r.nBombas + ' bomba(s))' : '') + '.');
 
-      D.formula('v  =  Q / A  =  4 · Q / (π · D²)', null);
-      D.aplicacao('A  =  π × ' + n(dm, 4) + '² / 4  =  ' + n(A, 5) + ' m²',
-                  'v  =  4 × ' + n(r.Q, 4) + ' / (π × ' + n(dm, 4) + '²)  =  ' + n(r.v, 3) + ' m/s');
+      D.formula('v = \\frac{Q}{A} = \\frac{4 \\cdot Q}{\\pi \\cdot D^2}',
+        'v é a velocidade média (m/s); Q, a vazão do trecho (m³/s); A, a área da seção (m²); ' +
+        'e D, o diâmetro interno (m).', { semNumero: D.equacoes > 6 });
+      D.aplicacao('A = \\frac{\\pi \\cdot ' + n(dm, 4) + '^2}{4} = ' + n(A, 5) + '\\ \\text{m}^2',
+                  'v = \\frac{4 \\cdot ' + n(r.Q, 4) + '}{\\pi \\cdot ' + n(dm, 4) + '^2} = ' +
+                  n(r.v, 3) + '\\ \\text{m/s}');
 
       if (usaHW) {
-        D.aplicacao('J  =  ' + ne(st.calculo.hwK) + ' × ' + n(r.Q, 4) + '^' + ne(st.calculo.hwExpQ) +
-                    ' × ' + n(t.C, 0) + '^−' + ne(st.calculo.hwExpQ) + ' × ' + n(dm, 4) + '^−' + ne(st.calculo.hwExpD),
-                    'J  =  ' + n(r.J, 5) + ' m/m  =  ' + n(r.J * 1000, 2) + ' m/km');
+        D.aplicacao('J = ' + ne(st.calculo.hwK) + ' \\cdot \\frac{' + n(r.Q, 4) + '^{' + ne(st.calculo.hwExpQ) +
+                    '}}{' + n(t.C, 0) + '^{' + ne(st.calculo.hwExpQ) + '} \\cdot ' + n(dm, 4) + '^{' +
+                    ne(st.calculo.hwExpD) + '}} = ' + n(r.J, 5) + '\\ \\text{m/m} = ' +
+                    n(r.J * 1000, 2) + '\\ \\text{m/km}');
       } else {
-        D.aplicacao('Re  =  ' + n(r.v, 3) + ' × ' + n(dm, 4) + ' / ' + n(ctx.ni * 1e6, 3) + '×10⁻⁶  =  ' +
-                    n(r.Re / 1000, 0) + ' × 10³',
-                    'ε / D  =  ' + n(t.epsMm, 4) + ' / ' + n(t.diMm, 1) + '  =  ' + (t.epsMm / t.diMm).toExponential(2).replace('.', ','),
-                    'f  =  ' + n(r.f, 5) + '   (regime ' + (r.regime || 'turbulento') + ')',
-                    'J  =  ' + n(r.f, 5) + ' × ' + n(r.v, 3) + '² / (2 × ' + n(g, 3) + ' × ' + n(dm, 4) + ')  =  ' +
-                    n(r.J, 5) + ' m/m  =  ' + n(r.J * 1000, 2) + ' m/km');
+        D.aplicacao('Re = \\frac{' + n(r.v, 3) + ' \\cdot ' + n(dm, 4) + '}{' + n(ctx.ni * 1e6, 3) +
+                    ' \\cdot 10^{-6}} = ' + n(r.Re / 1000, 0) + ' \\cdot 10^3',
+                    '\\frac{\\varepsilon}{D} = \\frac{' + n(t.epsMm, 4) + '}{' + n(t.diMm, 1) + '} = ' +
+                    (t.epsMm / t.diMm).toExponential(2).replace('.', ',').replace('e-', ' \\cdot 10^{-') + '}',
+                    'f = ' + n(r.f, 5) + '\\qquad \\text{(regime ' + (r.regime || 'turbulento') + ')}',
+                    'J = \\frac{' + n(r.f, 5) + ' \\cdot ' + n(r.v, 3) + '^2}{2 \\cdot ' + n(g, 3) +
+                    ' \\cdot ' + n(dm, 4) + '} = ' + n(r.J, 5) + '\\ \\text{m/m} = ' +
+                    n(r.J * 1000, 2) + '\\ \\text{m/km}');
       }
-      D.aplicacao('hf  =  J × L  =  ' + n(r.J, 5) + ' × ' + n(r.L, 1) + '  =  ' + n(r.hf, 3) + ' m');
+      D.aplicacao('hf = J \\cdot L = ' + n(r.J, 5) + ' \\cdot ' + n(r.L, 1) + ' = ' + n(r.hf, 3) + '\\ \\text{m}');
 
       if (r.pecas && r.pecas.length) {
         var somaK = 0, somaH = 0;
@@ -8561,16 +9354,19 @@ html.imprimindo-doc #doc-saida { display: block; }
         linhasP.push(h('tr', { class: 'total' },
           h('td', { class: 'esq' }, 'Total'), h('td', {}, ''), h('td', {}, ''),
           h('td', {}, n(somaK, 2)), h('td', {}, ''), h('td', {}, ''), h('td', {}, n(somaH, 4))));
-        D.tabela('Peças e conexões — ' + r.rot,
+        D.p('As peças e conexões lançadas no trecho, os coeficientes de perda adotados e a fonte de onde ' +
+            'foram tomados constam da Tabela ' + (D.tabelas.length + 1) + '.');
+        D.tabela('Peças e conexões – ' + r.rot,
           [{ rot: 'Peça', esq: true }, 'Quant.', 'K unitário', 'ΣK', 'DI (mm)', 'v (m/s)', 'hₗ (m)'],
           linhasP, PDA.P.fontePecas.az.replace(/\.$/, '') + '.');
         D.usar('az');
-        D.aplicacao('Σhₗ  =  ΣK × v² / (2 · g)  =  ' + n(somaK, 2) + ' × ' + n(r.v, 3) +
-                    '² / (2 × ' + n(g, 3) + ')  =  ' + n(r.hl, 3) + ' m');
+        D.aplicacao('\\Sigma h_l = \\Sigma K \\cdot \\frac{v^2}{2 \\cdot g} = ' + n(somaK, 2) +
+                    ' \\cdot \\frac{' + n(r.v, 3) + '^2}{2 \\cdot ' + n(g, 3) + '} = ' +
+                    n(r.hl, 3) + '\\ \\text{m}');
       }
 
-      D.aplicacao('h total do trecho  =  hf + Σhₗ  =  ' + n(r.hf, 3) + ' + ' + n(r.hl, 3) +
-                  '  =  ' + n(r.htotal, 3) + ' m');
+      D.aplicacao('h_{total} = hf + \\Sigma h_l = ' + n(r.hf, 3) + ' + ' + n(r.hl, 3) +
+                  ' = ' + n(r.htotal, 3) + '\\ \\text{m}');
 
       var cl = PDA.C.classificar(r.v, r.J, crit);
       D.p('Verificação: velocidade de ' + n(r.v, 2) + ' m/s e perda unitária de ' + n(r.J * 1000, 2) +
@@ -8600,7 +9396,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       h('td', {}, n(somaL, 1)), h('td', {}, ''), h('td', {}, ''), h('td', {}, ''),
       h('td', {}, n(somaHf, 3)), h('td', {}, n(somaHl, 3)), h('td', {}, n(somaHf + somaHl, 3))));
 
-    D.tabela('Resumo — ' + titulo,
+    D.tabela('Resumo – ' + titulo,
       [{ rot: 'Trecho', esq: true }, { rot: 'Diâmetro', esq: true }, 'DI (mm)', 'L (m)', 'Q (L/s)',
        'v (m/s)', 'J (m/km)', 'hf (m)', 'Σhₗ (m)', 'h total (m)'], linhas,
       'Resultados calculados pelo programa.');
@@ -8616,7 +9412,7 @@ html.imprimindo-doc #doc-saida { display: block; }
           h('td', {}, n(l.htotal, 3)),
           h('td', { class: 'esq' }, ({ bom: 'adequado', atencao: 'atenção', ruim: 'inadequado', na: '—' })[l.classe]));
       });
-      D.tabela('Comparação de diâmetros — ' + validos[0].rot,
+      D.tabela('Comparação de diâmetros – ' + validos[0].rot,
         [{ rot: 'Diâmetro', esq: true }, 'DI (mm)', 'v (m/s)', 'J (m/km)', 'h total (m)', { rot: 'Situação', esq: true }],
         lc, 'Varredura do catálogo, com os critérios de velocidade e perda unitária adotados.');
       D.p('O diâmetro de Bresse, tomado como referência de ordem de grandeza, resulta entre ' +
@@ -8641,11 +9437,14 @@ html.imprimindo-doc #doc-saida { display: block; }
         'elevatória e decai linearmente até zero no ponto de chegada, onde o nível do reservatório é fixo ' +
         D.usar('porto') + ' ' + MEM.cit('nbr12215') + '.');
     D.usar('nbr12215');
-    D.formula('p_máx(x)  =  LP(x)  +  Δh · (1 − x/L)  −  cota(x)',
-      'LP: linha piezométrica em regime permanente (m);  Δh: sobrepressão na elevatória (mca);  x: distância desde a elevatória (m);  L: extensão total (m).');
-    D.aplicacao('Δh adotado na elevatória  =  ' + n(env.dh, 2) + ' mca',
-                'Maior pressão  =  ' + n(env.criticoMax.pMax, 2) + ' mca, na distância ' + n(env.criticoMax.x, 0) + ' m',
-                'Menor pressão  =  ' + n(env.criticoMin.pMin, 2) + ' mca, na distância ' + n(env.criticoMin.x, 0) + ' m');
+    D.formula('p_{max}(x) = LP(x) + \\Delta h \\cdot ( 1 - \\frac{x}{L} ) - cota(x)',
+      'LP(x) é a linha piezométrica em regime permanente (m); \u0394h, a sobrepressão na elevatória (mca); ' +
+      'x, a distância desde a elevatória (m); e L, a extensão total da linha (m).');
+    D.aplicacao('\\Delta h = ' + n(env.dh, 2) + '\\ \\text{mca}',
+                'p_{max} = ' + n(env.criticoMax.pMax, 2) + '\\ \\text{mca}\\qquad \\text{(x = ' +
+                n(env.criticoMax.x, 0) + ' m)}',
+                'p_{min} = ' + n(env.criticoMin.pMin, 2) + '\\ \\text{mca}\\qquad \\text{(x = ' +
+                n(env.criticoMin.x, 0) + ' m)}');
 
     D.figura('Perfil da linha com a piezométrica e as envoltórias de pressão',
       PDA.Pf.grafico(st, ctx, res),
@@ -8696,8 +9495,8 @@ html.imprimindo-doc #doc-saida { display: block; }
     D.tabela('Composição da altura manométrica', [{ rot: 'Parcela', esq: true }, 'Valor (m)'], linhas,
       'Resultados calculados pelo programa.');
 
-    D.aplicacao('Hm  =  ' + n(c.HgMax, 3) + '  +  ' + n(c.hfSuccao + c.hfRecalque, 3) + '  +  ' +
-                n(c.hlSuccao + c.hlRecalque, 3) + '  =  ' + n(c.Hm, 3) + ' mca');
+    D.aplicacao('Hm = ' + n(c.HgMax, 3) + ' + ' + n(c.hfSuccao + c.hfRecalque, 3) + ' + ' +
+                n(c.hlSuccao + c.hlRecalque, 3) + ' = ' + n(c.Hm, 3) + '\\ \\text{mca}');
 
     var hTot = c.hSuccao + c.hRecalque;
     D.p('As perdas de carga respondem por ' + n(c.Hm > 0 ? hTot / c.Hm * 100 : 0, 1) + ' % da altura ' +
@@ -8736,11 +9535,14 @@ html.imprimindo-doc #doc-saida { display: block; }
     D.capitulo('Conjuntos elevatórios');
     D.p('A potência hidráulica útil corresponde ao produto do peso específico do fluido pela vazão e pela ' +
         'altura manométrica. A potência no eixo resulta da divisão pela eficiência do conjunto ' + D.usar('az') + '.');
-    D.formula('P  =  γ · Q · Hm / ( 75 · η )',
-      'P: potência no eixo (cv);  γ: peso específico do fluido (kgf/m³);  Q: vazão por bomba (m³/s);  Hm: altura manométrica (mca);  η: rendimento da bomba (decimal).');
-    D.aplicacao('γ  =  ' + n(ctx.gama, 0) + ' N/m³  a  ' + ne(st.fluido.temperatura) + ' °C',
-                'P  =  ' + n(ctx.qBomba * 1000, 2) + ' × ' + n(c.Hm, 2) + ' / ( 75 × ' +
-                n(st.bombas.rendBomba / 100, 2) + ' )  =  ' + n(c.bhpCv, 2) + ' cv  =  ' + n(c.bhpKw, 2) + ' kW');
+    D.formula('P = \\frac{\\gamma \\cdot Q \\cdot Hm}{75 \\cdot \\eta}',
+      'P é a potência no eixo (cv); \u03b3, o peso específico do fluido (kgf/m³); Q, a vazão por bomba (m³/s); ' +
+      'Hm, a altura manométrica (mca); e \u03b7, o rendimento da bomba (decimal).');
+    D.aplicacao('\\gamma = ' + n(ctx.gama, 0) + '\\ \\text{N/m}^3 \\qquad \\text{(a ' +
+                ne(st.fluido.temperatura) + ' °C)}',
+                'P = \\frac{' + n(ctx.qBomba * 1000, 2) + ' \\cdot ' + n(c.Hm, 2) + '}{75 \\cdot ' +
+                n(st.bombas.rendBomba / 100, 2) + '} = ' + n(c.bhpCv, 2) + '\\ \\text{cv} = ' +
+                n(c.bhpKw, 2) + '\\ \\text{kW}');
     D.p('Sobre a potência calculada foi aplicada folga de ' + n(c.folgaPct, 0) + ' %, resultando na adoção de ' +
         'motor comercial de ' + ne(c.motorCv) + ' cv (' + n(c.motorKw, 1) + ' kW) por conjunto. ' +
         'Com ' + ctx.nOp + ' conjunto(s) em operação simultânea, a potência instalada em funcionamento é de ' +
@@ -8773,15 +9575,20 @@ html.imprimindo-doc #doc-saida { display: block; }
         'disponível supera o NPSH requerido pela bomba, obtido na curva do fabricante, com margem de segurança ' +
         D.usar('nbr12214') + ' ' + MEM.cit('tsutiya') + '.');
     D.usar('tsutiya');
-    D.formula('NPSH_d  =  ( p_atm − p_v ) / γ  ±  z  −  hf,sucção',
-      'p_atm: pressão atmosférica local;  p_v: pressão de vapor do fluido na temperatura de trabalho;  z: desnível entre o nível de sucção e o eixo da bomba (positivo quando a bomba está afogada);  hf,sucção: perda de carga total na sucção.');
-    D.aplicacao('p_atm / γ  =  ' + n(ctx.patm, 3) + ' mca   (altitude de ' + ne(st.fluido.altitude) + ' m)',
-                'p_v / γ  =  ' + n(ctx.pvapor, 3) + ' mca   (a ' + ne(st.fluido.temperatura) + ' °C)',
-                'z  =  ' + n(st.cotas.nivelSuccaoMin, 2) + ' − ' + n(st.cotas.eixoBomba, 2) + '  =  ' +
-                  n(c.zSuccao, 2) + ' m   (bomba ' + (c.zSuccao >= 0 ? 'afogada' : 'aspirando') + ')',
-                'hf,sucção  =  ' + n(c.hSuccao, 4) + ' m',
-                'NPSH_d  =  ' + n(ctx.patm, 3) + ' − ' + n(ctx.pvapor, 3) + ' + (' + n(c.zSuccao, 2) + ') − ' +
-                  n(c.hSuccao, 4) + '  =  ' + n(c.npshd, 3) + ' mca');
+    D.formula('NPSH_d = \\frac{p_{atm} - p_v}{\\gamma} \\pm z - hf_{suc}',
+      'p_{atm} é a pressão atmosférica local; p_v, a pressão de vapor do fluido na temperatura de trabalho; ' +
+      'z, o desnível entre o nível de sucção e o eixo da bomba, positivo quando a bomba está afogada; ' +
+      'e hf_{suc}, a perda de carga total na sucção.');
+    D.aplicacao('\\frac{p_{atm}}{\\gamma} = ' + n(ctx.patm, 3) + '\\ \\text{mca} \\qquad ' +
+                  '\\text{(altitude de ' + ne(st.fluido.altitude) + ' m)}',
+                '\\frac{p_v}{\\gamma} = ' + n(ctx.pvapor, 3) + '\\ \\text{mca} \\qquad \\text{(a ' +
+                  ne(st.fluido.temperatura) + ' °C)}',
+                'z = ' + n(st.cotas.nivelSuccaoMin, 2) + ' - ' + n(st.cotas.eixoBomba, 2) + ' = ' +
+                  n(c.zSuccao, 2) + '\\ \\text{m} \\qquad \\text{(bomba ' +
+                  (c.zSuccao >= 0 ? 'afogada' : 'aspirando') + ')}',
+                'hf_{suc} = ' + n(c.hSuccao, 4) + '\\ \\text{m}',
+                'NPSH_d = ' + n(ctx.patm, 3) + ' - ' + n(ctx.pvapor, 3) + ' + ( ' + n(c.zSuccao, 2) + ' ) - ' +
+                  n(c.hSuccao, 4) + ' = ' + n(c.npshd, 3) + '\\ \\text{mca}');
 
     if (st.curvaBomba && st.curvaBomba.npshr) {
       var margem = c.npshd - Number(st.curvaBomba.npshr);
@@ -8809,12 +9616,12 @@ html.imprimindo-doc #doc-saida { display: block; }
     D.p('A curva do sistema representa a altura manométrica exigida pela instalação em função da vazão, para ' +
         'os diâmetros e as singularidades adotados. O ponto de operação real é a interseção entre a curva do ' +
         'sistema e a curva característica da bomba ' + D.usar('az') + '.');
-    D.formula('H_sistema(Q)  =  Hg  +  Σ hf(Q)  +  Σ hₗ(Q)', null);
+    D.formula('H_{sistema}(Q) = Hg + \\Sigma hf(Q) + \\Sigma h_l(Q)', null);
     D.p('A curva da bomba foi ajustada por mínimos quadrados sobre os pontos informados, na forma polinomial ' +
         'de segundo grau usual para bombas centrífugas.');
-    D.formula('H_bomba(Q)  =  a₀  +  a₁ · Q  +  a₂ · Q²', null);
-    D.aplicacao('a₀  =  ' + n(cv.a0, 4) + '   a₁  =  ' + n(cv.a1, 4) + '   a₂  =  ' + n(cv.a2, 4) +
-                '   [H em mca, Q em m³/s]');
+    D.formula('H_{bomba}(Q) = a_0 + a_1 \\cdot Q + a_2 \\cdot Q^2', null);
+    D.aplicacao('a_0 = ' + n(cv.a0, 4) + '\\qquad a_1 = ' + n(cv.a1, 4) + '\\qquad a_2 = ' + n(cv.a2, 4),
+                { rot: 'com H em mca e Q em m³/s.' });
 
     var linhasP = cv.pontos.map(function (p) {
       return h('tr', {}, h('td', {}, n(p.q * 1000, 1)), h('td', {}, n(p.H, 2)),
@@ -8824,11 +9631,12 @@ html.imprimindo-doc #doc-saida { display: block; }
       ['Q (L/s)', 'H informado (mca)', 'H ajustado (mca)', 'Desvio (mca)'], linhasP,
       'Pontos informados a partir da curva do fabricante.');
 
-    D.aplicacao('Ponto de operação com ' + op.n + ' bomba(s):',
-                'Q  =  ' + n(op.qTotal * 1000, 2) + ' L/s no total,  ' + n(op.qBomba * 1000, 2) + ' L/s por bomba',
-                'H  =  ' + n(op.H, 2) + ' mca',
-                'P  =  ' + n(op.bhpCv, 2) + ' cv por bomba',
-                'Desvio em relação à vazão de projeto: ' + n(op.desvioQ, 1) + ' %');
+    D.aplicacao({ rot: 'Ponto de operação com ' + op.n + ' bomba(s):' },
+                'Q = ' + n(op.qTotal * 1000, 2) + '\\ \\text{L/s} \\qquad \\text{(' +
+                  n(op.qBomba * 1000, 2) + ' L/s por bomba)}',
+                'H = ' + n(op.H, 2) + '\\ \\text{mca}',
+                'P = ' + n(op.bhpCv, 2) + '\\ \\text{cv por bomba}',
+                '\\Delta Q = ' + n(op.desvioQ, 1) + '\\ \\text{% em relação à vazão de projeto}');
 
     D.figura('Curva do sistema e curva da bomba, com o ponto de operação',
       PDA.F.graficoCurvas(st, ctx, res),
@@ -8861,31 +9669,35 @@ html.imprimindo-doc #doc-saida { display: block; }
 
   MEM.capituloTransitorio = function (D) {
     var st = D.st, res = D.res;
-    D.capitulo('Transitório hidráulico — pré-avaliação');
+    D.capitulo('Transitório hidráulico – pré-avaliação');
     D.p('A parada abrupta dos conjuntos ou o fechamento rápido de uma válvula provocam variação brusca da ' +
         'velocidade e, em consequência, sobrepressões e subpressões que se propagam pela tubulação com ' +
         'celeridade própria do conjunto fluido-tubo ' + D.usar('streeter') + '. A verificação a seguir é ' +
         'preliminar e destina-se a conferir se a classe de pressão adotada possui folga.');
-    D.formula('a  =  1 / √[ ρ · ( 1/K  +  ψ · D / ( e · E ) ) ]',
-      'a: celeridade da onda (m/s);  ρ: massa específica do fluido (kg/m³);  K: módulo de elasticidade volumétrica da água, 2,19 GPa;  ψ: coeficiente de ancoragem longitudinal;  D: diâmetro interno (m);  e: espessura de parede (m);  E: módulo de elasticidade do material (Pa).');
+    D.formula('a = \\frac{1}{\\sqrt{\\rho \\cdot ( \\frac{1}{K} + \\frac{\\psi \\cdot D}{e \\cdot E} )}}',
+      'a é a celeridade da onda (m/s); \u03c1, a massa específica do fluido (kg/m³); K, o módulo de ' +
+      'elasticidade volumétrica da água, 2,19 GPa; \u03c8, o coeficiente de ancoragem longitudinal; ' +
+      'D, o diâmetro interno (m); e, a espessura de parede (m); e E, o módulo de elasticidade do material (Pa).');
     var anc = PDA.H.ancoragem.filter(function (a) { return a.id === (st.golpe.ancoragem || 'juntas'); })[0];
     D.p('Foi adotada a condição de ancoragem "' + (anc ? anc.rot.toLowerCase() : '—') + '" ' +
         D.usar('halliwell') + '.');
-    D.formula('t_c  =  2 · L / a          Δh  =  a · Δv / g   (manobra rápida)',
-      't_c: tempo crítico de manobra (s);  Δv: variação de velocidade (m/s).');
-    D.formula('Δh  =  2 · L · v / ( g · t )   (manobra lenta)',
-      't: tempo de manobra (s). Aplicável quando t > t_c.');
+    D.formula('t_c = \\frac{2 \\cdot L}{a} \\qquad \\Delta h = \\frac{a \\cdot \\Delta v}{g}',
+      't_c é o tempo crítico de manobra (s); e \u0394v, a variação de velocidade (m/s). ' +
+      'Vale para manobra rápida, isto é, quando o tempo de manobra é menor que t_c.');
+    D.formula('\\Delta h = \\frac{2 \\cdot L \\cdot v}{g \\cdot t}',
+      't é o tempo de manobra (s). Vale para manobra lenta, quando t é maior que t_c.');
     D.usar('joukowsky');
 
     res.golpe.forEach(function (g) {
-      D.aplicacao(g.rot + ':',
-        'a  =  ' + n(g.celeridade, 0) + ' m/s   (E = ' + n(g.E_GPa, 0) + ' GPa,  ν = ' + ne(g.nu) +
-          ',  ψ = ' + n(g.psi, 3) + ',  e = ' + n(g.eMm, 1) + ' mm)',
-        't_c  =  2 × ' + n(g.L, 0) + ' / ' + n(g.celeridade, 0) + '  =  ' + n(g.tempoCritico, 2) +
-          ' s    →   manobra ' + (g.manobraRapida ? 'RÁPIDA' : 'LENTA') + ' (t = ' + ne(g.tempoManobra) + ' s)',
-        'Δh  =  ' + n(g.dh, 1) + ' mca',
-        'pressão máxima  =  Hm + Δh  =  ' + n(g.pressaoMaxMca, 1) + ' mca' +
-          (g.pnMca ? '   |   admissível do tubo: ' + n(g.pnMca, 0) + ' mca' : ''));
+      D.aplicacao({ rot: g.rot + ':' },
+        'a = ' + n(g.celeridade, 0) + '\\ \\text{m/s} \\qquad \\text{(E = ' + n(g.E_GPa, 0) +
+          ' GPa; \u03bd = ' + ne(g.nu) + '; \u03c8 = ' + n(g.psi, 3) + '; e = ' + n(g.eMm, 1) + ' mm)}',
+        't_c = \\frac{2 \\cdot ' + n(g.L, 0) + '}{' + n(g.celeridade, 0) + '} = ' + n(g.tempoCritico, 2) +
+          '\\ \\text{s} \\qquad \\text{(manobra ' + (g.manobraRapida ? 'rápida' : 'lenta') +
+          ', com t = ' + ne(g.tempoManobra) + ' s)}',
+        '\\Delta h = ' + n(g.dh, 1) + '\\ \\text{mca}',
+        'p_{max} = Hm + \\Delta h = ' + n(g.pressaoMaxMca, 1) + '\\ \\text{mca}' +
+          (g.pnMca ? '\\qquad \\text{(admissível do tubo: ' + n(g.pnMca, 0) + ' mca)}' : ''));
     });
 
     var linhas = res.golpe.map(function (g) {
@@ -8974,15 +9786,30 @@ html.imprimindo-doc #doc-saida { display: block; }
   X.init = function () { UI = PDA.UI; h = UI.h; };
 
   var MM = 96 / 25.4;              /* 1 mm em px a 96 dpi */
+  /* margens da ABNT (NBR 14724): 3 cm em cima e à esquerda, 2 cm embaixo
+     e à direita. Com timbrado, as margens de cima e de baixo passam a ser
+     as informadas pelo usuário, para o texto não invadir a arte. */
   X.PAG = {
     largura: 210, altura: 297,
-    margEsq: 25, margDir: 20, margSup: 20, margInf: 15,
-    cabecalho: 14, rodape: 10
+    margEsq: 30, margDir: 20, margSup: 30, margInf: 20
   };
 
-  X.larguraUtilMm = function () { return X.PAG.largura - X.PAG.margEsq - X.PAG.margDir; };
+  X.margens = function () {
+    var t = PDA.M.timbrado && PDA.M.timbrado();
+    return {
+      esq: X.PAG.margEsq, dir: X.PAG.margDir,
+      sup: t ? t.margSup : X.PAG.margSup,
+      inf: t ? t.margInf : X.PAG.margInf
+    };
+  };
+
+  X.larguraUtilMm = function () {
+    var m = X.margens();
+    return X.PAG.largura - m.esq - m.dir;
+  };
   X.alturaUtilMm = function () {
-    return X.PAG.altura - X.PAG.margSup - X.PAG.margInf - X.PAG.cabecalho - X.PAG.rodape;
+    var m = X.margens();
+    return X.PAG.altura - m.sup - m.inf;
   };
 
   /* ================================================================
@@ -9075,6 +9902,8 @@ html.imprimindo-doc #doc-saida { display: block; }
       if (idx + n >= linhas.length) {
         while (n > 1 && acc + sobreUlt > disp) { n--; acc -= alturas[idx + n]; }
       }
+      /* não deixa uma linha órfã na continuação */
+      if (linhas.length - (idx + n) === 1 && n > MIN_LINHAS) n--;
       /* não coube nem o mínimo no resto da página: começa a tabela na próxima */
       if (n < MIN_LINHAS && primeira) { primeira = false; continue; }
       if (!n) n = 1;                                 /* linha maior que a página */
@@ -9110,6 +9939,12 @@ html.imprimindo-doc #doc-saida { display: block; }
     blocos.forEach(function (b) {
       var alt = medir(medidor, b);
       var restante = H - atual;
+
+      /* seção primária começa em folha nova (NBR 14724) */
+      if (b.classList && b.classList.contains('pagina-nova') && !vazia()) {
+        novaPagina();
+        restante = H;
+      }
 
       if (ehTitulo(b) && alt + MIN_APOS > restante && !vazia()) {
         novaPagina();
@@ -9201,31 +10036,33 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     function lista(titulo, itens, montar) {
       if (!itens.length) return;
-      out.push(h('h1', { class: 'doc-h1 doc-h1-frente bloco' }, titulo));
+      out.push(h('h1', { class: 'doc-h1 doc-h1-frente bloco pagina-nova' }, titulo));
       itens.forEach(function (it) {
         out.push(montar(it));
       });
     }
 
-    lista('Sumário', D.capitulos, function (cap) {
-      return h('div', { class: 'doc-sum bloco nivel' + cap.nivel },
-        h('span', { class: 'sum-txt' }, cap.num + '.  ' + cap.titulo),
-        h('span', { class: 'sum-pts' }),
-        h('span', { class: 'sum-pag' }, mapa[cap.id] === undefined ? '—' : String(mapa[cap.id])));
-    });
-
-    lista('Índice de figuras', D.figuras, function (f) {
+    /* ordem dos elementos pré-textuais da NBR 14724: listas de
+       ilustrações e de tabelas antes do sumário */
+    lista('LISTA DE FIGURAS', D.figuras, function (f) {
       return h('div', { class: 'doc-sum bloco nivel2' },
-        h('span', { class: 'sum-txt' }, 'Figura ' + f.num + ' — ' + f.titulo),
+        h('span', { class: 'sum-txt' }, 'Figura ' + f.num + ' – ' + f.titulo),
         h('span', { class: 'sum-pts' }),
         h('span', { class: 'sum-pag' }, mapa[f.id] === undefined ? '—' : String(mapa[f.id])));
     });
 
-    lista('Índice de tabelas', D.tabelas, function (t) {
+    lista('LISTA DE TABELAS', D.tabelas, function (t) {
       return h('div', { class: 'doc-sum bloco nivel2' },
-        h('span', { class: 'sum-txt' }, 'Tabela ' + t.num + ' — ' + t.titulo),
+        h('span', { class: 'sum-txt' }, 'Tabela ' + t.num + ' – ' + t.titulo),
         h('span', { class: 'sum-pts' }),
         h('span', { class: 'sum-pag' }, mapa[t.id] === undefined ? '—' : String(mapa[t.id])));
+    });
+
+    lista('SUMÁRIO', D.capitulos, function (cap) {
+      return h('div', { class: 'doc-sum bloco nivel' + cap.nivel },
+        h('span', { class: 'sum-txt' }, (cap.num ? cap.num + ' ' : '') + cap.titulo),
+        h('span', { class: 'sum-pts' }),
+        h('span', { class: 'sum-pag' }, mapa[cap.id] === undefined ? '—' : String(mapa[cap.id])));
     });
 
     return out;
@@ -9234,7 +10071,7 @@ html.imprimindo-doc #doc-saida { display: block; }
   X.capa = function (st, ctx, res) {
     var esgoto = ctx.familiaCriterio === 'esgoto';
     return h('div', { class: 'doc-capa' },
-      h('div', { class: 'capa-topo' }, PDA.M.marca(64, { larguraMax: 260 })),
+      h('div', { class: 'capa-topo' }, PDA.M.marca(PDA.M.CAIXA.alturaCapa, { larguraMax: 330 })),
       h('div', { class: 'capa-meio' },
         h('div', { class: 'capa-tipo' }, 'Memorial descritivo e de cálculo'),
         h('h1', { class: 'capa-titulo' }, st.projeto.nome || 'Pré-dimensionamento de adutora'),
@@ -9255,26 +10092,35 @@ html.imprimindo-doc #doc-saida { display: block; }
     var frag = document.createDocumentFragment();
     var num = 1;
 
-    var capa = h('div', { class: 'pagina pagina-capa' }, doc.capa);
+    var timbreCapa = PDA.M.timbrado && PDA.M.timbrado();
+    var capa = h('div', { class: 'pagina pagina-capa' },
+      timbreCapa ? h('img', { class: 'pag-timbrado', src: timbreCapa.imagem, alt: '' }) : null,
+      doc.capa);
     frag.appendChild(capa);
     num++;
 
-    function pagina(blocos) {
-      var p = h('div', { class: 'pagina' },
-        h('div', { class: 'pag-cabecalho' },
-          h('span', { class: 'pc-marca' }, PDA.M.marca(20, { larguraMax: 120, semTexto: false })),
-          h('span', { class: 'pc-titulo' }, st.projeto.nome || 'Memorial de cálculo')),
-        h('div', { class: 'pag-corpo' }, blocos),
-        h('div', { class: 'pag-rodape' },
-          h('span', {}, 'Memorial descritivo e de cálculo' +
-            (st.projeto.local ? ' — ' + st.projeto.local : '')),
-          h('span', {}, num + ' / ' + doc.total)));
+    var timbre = PDA.M.timbrado && PDA.M.timbrado();
+    var m = X.margens();
+
+    function fundo() {
+      if (!timbre) return null;
+      return h('img', { class: 'pag-timbrado', src: timbre.imagem, alt: '' });
+    }
+
+    /* A ABNT numera a partir da folha de rosto, mas só imprime o número
+       a partir da primeira folha textual, no canto superior direito. */
+    function pagina(blocos, numerar) {
+      var p = h('div', { class: 'pagina', style: 'padding:' + m.sup + 'mm ' + m.dir +
+                        'mm ' + m.inf + 'mm ' + m.esq + 'mm' },
+        fundo(),
+        numerar ? h('div', { class: 'pag-num' }, String(num)) : null,
+        h('div', { class: 'pag-corpo' }, blocos));
       num++;
       return p;
     }
 
-    doc.frente.forEach(function (bl) { frag.appendChild(pagina(bl)); });
-    doc.corpo.forEach(function (bl) { frag.appendChild(pagina(bl)); });
+    doc.frente.forEach(function (bl) { frag.appendChild(pagina(bl, false)); });
+    doc.corpo.forEach(function (bl) { frag.appendChild(pagina(bl, true)); });
     return frag;
   };
 
@@ -9427,13 +10273,13 @@ html.imprimindo-doc #doc-saida { display: block; }
       document.body.removeChild(tmp);
 
       var sumario = D.capitulos.map(function (c) {
-        return '<p class=sum' + c.nivel + '>' + c.num + '. ' + escapar(c.titulo) + '</p>';
+        return '<p class=sum' + c.nivel + '>' + (c.num ? c.num + ' ' : '') + escapar(c.titulo) + '</p>';
       }).join('');
       var idxFig = D.figuras.map(function (f) {
-        return '<p class=sum2>Figura ' + f.num + ' — ' + escapar(f.titulo) + '</p>';
+        return '<p class=sum2>Figura ' + f.num + ' – ' + escapar(f.titulo) + '</p>';
       }).join('');
       var idxTab = D.tabelas.map(function (t) {
-        return '<p class=sum2>Tabela ' + t.num + ' — ' + escapar(t.titulo) + '</p>';
+        return '<p class=sum2>Tabela ' + t.num + ' – ' + escapar(t.titulo) + '</p>';
       }).join('');
 
       var capaHtml =
@@ -9457,9 +10303,9 @@ html.imprimindo-doc #doc-saida { display: block; }
         '<w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->' +
         '<style>' + X.cssWord() + '</style></head><body>' +
         capaHtml +
+        (idxFig ? '<div class=quebra></div><h1>Lista de figuras</h1>' + idxFig : '') +
+        (idxTab ? '<div class=quebra></div><h1>Lista de tabelas</h1>' + idxTab : '') +
         '<div class=quebra></div><h1>Sumário</h1>' + sumario +
-        (idxFig ? '<div class=quebra></div><h1>Índice de figuras</h1>' + idxFig : '') +
-        (idxTab ? '<div class=quebra></div><h1>Índice de tabelas</h1>' + idxTab : '') +
         '<p class=notarodape>As páginas do sumário e dos índices são renumeradas pelo editor de texto ao abrir ' +
         'o arquivo. A versão em PDF, gerada pelo próprio programa, já traz a numeração correta.</p>' +
         '<div class=quebra></div>' + corpo +
@@ -9472,7 +10318,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     }
 
     /* logo da capa em imagem */
-    var marca = PDA.M.marca(64, { larguraMax: 260 });
+    var marca = PDA.M.marca(PDA.M.CAIXA.alturaCapa, { larguraMax: 330 });
     tmp.appendChild(marca);
     var svgMarca = marca.querySelector('svg');
     var imgMarca = marca.querySelector('img');
@@ -9509,37 +10355,42 @@ html.imprimindo-doc #doc-saida { display: block; }
   }
 
   X.cssWord = function () {
-    return '@page { size: A4; margin: ' + X.PAG.margSup + 'mm ' + X.PAG.margDir + 'mm ' +
-      X.PAG.margInf + 'mm ' + X.PAG.margEsq + 'mm; }' +
-      'body { font-family: "Times New Roman", serif; font-size: 11pt; color: #000; line-height: 1.4; }' +
-      'h1 { font-size: 14pt; margin: 18pt 0 8pt; page-break-before: always; page-break-after: avoid; }' +
+    var m = X.margens();
+    return '@page { size: A4; margin: ' + m.sup + 'mm ' + m.dir + 'mm ' + m.inf + 'mm ' + m.esq + 'mm; }' +
+      'body { font-family: Arial, sans-serif; font-size: 12pt; color: #000; line-height: 1.2; }' +
+      'h1 { font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 0 0 8pt; ' +
+        'page-break-before: always; page-break-after: avoid; }' +
       'h1:first-of-type { page-break-before: auto; }' +
-      'h2 { font-size: 12pt; margin: 12pt 0 6pt; page-break-after: avoid; }' +
-      'p { margin: 0 0 6pt; text-align: justify; }' +
-      '.doc-formula { text-align: center; margin: 8pt 0; font-family: "Cambria Math", "Times New Roman", serif; }' +
-      '.formula-txt { font-size: 12pt; }' +
-      '.formula-leg { font-size: 9pt; color: #444; text-align: center; }' +
-      '.doc-aplicacao { margin: 6pt 0 6pt 18pt; font-family: Consolas, "Courier New", monospace; font-size: 9.5pt; }' +
-      'table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 4pt 0 6pt; }' +
-      'th, td { border: 0.5pt solid #999; padding: 2pt 4pt; text-align: right; }' +
-      'th { background: #eef2f6; font-weight: bold; text-align: center; }' +
+      'h2 { font-size: 12pt; font-weight: bold; margin: 10pt 0 6pt; page-break-after: avoid; }' +
+      'p { margin: 0 0 6pt; text-align: justify; text-indent: 12.5mm; }' +
+      '.doc-formula { text-align: center; margin: 8pt 0; text-indent: 0; }' +
+      '.formula-leg { font-size: 12pt; text-align: justify; text-indent: 0; margin: 0 0 6pt; }' +
+      '.doc-aplicacao { margin: 4pt 0 8pt 12.5mm; text-indent: 0; }' +
+      '.doc-alineas { margin: 0 0 6pt 12.5mm; }' +
+      '.doc-alineas li { text-align: justify; margin-bottom: 3pt; }' +
+      'table { border-collapse: collapse; width: 100%; font-size: 10pt; margin: 3pt 0 4pt; }' +
+      'th, td { border: 0; padding: 1.6mm 2mm; text-align: right; height: 6mm; }' +
+      'thead th { border-top: 1pt solid #000; border-bottom: 0.75pt solid #000; font-weight: bold; ' +
+        'text-align: center; }' +
+      'tbody tr:last-child td { border-bottom: 1pt solid #000; }' +
       'td.esq, th.esq { text-align: left; }' +
-      'tr.total td { font-weight: bold; background: #f4f6f8; }' +
-      'tr.destaque td { background: #eaf5f4; }' +
-      '.doc-cap-tab, .doc-cap-fig { font-size: 9.5pt; font-weight: bold; text-align: center; margin: 8pt 0 2pt; }' +
-      '.doc-cap-fig { margin-top: 2pt; }' +
-      '.doc-fonte { font-size: 8.5pt; color: #444; text-align: center; margin-bottom: 8pt; }' +
-      '.doc-fig { text-align: center; }' +
-      '.doc-nota { font-size: 9.5pt; color: #333; }' +
-      '.doc-ref { text-align: left; text-indent: 0; margin-bottom: 8pt; }' +
+      'tr.total td { font-weight: bold; border-top: 0.75pt solid #000; }' +
+      'tr.destaque td { background: #ececec; }' +
+      '.doc-cap-tab, .doc-cap-fig { font-size: 10pt; font-weight: bold; text-align: left; ' +
+        'text-indent: 0; margin: 8pt 0 3pt; }' +
+      '.doc-fonte { font-size: 10pt; text-align: left; text-indent: 0; margin: 3pt 0 10pt; }' +
+      '.doc-fig { text-align: center; text-indent: 0; }' +
+      '.doc-nota { font-size: 10pt; text-indent: 0; }' +
+      '.doc-ref { text-align: left; text-indent: 0; margin-bottom: 11pt; line-height: 1.0; }' +
       '.quebra { page-break-before: always; }' +
       '.capa { text-align: center; margin-top: 60pt; }' +
-      '.capatipo { letter-spacing: 2pt; text-transform: uppercase; font-size: 10pt; }' +
-      '.capatit { font-size: 20pt; page-break-before: auto; margin: 18pt 0; }' +
-      '.capadado { text-align: center; font-size: 11pt; margin: 2pt 0; }' +
-      '.sum1 { margin: 3pt 0; font-weight: bold; }' +
-      '.sum2 { margin: 2pt 0 2pt 14pt; }' +
-      '.notarodape { font-size: 8.5pt; color: #555; margin-top: 12pt; }';
+      '.capa p, .capa h1 { text-indent: 0; text-align: center; }' +
+      '.capatipo { letter-spacing: 2pt; text-transform: uppercase; font-size: 12pt; font-weight: bold; }' +
+      '.capatit { font-size: 16pt; page-break-before: auto; margin: 18pt 0; }' +
+      '.capadado { text-align: center; font-size: 12pt; margin: 2pt 0; }' +
+      '.sum1 { margin: 3pt 0; font-weight: bold; text-transform: uppercase; text-indent: 0; }' +
+      '.sum2 { margin: 2pt 0 2pt 8mm; text-indent: 0; }' +
+      '.notarodape { font-size: 10pt; margin-top: 12pt; text-indent: 0; }';
   };
 
   X.baixar = function (nome, blob) {

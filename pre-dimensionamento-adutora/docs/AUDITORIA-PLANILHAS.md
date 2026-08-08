@@ -283,6 +283,33 @@ No mesmo passo, o nome do arquivo `.doc` levava um travessão; o navegador
 descarta nomes com esse caractere e salvava tudo como `download`, sem extensão.
 O nome passa por uma limpeza antes de ir para o arquivo.
 
+### 3.14 Fórmulas escritas em linha
+
+Até esta versão o memorial escrevia as expressões em linha — `J = f · v² / (2 ·
+g · D)` —, o que é legível, mas não é a notação de um memorial de cálculo. Foi
+escrito um compositor matemático próprio (`src/js/08c-formula.js`): lê um código
+parecido com o do LaTeX e devolve um SVG com fração de barra horizontal, radical
+com barra sobre o radicando, expoentes, índices e parênteses que crescem com o
+conteúdo. Vale para a fórmula simbólica e para a memória de cálculo — nesta, as
+linhas saem alinhadas pelo sinal de igual.
+
+O SVG serve às duas saídas: fica vetorial no PDF e é convertido em imagem na
+exportação para o Word, pelo mesmo caminho já usado nos gráficos.
+
+### 3.15 Formatação do documento
+
+O memorial passou a seguir a ABNT: Arial 12 pt, margens 3/2/3/2 cm, parágrafo
+justificado com recuo de 1,25 cm, numeração progressiva das seções sem ponto
+após o indicativo, seção primária em folha nova, número da página no canto
+superior direito, equações numeradas entre parênteses, legenda de figura acima e
+fonte abaixo, tabelas na largura da mancha com 10 pt, linhas de 0,6 cm e sem
+traços verticais (padrão IBGE), pré-textuais na ordem capa, lista de figuras,
+lista de tabelas e sumário, e referências como elemento pós-textual sem
+indicativo numérico.
+
+A única divergência deliberada em relação à norma é o **espaçamento entre
+linhas: 1,2 em vez de 1,5**, a pedido do usuário.
+
 ## 4. Itens que dependem de conferência do fornecedor
 
 Marcados no programa com a etiqueta **"conferir catálogo"** e listados no painel

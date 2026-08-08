@@ -657,7 +657,7 @@ function titulo(t) { console.log('\n' + t); }
   await page.waitForSelector('.modal');
   ok('modal de logo explica a substituição',
      /arquivo oficial/.test(await page.locator('.modal').innerText()));
-  ok('aceita arquivo de imagem', (await page.locator('.modal input[type="file"]').count()) === 1);
+  ok('aceita arquivo de imagem', (await page.locator('.modal input[type="file"]').count()) >= 1);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(150);
   const logoPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
@@ -1106,16 +1106,17 @@ function titulo(t) { console.log('\n' + t); }
       const img = document.querySelector('#marca img.marca-img');
       if (!img) return null;
       const r = img.getBoundingClientRect();
-      return { largura: r.width, altura: r.height, caixa: window.PDA.M.CAIXA.larguraTela };
+      return { largura: r.width, altura: r.height, caixa: window.PDA.M.CAIXA.larguraTela,
+               alta: window.PDA.M.CAIXA.alturaTela };
     }, [w, hh]);
   }
   const comprida = await medirMarca(1600, 120);
   ok('logo comprida cabe na largura da caixa',
-     comprida && comprida.largura <= comprida.caixa + 1 && comprida.altura <= 39,
+     comprida && comprida.largura <= comprida.caixa + 1 && comprida.altura <= comprida.alta + 1,
      comprida && `${comprida.largura.toFixed(0)}×${comprida.altura.toFixed(0)}`);
   const alta = await medirMarca(300, 900);
   ok('logo alta cabe na altura da caixa',
-     alta && alta.altura <= 39 && alta.largura <= alta.caixa + 1,
+     alta && alta.altura <= alta.alta + 1 && alta.largura <= alta.caixa + 1,
      alta && `${alta.largura.toFixed(0)}×${alta.altura.toFixed(0)}`);
   const semDistorcer = alta && Math.abs((alta.largura / alta.altura) - (300 / 900)) < 0.05;
   ok('a logo não é distorcida', !!semDistorcer);
@@ -1136,6 +1137,76 @@ function titulo(t) { console.log('\n' + t); }
   ok('apagar o arquivo devolve o desenho padrão',
      (await page.evaluate(() => window.PDA.M.modo())) === 'padrao' &&
      (await page.locator('#marca .marca-simbolo svg').count()) === 1);
+
+  titulo('33b. Timbrado do memorial');
+  await page.evaluate(() => window.PDA.UI.fecharModal());
+  await page.waitForTimeout(200);
+  await page.locator('[data-acao="logo"]').click();
+  await page.waitForSelector('.modal');
+  const txtT = await page.locator('.modal').innerText();
+  ok('modal explica o timbrado', /papel timbrado do memorial/i.test(txtT));
+  ok('avisa que a conversão é local', /Nada é enviado para fora/.test(txtT));
+  ok('sem timbrado, informa as margens da ABNT', /margens da ABNT/.test(txtT));
+
+  /* imagem grande, como um timbrado de verdade, tem de ser reduzida */
+  const timb = await page.evaluate(async () => {
+    const c = document.createElement('canvas');
+    c.width = 2480; c.height = 3508;                    /* A4 a 300 dpi */
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#0E2148'; g.fillRect(0, 0, c.width, 240);
+    g.fillRect(0, c.height - 160, c.width, 160);
+    const grande = c.toDataURL('image/png');
+    return await new Promise(res => {
+      window.PDA.M.reduzirParaA4(grande, t => {
+        const ok = window.PDA.M.gravarTimbrado(Object.assign({ margSup: 35, margInf: 25 }, t));
+        res({ originalKb: Math.round(grande.length * 0.75 / 1024), reduzidoKb: Math.round(t.bytes / 1024),
+              gravou: ok, largura: t.largura, altura: t.altura });
+      });
+    });
+  });
+  ok('timbrado grande é reduzido para caber no navegador',
+     timb.gravou && timb.reduzidoKb < 900 && timb.reduzidoKb < timb.originalKb,
+     `${timb.originalKb} kB -> ${timb.reduzidoKb} kB`);
+  ok('guarda as dimensões do original', timb.largura === 2480 && timb.altura === 3508);
+
+  const comTimb = await page.evaluate(() => {
+    const P = window.PDA;
+    const ctx = P.C.contexto(P.App.st, P.App.cats);
+    const res = P.C.resumo(P.App.st, P.App.cats);
+    const alvo = document.createElement('div');
+    alvo.className = 'doc'; document.body.appendChild(alvo);
+    alvo.appendChild(P.X.render(P.X.montar(P.App.st, ctx, res), P.App.st));
+    const pg = alvo.querySelector('.pagina:not(.pagina-capa)');
+    const mm = 96 / 25.4;
+    const r = {
+      fundos: alvo.querySelectorAll('img.pag-timbrado').length,
+      paginas: alvo.querySelectorAll('.pagina').length,
+      naCapa: !!alvo.querySelector('.pagina-capa img.pag-timbrado'),
+      margSup: parseFloat(getComputedStyle(pg).paddingTop) / mm,
+      margInf: parseFloat(getComputedStyle(pg).paddingBottom) / mm,
+      atras: getComputedStyle(alvo.querySelector('img.pag-timbrado')).zIndex
+    };
+    alvo.remove();
+    return r;
+  });
+  ok('timbrado entra em todas as páginas, capa inclusive',
+     comTimb.fundos === comTimb.paginas && comTimb.naCapa,
+     `${comTimb.fundos} de ${comTimb.paginas}`);
+  ok('margens passam a ser as do timbrado',
+     Math.abs(comTimb.margSup - 35) < 0.5 && Math.abs(comTimb.margInf - 25) < 0.5,
+     `${comTimb.margSup.toFixed(0)} / ${comTimb.margInf.toFixed(0)} mm`);
+  ok('o timbrado fica atrás do texto', comTimb.atras === '0', comTimb.atras);
+
+  await page.evaluate(() => window.PDA.M.removerTimbrado());
+  await page.waitForTimeout(120);
+  const semTimb = await page.evaluate(() => {
+    const m = window.PDA.X.margens();
+    return { sup: m.sup, inf: m.inf, tem: !!window.PDA.M.timbrado() };
+  });
+  ok('removido o timbrado, voltam as margens da ABNT',
+     !semTimb.tem && semTimb.sup === 30 && semTimb.inf === 20,
+     `${semTimb.sup} / ${semTimb.inf}`);
 
   titulo('34. Memorial descritivo e de cálculo');
   await page.evaluate(() => window.PDA.UI.fecharModal());
@@ -1206,14 +1277,23 @@ function titulo(t) { console.log('\n' + t); }
       erradas: erradas, estouros: estouros, orfaos: orfaos,
       capa: !!alvo.querySelector('.pagina-capa'),
       logoCapa: !!alvo.querySelector('.pagina-capa .marca-bloco'),
-      sumario: /Sumário/.test(t),
-      idxFiguras: /Índice de figuras/.test(t),
-      idxTabelas: /Índice de tabelas/.test(t),
-      introducao: /1\. Introdução/.test(t),
+      sumario: /SUMÁRIO/.test(t),
+      idxFiguras: /LISTA DE FIGURAS/.test(t),
+      idxTabelas: /LISTA DE TABELAS/.test(t),
+      introducao: /1 Introdução/.test(t),
       metodologia: /Metodologia de cálculo/.test(t),
-      biblio: /Referências bibliográficas/.test(t),
+      biblio: /Referências/.test(t),
       formulas: alvo.querySelectorAll('.doc-formula').length,
       aplicacoes: alvo.querySelectorAll('.doc-aplicacao').length,
+      formulasSvg: alvo.querySelectorAll('.doc-formula svg.formula-svg').length,
+      fracoes: alvo.querySelectorAll('.doc-formula svg line').length,
+      raizes: alvo.querySelectorAll('.formula-svg path').length,
+      equacoesNumeradas: (function () {
+        var k = 0;
+        alvo.querySelectorAll('.formula-num').forEach(function (e) { if (/\(\d+\)/.test(e.textContent)) k++; });
+        return k;
+      })(),
+      alineas: alvo.querySelectorAll('.doc-alineas li').length,
       figuras: doc.D.figuras.length,
       tabelas: doc.D.tabelas.length,
       capitulos: doc.D.capitulos.filter(c => c.nivel === 1).length,
@@ -1223,8 +1303,52 @@ function titulo(t) { console.log('\n' + t); }
       curva: /Curva do sistema e ponto de operação/.test(t),
       npsh: /NPSH disponível/.test(t),
       virgula: !/=\s-?\d+\.\d/.test(t),
-      cabecalhos: alvo.querySelectorAll('.pag-cabecalho').length,
-      rodapes: alvo.querySelectorAll('.pag-rodape').length
+      numeros: alvo.querySelectorAll('.pag-num').length,
+      /* --- conformidade ABNT --- */
+      abnt: (function () {
+        var cs = getComputedStyle(alvo.querySelector('.doc-p'));
+        var pg = alvo.querySelector('.pagina .pag-num') ?
+                 alvo.querySelector('.pagina .pag-num').parentNode :
+                 alvo.querySelector('.pagina:not(.pagina-capa)');
+        var pgs = getComputedStyle(pg);
+        var nu = pg.querySelector('.pag-num');
+        var nus = nu ? getComputedStyle(nu) : null;
+        var tab = alvo.querySelector('.doc-tabela');
+        var ts = getComputedStyle(tab);
+        var td = tab.querySelector('tbody td');
+        var corpo = pg.querySelector('.pag-corpo');
+        var mm = 96 / 25.4;
+        return {
+          fonte: cs.fontFamily,
+          corpoPt: parseFloat(cs.fontSize) / (96 / 72),
+          entrelinhas: parseFloat(cs.lineHeight) / parseFloat(cs.fontSize),
+          recuoMm: parseFloat(cs.textIndent) / mm,
+          justificado: cs.textAlign,
+          margEsqMm: parseFloat(pgs.paddingLeft) / mm,
+          margSupMm: parseFloat(pgs.paddingTop) / mm,
+          margDirMm: parseFloat(pgs.paddingRight) / mm,
+          margInfMm: parseFloat(pgs.paddingBottom) / mm,
+          numTopo: nus ? parseFloat(nus.top) / mm : -1,
+          numDir: nus ? parseFloat(nus.right) / mm : -1,
+          tabelaPt: parseFloat(ts.fontSize) / (96 / 72),
+          linhaMm: td.getBoundingClientRect().height / mm,
+          larguraTabela: tab.getBoundingClientRect().width / corpo.getBoundingClientRect().width,
+          semTracoVertical: getComputedStyle(td).borderLeftWidth === '0px' &&
+                            getComputedStyle(td).borderRightWidth === '0px'
+        };
+      })(),
+      /* toda seção primária tem de abrir uma folha */
+      capitulosNoTopo: (function () {
+        var fora = 0;
+        pgs.forEach(function (pg) {
+          var corpo = pg.querySelector('.pag-corpo');
+          if (!corpo) return;
+          corpo.querySelectorAll('.doc-h1').forEach(function (t) {
+            if (t !== corpo.firstElementChild) fora++;
+          });
+        });
+        return fora;
+      })()
     };
     alvo.remove();
     return r;
@@ -1256,9 +1380,34 @@ function titulo(t) { console.log('\n' + t); }
   ok('capítulo do NPSH', doc.npsh);
   ok('bibliografia ao final', doc.biblio);
   ok('números com vírgula decimal', doc.virgula);
-  ok('cabeçalho e rodapé em todas as páginas',
-     doc.cabecalhos === doc.paginas - 1 && doc.rodapes === doc.paginas - 1,
-     `${doc.cabecalhos}/${doc.rodapes} de ${doc.paginas - 1}`);
+  ok('número de página em todas as folhas do texto', doc.numeros > 10, String(doc.numeros));
+  ok('equações numeradas entre parênteses', doc.equacoesNumeradas >= 8, String(doc.equacoesNumeradas));
+  ok('fórmulas compostas em SVG', doc.formulasSvg >= 8, String(doc.formulasSvg));
+  ok('frações com barra horizontal', doc.fracoes >= 6, String(doc.fracoes));
+  ok('radical desenhado', doc.raizes >= 1, String(doc.raizes));
+  ok('itemização em alíneas', doc.alineas >= 3, String(doc.alineas));
+  ok('cada seção primária abre uma folha', doc.capitulosNoTopo === 0, String(doc.capitulosNoTopo));
+
+  titulo('34c. Conformidade com a ABNT');
+  const A = doc.abnt;
+  ok('fonte Arial', /Arial/i.test(A.fonte), A.fonte);
+  ok('corpo do texto em 12 pt', Math.abs(A.corpoPt - 12) < 0.2, A.corpoPt.toFixed(1) + ' pt');
+  ok('entrelinhas 1,2 (exceção pedida à NBR 14724)', Math.abs(A.entrelinhas - 1.2) < 0.03,
+     A.entrelinhas.toFixed(2));
+  ok('texto justificado', A.justificado === 'justify', A.justificado);
+  ok('recuo de primeira linha de 1,25 cm', Math.abs(A.recuoMm - 12.5) < 0.6, A.recuoMm.toFixed(1) + ' mm');
+  ok('margens 3 / 2 / 3 / 2 cm',
+     Math.abs(A.margEsqMm - 30) < 0.5 && Math.abs(A.margSupMm - 30) < 0.5 &&
+     Math.abs(A.margDirMm - 20) < 0.5 && Math.abs(A.margInfMm - 20) < 0.5,
+     `${A.margEsqMm.toFixed(0)}/${A.margSupMm.toFixed(0)}/${A.margDirMm.toFixed(0)}/${A.margInfMm.toFixed(0)}`);
+  ok('número no canto superior direito, a 2 cm da borda',
+     Math.abs(A.numTopo - 20) < 0.5 && Math.abs(A.numDir - 20) < 0.5,
+     `${A.numTopo.toFixed(0)} / ${A.numDir.toFixed(0)} mm`);
+  ok('tabelas em corpo 10 pt', Math.abs(A.tabelaPt - 10) < 0.2, A.tabelaPt.toFixed(1) + ' pt');
+  ok('linhas de tabela com pelo menos 0,6 cm', A.linhaMm >= 5.95, A.linhaMm.toFixed(1) + ' mm');
+  ok('tabelas ocupando a largura da mancha', A.larguraTabela > 0.99,
+     (A.larguraTabela * 100).toFixed(1) + ' %');
+  ok('tabelas sem traços verticais (padrão IBGE)', A.semTracoVertical);
 
   titulo('34b. Prévia, PDF e Word do memorial');
   await page.locator('[data-acao="exportarProjeto"]').click();

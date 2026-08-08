@@ -19,7 +19,7 @@
      ajustada por object-fit: contain, então uma logo comprida encolhe pela
      largura e uma logo alta encolhe pela altura — nas duas situações ela cabe
      inteira, sem distorcer e sem empurrar o resto do cabeçalho. */
-  M.CAIXA = { larguraTela: 230, larguraImpressao: 190 };
+  M.CAIXA = { larguraTela: 250, larguraImpressao: 210, alturaTela: 46, alturaCapa: 96 };
 
   M.cores = {
     navy: '#0E2148',
@@ -153,6 +153,63 @@
 
   M.removerLogo = function () {
     try { localStorage.removeItem(LS_LOGO); localStorage.setItem(LS_MODO, 'padrao'); } catch (e) {}
+  };
+
+  /* ------------------------------------------------------------------
+     Timbrado: a folha timbrada do escritório, usada como fundo de todas
+     as páginas do memorial. Guardada já reduzida ao tamanho de uma A4 a
+     150 dpi, porque o arquivo original costuma ter dezenas de megabytes
+     e não caberia no armazenamento do navegador.
+     ------------------------------------------------------------------ */
+
+  var LS_TIMB = 'pda.timbrado.v1';
+  M.TIMBRADO_PX = { largura: 1240, altura: 1754 };      /* A4 a 150 dpi */
+
+  M.timbrado = function () {
+    try {
+      var s = localStorage.getItem(LS_TIMB);
+      if (!s) return null;
+      var t = JSON.parse(s);
+      if (!t || !t.imagem) return null;
+      if (!(t.margSup > 0)) t.margSup = 35;
+      if (!(t.margInf > 0)) t.margInf = 25;
+      return t;
+    } catch (e) { return null; }
+  };
+
+  M.gravarTimbrado = function (t) {
+    try { localStorage.setItem(LS_TIMB, JSON.stringify(t)); return true; } catch (e) { return false; }
+  };
+
+  M.removerTimbrado = function () {
+    try { localStorage.removeItem(LS_TIMB); } catch (e) {}
+  };
+
+  M.margensTimbrado = function (sup, inf) {
+    var t = M.timbrado();
+    if (!t) return false;
+    t.margSup = sup; t.margInf = inf;
+    return M.gravarTimbrado(t);
+  };
+
+  /* Reduz a imagem para o tamanho de uma folha A4 a 150 dpi e devolve um
+     data URI leve, que cabe no armazenamento do navegador. */
+  M.reduzirParaA4 = function (dataUri, cb) {
+    var img = new Image();
+    img.onload = function () {
+      var L = M.TIMBRADO_PX.largura, A = M.TIMBRADO_PX.altura;
+      var cv = document.createElement('canvas');
+      cv.width = L; cv.height = A;
+      var g = cv.getContext('2d');
+      g.fillStyle = '#fff';
+      g.fillRect(0, 0, L, A);
+      g.drawImage(img, 0, 0, L, A);
+      var jpg = cv.toDataURL('image/jpeg', 0.86);
+      cb({ imagem: jpg, largura: img.naturalWidth, altura: img.naturalHeight,
+           bytes: Math.round(jpg.length * 0.75) });
+    };
+    img.onerror = function () { cb(null); };
+    img.src = dataUri;
   };
 
   /* Mede a imagem carregada e devolve a proporção, para avisar quando a logo

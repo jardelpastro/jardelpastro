@@ -168,22 +168,29 @@ diâmetros: Hazen-Williams, Colebrook-White iterativa, Swamee-Jain e
 Zigrang-Sylvester, lado a lado, com a diferença percentual na altura
 manométrica.
 
-**Memorial descritivo e de cálculo** — documento completo em A4, gerado pelo
-botão **Exportar**, em PDF (pela impressão do próprio navegador) ou em arquivo
-`.doc` para editar no Word ou no LibreOffice. Traz capa, sumário, índice de
-figuras e índice de tabelas **com os números de página certos**, e em cada
-capítulo o mesmo encadeamento: descrição do que está sendo calculado com a fonte
-entre parênteses (norma ou literatura), a fórmula usada, a mesma fórmula com os
-números do projeto no lugar das letras, e a tabela-resumo com os resultados. Há
-um capítulo por conjunto de trechos (sucção, barrilete de recalque, adutora),
-cada um com a tabela de peças mostrando os coeficientes K e a fonte de onde
-vieram; depois o perfil da linha com a piezométrica e as envoltórias, o resumo
-das perdas e da altura manométrica, os conjuntos elevatórios, o NPSH disponível,
-a curva do sistema cruzada com a curva da bomba no ponto de operação, a
-pré-avaliação do transitório e a bibliografia. A introdução é redigida a partir
-dos dados do projeto (nome, local, fluido, vazão, extensão, material, desnível,
-potência) e pode ser editada ou reescrita no próprio programa — o botão *Editar
-a introdução* fica na prévia.
+**Memorial descritivo e de cálculo, formatado na ABNT** — documento completo em
+A4, gerado pelo botão **Exportar**, em PDF (pela impressão do próprio navegador)
+ou em arquivo `.doc` para editar no Word ou no LibreOffice. Traz capa, lista de
+figuras, lista de tabelas e sumário **com os números de página certos**, e em
+cada capítulo o mesmo encadeamento: descrição do que está sendo calculado com a
+fonte entre parênteses (norma ou literatura), a fórmula usada, a mesma fórmula
+com os números do projeto no lugar das letras, e a tabela-resumo com os
+resultados. Há um capítulo por conjunto de trechos (sucção, barrilete de
+recalque, adutora), cada um com a tabela de peças mostrando os coeficientes K e a
+fonte de onde vieram; depois o perfil da linha com a piezométrica e as
+envoltórias, o resumo das perdas e da altura manométrica, os conjuntos
+elevatórios, o NPSH disponível, a curva do sistema cruzada com a curva da bomba
+no ponto de operação, a pré-avaliação do transitório e as referências. A
+introdução é redigida a partir dos dados do projeto (nome, local, fluido, vazão,
+extensão, material, desnível, potência) e pode ser editada ou reescrita no
+próprio programa — o botão *Editar a introdução* fica na prévia.
+
+**Fórmulas com cara de fórmula** — o memorial não escreve `a/b` em linha: um
+compositor matemático próprio monta as expressões em SVG, com fração de barra
+horizontal, radical com a barra sobre o radicando, expoentes, índices e
+parênteses que crescem com o conteúdo. Vale tanto para a fórmula simbólica
+quanto para a memória de cálculo, cujas linhas saem alinhadas pelo sinal de
+igual. As equações são numeradas entre parênteses na margem direita.
 
 A aba **Resultados** mantém o memorial curto de sempre, para conferência rápida
 na tela.
@@ -219,11 +226,12 @@ src/js/10-ui-resultados.js  resultados, piezométrica e memorial
 src/js/11-ui-catalogos.js   catálogos e fontes
 src/js/11b-ui-biblioteca.js biblioteca de projetos
 src/js/12-app.js            aplicação, ações, arquivos
+src/js/08c-formula.js       compositor de fórmulas (frações, radicais, índices)
 src/js/13-memorial.js       texto, fórmulas, tabelas e figuras do memorial
 src/js/14-exportar.js       paginação A4, sumário/índices, PDF e Word
 build.py                    gera dist/Pre-dimensionamento-Adutora.html
 tests/run.js                243 testes do núcleo de cálculo
-tests/ui.js                 283 testes de interface em navegador
+tests/ui.js                 309 testes de interface em navegador
 docs/AUDITORIA-PLANILHAS.md auditoria das planilhas de origem
 ```
 
@@ -244,6 +252,38 @@ ferro fundido, `e = DE/SDR` para PEAD), a monotonicidade dos coeficientes com a
 idade, os cenários de bombeamento, a classificação por cores, a curva do sistema,
 o ponto de operação em paralelo, as envoltórias do transitório e o ótimo
 econômico de diâmetro.
+
+## Formatação do memorial
+
+O documento segue a ABNT, com **uma exceção pedida**: entrelinhas 1,2 no lugar
+de 1,5.
+
+| Item | Adotado | Referência |
+|---|---|---|
+| Fonte | Arial 12 pt no texto; 10 pt em legendas, fontes e tabelas | NBR 14724 |
+| Entrelinhas | **1,2** (exceção; a norma pede 1,5) | — |
+| Margens | 3 cm em cima e à esquerda; 2 cm embaixo e à direita | NBR 14724 |
+| Parágrafo | justificado, recuo de 1,25 cm na primeira linha | prática corrente |
+| Seções | indicativo numérico progressivo (1, 1.1), separado do título por um espaço, sem ponto; primária em caixa alta e negrito, começando em folha nova | NBR 6024 e NBR 14724 |
+| Alíneas | letra minúscula seguida de parêntese, terminadas em ponto e vírgula | NBR 6024 |
+| Paginação | algarismos no canto superior direito, a 2 cm da borda; as folhas pré-textuais contam mas não recebem número | NBR 14724 |
+| Equações | centralizadas, numeradas entre parênteses junto à margem direita, seguidas da lista "em que…" | NBR 14724 |
+| Figuras | legenda **acima** ("Figura 1 – Título") e fonte abaixo, ambas em 10 pt | NBR 14724 |
+| Tabelas | título acima e fonte abaixo; largura total da mancha; corpo 10 pt; linhas de 0,6 cm; fechadas em cima e embaixo, sem traços verticais | IBGE / NBR 14724 |
+| Pré-textuais | capa, lista de figuras, lista de tabelas e sumário, nessa ordem | NBR 14724 |
+| Citações | autor-data entre parênteses no corpo do texto | NBR 10520 |
+| Referências | elemento pós-textual sem indicativo numérico, em ordem alfabética, espaço simples, separadas por uma linha em branco | NBR 6023 |
+
+## Papel timbrado
+
+O botão **Logo** também carrega o papel timbrado do escritório, que passa a ser
+o fundo de todas as páginas do memorial, capa inclusive. O arquivo original não
+precisa ser preparado antes: o programa o converte para uma folha A4 a 150 dpi
+(1240 × 1754 px) e guarda essa versão, o que troca dezenas de megabytes por
+algumas centenas de kilobytes — a conversão acontece no próprio navegador, sem
+enviar nada para fora. Com o timbrado ativo, as margens superior e inferior
+passam a ser as informadas nos dois campos ao lado da prévia, para o texto não
+invadir a arte; o botão **Remover o timbrado** devolve as margens da ABNT.
 
 ## Pressão admissível do tubo
 
@@ -269,10 +309,10 @@ O botão **Logo** oferece três opções:
 - **um arquivo meu** — PNG com fundo transparente, JPG, SVG ou WebP, até 900 kB;
 - **sem logo** — o cabeçalho e o memorial saem apenas com o nome do projeto.
 
-Qualquer imagem carregada é ajustada para caber na **mesma caixa** (230 px de
-largura por 38 px de altura na tela, 190 px no papel): uma logo comprida encolhe
-pela largura, uma logo alta encolhe pela altura, nenhuma delas distorce nem
-empurra o resto do cabeçalho. O modal mostra a prévia na tela e no papel e avisa
+Qualquer imagem carregada é ajustada para caber na **mesma caixa** (250 px de
+largura por 46 px de altura na tela, 210 px no papel; 96 px de altura na capa do
+memorial): uma logo comprida encolhe pela largura, uma logo alta encolhe pela
+altura, nenhuma delas distorce nem empurra o resto do cabeçalho. O modal mostra a prévia na tela e no papel e avisa
 quando a proporção da imagem a deixa pequena dentro da caixa. A escolha vale
 para o cabeçalho do programa, para a impressão das abas e para a capa e o
 cabeçalho do memorial, e fica gravada no navegador daquele computador.
