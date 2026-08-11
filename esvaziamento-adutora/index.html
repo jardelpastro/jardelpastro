@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tempo de Esvaziamento de Adutora</title>
+<style>
+  :root {
+    --azul: #0b5394;
+    --azul-escuro: #073763;
+    --azul-claro: #e8f1fa;
+    --agua: #3d85c6;
+    --verde: #2e7d32;
+    --laranja: #e65100;
+    --vermelho: #c62828;
+    --cinza: #5f6368;
+    --borda: #d6e0ea;
+    --fundo: #f4f7fa;
+    --card: #ffffff;
+    --texto: #202124;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--fundo);
+    color: var(--texto);
+    line-height: 1.5;
+    padding-bottom: 3rem;
+  }
+  header {
+    background: linear-gradient(135deg, var(--azul-escuro), var(--azul));
+    color: #fff;
+    padding: 1.6rem 1rem 1.4rem;
+    text-align: center;
+  }
+  header h1 { font-size: 1.45rem; font-weight: 600; }
+  header p { font-size: .9rem; opacity: .85; margin-top: .3rem; }
+  main { max-width: 980px; margin: 0 auto; padding: 1rem; }
+
+  .tabs {
+    display: flex; gap: .5rem; margin: 1rem 0;
+  }
+  .tab-btn {
+    flex: 1; padding: .7rem .5rem; border: 1px solid var(--borda);
+    background: var(--card); border-radius: 10px; cursor: pointer;
+    font-size: .95rem; font-weight: 600; color: var(--cinza);
+    transition: all .15s;
+  }
+  .tab-btn.ativo {
+    background: var(--azul); color: #fff; border-color: var(--azul);
+    box-shadow: 0 2px 6px rgba(11,83,148,.3);
+  }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--borda);
+    border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem;
+  }
+  .card h2 {
+    font-size: 1rem; color: var(--azul-escuro); margin-bottom: .8rem;
+    display: flex; align-items: center; gap: .45rem;
+  }
+  .card h2 .num {
+    background: var(--azul); color: #fff; width: 1.5rem; height: 1.5rem;
+    border-radius: 50%; display: inline-flex; align-items: center;
+    justify-content: center; font-size: .8rem; flex-shrink: 0;
+  }
+
+  .campo { margin-bottom: .85rem; }
+  .campo label {
+    display: block; font-size: .84rem; font-weight: 600;
+    color: var(--cinza); margin-bottom: .25rem;
+  }
+  .campo .dica { font-weight: 400; color: #8a9199; }
+  .linha-input { display: flex; gap: .5rem; align-items: center; }
+  input[type=number], select {
+    width: 100%; padding: .55rem .7rem; font-size: 1rem;
+    border: 1px solid var(--borda); border-radius: 8px;
+    background: #fff; color: var(--texto);
+  }
+  input[type=number]:focus, select:focus {
+    outline: 2px solid var(--agua); border-color: var(--agua);
+  }
+  .unidade { font-size: .85rem; color: var(--cinza); min-width: 2.4rem; }
+
+  .resultado-principal {
+    background: var(--azul-claro); border: 1px solid #bcd3e8;
+    border-radius: 12px; padding: 1.2rem; text-align: center;
+    margin-bottom: 1rem;
+  }
+  .resultado-principal .rotulo { font-size: .85rem; color: var(--cinza); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .resultado-principal .valor { font-size: 2.1rem; font-weight: 700; color: var(--azul-escuro); margin: .2rem 0; }
+  .resultado-principal .detalhe { font-size: .9rem; color: var(--cinza); }
+
+  table.res { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  table.res td { padding: .45rem .3rem; border-bottom: 1px solid #eef2f6; }
+  table.res td:last-child { text-align: right; font-weight: 600; white-space: nowrap; }
+  table.res tr:last-child td { border-bottom: none; }
+
+  .alerta { border-radius: 8px; padding: .6rem .8rem; font-size: .87rem; margin-top: .6rem; display: flex; gap: .5rem; }
+  .alerta.aviso { background: #fff3e0; color: var(--laranja); border: 1px solid #ffd8a8; }
+  .alerta.erro  { background: #fdecea; color: var(--vermelho); border: 1px solid #f5c6c2; }
+  .alerta.ok    { background: #e8f5e9; color: var(--verde); border: 1px solid #bfe3c0; }
+  .alerta.info  { background: var(--azul-claro); color: var(--azul-escuro); border: 1px solid #bcd3e8; }
+
+  .memoria { font-size: .86rem; }
+  .memoria .passo {
+    padding: .55rem .7rem; background: #f8fafc; border: 1px solid #eef2f6;
+    border-radius: 8px; margin-bottom: .5rem;
+  }
+  .memoria .passo b { color: var(--azul-escuro); }
+  .memoria .formula {
+    font-family: "Cambria Math", Georgia, serif; font-style: italic;
+    color: var(--azul-escuro);
+  }
+
+  .esquema { width: 100%; height: auto; display: block; margin: .3rem auto 0; }
+  .rodape { text-align: center; font-size: .78rem; color: #8a9199; margin-top: 1.2rem; padding: 0 1rem; }
+  .oculto { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💧 Tempo de Esvaziamento de Adutora</h1>
+  <p>Cálculo do tempo de esvaziamento do trecho pela descarga de fundo</p>
+</header>
+
+<main>
+
+  <div class="tabs">
+    <button class="tab-btn ativo" id="tabTempo" onclick="mudarModo('tempo')">⏱️ Calcular tempo de esvaziamento</button>
+    <button class="tab-btn" id="tabDim" onclick="mudarModo('dim')">📐 Dimensionar a descarga</button>
+  </div>
+
+  <div class="grid">
+
+    <!-- ===================== ENTRADAS ===================== -->
+    <div>
+      <div class="card">
+        <h2><span class="num">1</span> Dados da adutora (trecho a esvaziar)</h2>
+
+        <div class="campo">
+          <label>Diâmetro da adutora — DN <span class="dica">(interno)</span></label>
+          <div class="linha-input">
+            <select id="selD" onchange="sincronizarSelect('selD','inpD')"></select>
+            <input type="number" id="inpD" min="1" step="1" value="300" oninput="calcular()">
+            <span class="unidade">mm</span>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label>Extensão do trecho — L <span class="dica">(entre o ponto alto e a descarga)</span></label>
+          <div class="linha-input">
+            <input type="number" id="inpL" min="0" step="10" value="1500" oninput="calcular()">
+            <span class="unidade">m</span>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label>Desnível — H <span class="dica">(cota do ponto alto − cota da descarga)</span></label>
+          <div class="linha-input">
+            <input type="number" id="inpH" min="0" step="0.5" value="20" oninput="calcular()">
+            <span class="unidade">m</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">2</span> Dados da descarga</h2>
+
+        <div class="campo" id="campoDescarga">
+          <label>Diâmetro da descarga — d</label>
+          <div class="linha-input">
+            <select id="selDd" onchange="sincronizarSelect('selDd','inpDd')"></select>
+            <input type="number" id="inpDd" min="1" step="1" value="100" oninput="calcular()">
+            <span class="unidade">mm</span>
+          </div>
+        </div>
+
+        <div class="campo oculto" id="campoTempoAlvo">
+          <label>Tempo de esvaziamento desejado — t</label>
+          <div class="linha-input">
+            <input type="number" id="inpTalvo" min="0.1" step="0.5" value="2" oninput="calcular()">
+            <span class="unidade">horas</span>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label>Coeficiente de vazão — C<sub>d</sub> <span class="dica">(tipo de saída da descarga)</span></label>
+          <div class="linha-input">
+            <select id="selCd" onchange="sincronizarSelect('selCd','inpCd')">
+              <option value="0.61">Orifício / parede delgada — Cd = 0,61</option>
+              <option value="0.82" selected>Tubo curto + válvula (usual) — Cd = 0,82</option>
+              <option value="0.97">Bocal com bordas arredondadas — Cd = 0,97</option>
+              <option value="custom">Personalizado…</option>
+            </select>
+            <input type="number" id="inpCd" min="0.1" max="1" step="0.01" value="0.82" oninput="calcular()" style="max-width:6.5rem">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📋 Esquema do trecho</h2>
+        <svg class="esquema" viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg" aria-label="Esquema do trecho da adutora">
+          <!-- terreno -->
+          <polygon points="20,60 440,160 440,200 20,200" fill="#efe6d8"/>
+          <line x1="20" y1="60" x2="440" y2="160" stroke="#b09b7c" stroke-width="2"/>
+          <!-- adutora -->
+          <line x1="45" y1="72" x2="400" y2="152" stroke="#0b5394" stroke-width="9" stroke-linecap="round"/>
+          <line x1="45" y1="72" x2="400" y2="152" stroke="#8ab6e0" stroke-width="4" stroke-linecap="round"/>
+          <!-- ponto alto / ventosa -->
+          <circle cx="45" cy="72" r="5" fill="#073763"/>
+          <text x="38" y="52" font-size="12" fill="#073763" font-weight="bold">Ponto alto</text>
+          <text x="38" y="65" font-size="10" fill="#5f6368">(ventosa)</text>
+          <!-- descarga -->
+          <rect x="394" y="150" width="12" height="18" rx="2" fill="#073763"/>
+          <path d="M 400 170 q 6 16 22 24" stroke="#3d85c6" stroke-width="4" fill="none" stroke-dasharray="1 6" stroke-linecap="round"/>
+          <text x="330" y="190" font-size="12" fill="#073763" font-weight="bold">Descarga</text>
+          <text x="330" y="203" font-size="11" fill="#5f6368" id="svgDd">d = 100 mm</text>
+          <!-- cota L -->
+          <text x="200" y="98" font-size="12" fill="#0b5394" font-weight="bold" transform="rotate(12.7 200 98)" id="svgL">L = 1.500 m</text>
+          <text x="200" y="130" font-size="11" fill="#5f6368" transform="rotate(12.7 200 130)" id="svgD">DN 300</text>
+          <!-- desnível H -->
+          <line x1="428" y1="72" x2="428" y2="160" stroke="#c62828" stroke-width="1.5"/>
+          <line x1="45" y1="72" x2="428" y2="72" stroke="#c62828" stroke-width="1" stroke-dasharray="4 4"/>
+          <polygon points="428,72 424,80 432,80" fill="#c62828"/>
+          <polygon points="428,160 424,152 432,152" fill="#c62828"/>
+          <text x="405" y="120" font-size="12" fill="#c62828" font-weight="bold" id="svgH" text-anchor="end">H = 20 m</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- ===================== RESULTADOS ===================== -->
+    <div>
+      <div class="resultado-principal" id="boxResultado">
+        <div class="rotulo" id="resRotulo">Tempo de esvaziamento</div>
+        <div class="valor" id="resValor">—</div>
+        <div class="detalhe" id="resDetalhe"></div>
+      </div>
+
+      <div class="card">
+        <h2>📊 Resumo do cálculo</h2>
+        <table class="res" id="tabResumo"></table>
+        <div id="alertas"></div>
+      </div>
+
+      <div class="card memoria">
+        <h2>🧮 Memória de cálculo</h2>
+        <div id="memoria"></div>
+      </div>
+
+      <div class="card">
+        <h2>ℹ️ Hipóteses e observações</h2>
+        <div class="memoria">
+          <div class="passo">A adutora é considerada <b>isolada a montante</b> (registro fechado — sem vazão afluente durante o esvaziamento).</div>
+          <div class="passo">É admitida <b>entrada de ar adequada</b> no ponto alto (ventosas). Sem admissão de ar suficiente, o tempo real será maior e há risco de <b>colapso por subpressão</b>.</div>
+          <div class="passo">O trecho é tratado com <b>declividade uniforme</b> entre o ponto alto e a descarga; a carga sobre a descarga decresce à medida que a linha esvazia, o que conduz à expressão <span class="formula">t = 2V / (C<sub>d</sub>·a·√(2gH))</span> — o dobro do tempo que resultaria da vazão inicial constante.</div>
+          <div class="passo">Prática usual: descarga com diâmetro entre <b>D/6 e D/4</b> da adutora e tempo de esvaziamento típico de <b>2 a 6 horas</b> (ajuste conforme a operação prevista e o corpo receptor).</div>
+          <div class="passo">Prever <b>proteção anti-erosiva</b> (caixa de descarga, enrocamento) no lançamento quando a velocidade do jato for elevada.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rodape">
+    Ferramenta de pré-dimensionamento — os resultados devem ser verificados em projeto. g = 9,81 m/s².
+  </div>
+</main>
+
+<script>
+"use strict";
+
+const G = 9.81;
+const DN_COMERCIAIS = [50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1100, 1200];
+let modo = "tempo"; // "tempo" | "dim"
+
+const fmt = (v, casas = 2) =>
+  isFinite(v) ? v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas }) : "—";
+
+function fmtTempo(seg) {
+  if (!isFinite(seg) || seg <= 0) return "—";
+  if (seg < 60) return fmt(seg, 0) + " s";
+  const h = Math.floor(seg / 3600);
+  const min = Math.round((seg - h * 3600) / 60);
+  if (h === 0) return min + " min";
+  if (min === 0) return h + " h";
+  return h + " h " + min + " min";
+}
+
+function preencherSelects() {
+  for (const [selId, inpId] of [["selD", "inpD"], ["selDd", "inpDd"]]) {
+    const sel = document.getElementById(selId);
+    DN_COMERCIAIS.forEach(dn => {
+      const o = document.createElement("option");
+      o.value = dn; o.textContent = "DN " + dn;
+      sel.appendChild(o);
+    });
+    const oc = document.createElement("option");
+    oc.value = "custom"; oc.textContent = "Personalizado…";
+    sel.appendChild(oc);
+    sel.value = document.getElementById(inpId).value;
+    if (sel.value === "") sel.value = "custom";
+  }
+}
+
+function sincronizarSelect(selId, inpId) {
+  const sel = document.getElementById(selId);
+  const inp = document.getElementById(inpId);
+  if (sel.value !== "custom") inp.value = sel.value;
+  inp.focus();
+  calcular();
+}
+
+function mudarModo(novo) {
+  modo = novo;
+  document.getElementById("tabTempo").classList.toggle("ativo", modo === "tempo");
+  document.getElementById("tabDim").classList.toggle("ativo", modo === "dim");
+  document.getElementById("campoDescarga").classList.toggle("oculto", modo === "dim");
+  document.getElementById("campoTempoAlvo").classList.toggle("oculto", modo === "tempo");
+  calcular();
+}
+
+function num(id) { return parseFloat(document.getElementById(id).value); }
+
+function alerta(tipo, icone, texto) {
+  return `<div class="alerta ${tipo}"><span>${icone}</span><span>${texto}</span></div>`;
+}
+
+function calcular() {
+  // sincroniza selects com os inputs (caso o usuário digite um DN comercial)
+  for (const [selId, inpId] of [["selD", "inpD"], ["selDd", "inpDd"]]) {
+    const sel = document.getElementById(selId);
+    const v = document.getElementById(inpId).value;
+    sel.value = DN_COMERCIAIS.includes(parseFloat(v)) ? v : "custom";
+  }
+  const selCd = document.getElementById("selCd");
+  const cdVal = document.getElementById("inpCd").value;
+  selCd.value = ["0.61", "0.82", "0.97"].includes(cdVal) ? cdVal : "custom";
+
+  const Dmm = num("inpD"), L = num("inpL"), H = num("inpH"), Cd = num("inpCd");
+  const resValor = document.getElementById("resValor");
+  const resDetalhe = document.getElementById("resDetalhe");
+  const resRotulo = document.getElementById("resRotulo");
+  const tabResumo = document.getElementById("tabResumo");
+  const alertas = document.getElementById("alertas");
+  const memoria = document.getElementById("memoria");
+
+  const erros = [];
+  if (!(Dmm > 0)) erros.push("Informe o diâmetro da adutora.");
+  if (!(L > 0)) erros.push("Informe a extensão do trecho.");
+  if (!(H > 0)) erros.push("Informe um desnível maior que zero (a descarga deve estar abaixo do ponto alto).");
+  if (!(Cd > 0 && Cd <= 1)) erros.push("O coeficiente de vazão deve estar entre 0 e 1.");
+
+  let dmm, tAlvoH;
+  if (modo === "tempo") {
+    dmm = num("inpDd");
+    if (!(dmm > 0)) erros.push("Informe o diâmetro da descarga.");
+  } else {
+    tAlvoH = num("inpTalvo");
+    if (!(tAlvoH > 0)) erros.push("Informe o tempo de esvaziamento desejado.");
+  }
+
+  if (erros.length) {
+    resValor.textContent = "—";
+    resDetalhe.textContent = "";
+    tabResumo.innerHTML = "";
+    memoria.innerHTML = "";
+    alertas.innerHTML = erros.map(e => alerta("erro", "⚠️", e)).join("");
+    return;
+  }
+
+  const D = Dmm / 1000;
+  const A = Math.PI * D * D / 4;      // seção da adutora (m²)
+  const V = A * L;                     // volume do trecho (m³)
+  const raiz = Math.sqrt(2 * G * H);   // √(2gH)
+
+  let d, a, Q0, t, dReq = null, dnAdotado = null;
+
+  if (modo === "dim") {
+    // área necessária para esvaziar no tempo-alvo: a = 2V / (Cd · t · √(2gH))
+    const tAlvoS = tAlvoH * 3600;
+    const aReq = 2 * V / (Cd * tAlvoS * raiz);
+    dReq = Math.sqrt(4 * aReq / Math.PI) * 1000; // mm
+    dnAdotado = DN_COMERCIAIS.find(dn => dn >= dReq) || null;
+    d = (dnAdotado || dReq) / 1000;
+  } else {
+    d = dmm / 1000;
+  }
+
+  a = Math.PI * d * d / 4;
+  Q0 = Cd * a * raiz;                 // vazão inicial (m³/s)
+  t = 2 * V / Q0;                      // tempo de esvaziamento (s)
+  const v0 = Cd * raiz;               // velocidade inicial na descarga (m/s)
+  const Qm = V / t;                    // vazão média
+  const relacao = (d * 1000) / Dmm;   // d/D
+
+  // ---------- resultado principal ----------
+  if (modo === "tempo") {
+    resRotulo.textContent = "Tempo de esvaziamento";
+    resValor.textContent = fmtTempo(t);
+    resDetalhe.textContent = `Volume de ${fmt(V, 1)} m³ descarregado por DN ${fmt(d * 1000, 0)}`;
+  } else {
+    resRotulo.textContent = "Diâmetro de descarga recomendado";
+    if (dnAdotado) {
+      resValor.textContent = "DN " + dnAdotado;
+      resDetalhe.textContent = `Mínimo teórico de ${fmt(dReq, 1)} mm → tempo resultante de ${fmtTempo(t)}`;
+    } else {
+      resValor.textContent = fmt(dReq, 0) + " mm";
+      resDetalhe.textContent = "Acima do maior DN comercial da lista — verifique os dados ou preveja descargas múltiplas.";
+    }
+  }
+
+  // ---------- resumo ----------
+  const linhas = [
+    ["Área da seção da adutora (A)", fmt(A, 4) + " m²"],
+    ["Volume do trecho (V)", fmt(V, 1) + " m³"],
+    ["Área da descarga (a)", fmt(a, 5) + " m²"],
+    ["Vazão inicial da descarga (Q₀)", fmt(Q0 * 1000, 1) + " L/s"],
+    ["Vazão média durante o esvaziamento", fmt(Qm * 1000, 1) + " L/s"],
+    ["Velocidade inicial do jato (v₀)", fmt(v0, 2) + " m/s"],
+    ["Relação d/D", fmt(relacao, 2) + " (1/" + fmt(1 / relacao, 1) + ")"],
+    ["Tempo de esvaziamento (t)", fmtTempo(t)],
+  ];
+  if (modo === "dim") linhas.splice(2, 0, ["Diâmetro mínimo teórico da descarga", fmt(dReq, 1) + " mm"]);
+  tabResumo.innerHTML = linhas.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+
+  // ---------- alertas ----------
+  let av = "";
+  if (modo === "tempo" && d >= D)
+    av += alerta("aviso", "⚠️", "A descarga tem diâmetro igual ou maior que a adutora — verifique os dados.");
+  if (relacao < 1 / 6 && d < D)
+    av += alerta("aviso", "⚠️", "Descarga menor que D/6 da adutora — abaixo da faixa usual (D/6 a D/4). O esvaziamento tende a ser demorado.");
+  if (t > 6 * 3600)
+    av += alerta("aviso", "⏱️", "Tempo de esvaziamento acima de 6 h — considere aumentar o diâmetro da descarga ou dividir o trecho com descargas intermediárias.");
+  if (v0 > 6)
+    av += alerta("aviso", "🌊", `Velocidade do jato elevada (${fmt(v0, 1)} m/s) — prever dissipação de energia e proteção anti-erosiva no lançamento.`);
+  if (!av)
+    av = alerta("ok", "✅", "Parâmetros dentro das faixas usuais de projeto.");
+  av += alerta("info", "💡", `Para referência: a vazão inicial de ${fmt(Q0 * 1000, 1)} L/s decresce ao longo do esvaziamento até zero.`);
+  alertas.innerHTML = av;
+
+  // ---------- memória de cálculo ----------
+  const passos = [
+    `<b>1. Volume do trecho:</b><br><span class="formula">V = (π·D²/4)·L</span> = (π·${fmt(D, 3)}²/4)·${fmt(L, 0)} = <b>${fmt(V, 1)} m³</b>`,
+    `<b>2. Área da descarga:</b><br><span class="formula">a = π·d²/4</span> = π·${fmt(d, 3)}²/4 = <b>${fmt(a, 5)} m²</b>`,
+    `<b>3. Vazão inicial pela descarga</b> (orifício sob carga H = ${fmt(H, 1)} m):<br><span class="formula">Q₀ = C<sub>d</sub>·a·√(2gH)</span> = ${fmt(Cd, 2)}·${fmt(a, 5)}·√(2·9,81·${fmt(H, 1)}) = <b>${fmt(Q0 * 1000, 1)} L/s</b>`,
+    `<b>4. Tempo de esvaziamento</b> (carga decrescente, declividade uniforme):<br><span class="formula">t = 2V/Q₀</span> = 2·${fmt(V, 1)}/${fmt(Q0, 4)} = ${fmt(t, 0)} s = <b>${fmtTempo(t)}</b>`,
+  ];
+  if (modo === "dim") {
+    passos.splice(1, 0,
+      `<b>1b. Área mínima da descarga para t = ${fmt(tAlvoH, 1)} h:</b><br><span class="formula">a = 2V/(C<sub>d</sub>·t·√(2gH))</span> → d<sub>mín</sub> = <b>${fmt(dReq, 1)} mm</b>${dnAdotado ? " → adotado <b>DN " + dnAdotado + "</b>" : ""}`);
+  }
+  memoria.innerHTML = passos.map(p => `<div class="passo">${p}</div>`).join("");
+
+  // ---------- esquema ----------
+  document.getElementById("svgL").textContent = "L = " + fmt(L, 0) + " m";
+  document.getElementById("svgH").textContent = "H = " + fmt(H, 1) + " m";
+  document.getElementById("svgD").textContent = "DN " + fmt(Dmm, 0);
+  document.getElementById("svgDd").textContent = "d = " + fmt(d * 1000, 0) + " mm";
+}
+
+preencherSelects();
+calcular();
+</script>
+</body>
+</html>
