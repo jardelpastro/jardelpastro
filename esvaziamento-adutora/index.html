@@ -109,6 +109,13 @@
     margin: .8rem 0 .5rem; padding-top: .6rem; border-top: 1px dashed var(--borda);
   }
 
+  .lados { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+  .lados.um { grid-template-columns: 1fr; }
+  .lados.um #blocoLado1 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+  @media (max-width: 480px) {
+    .lados, .lados.um #blocoLado1 { grid-template-columns: 1fr; }
+  }
+
   .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .45rem; align-items: center; }
   .chips .rotulo-chip { font-size: .78rem; color: var(--cinza); }
   .chip {
@@ -148,7 +155,7 @@
     color: var(--primaria-escura);
   }
 
-  .esquema { width: 100%; height: auto; display: block; margin: .3rem auto 0; }
+  .esquema { width: 100%; height: auto; display: block; margin: .2rem auto .9rem; }
   .esquema text { font-family: "Segoe UI", Roboto, Arial, sans-serif; }
   .rodape { text-align: center; font-size: .78rem; color: #8a9199; margin-top: 1.2rem; padding: 0 1rem; }
   .oculto { display: none; }
@@ -192,80 +199,6 @@
           </div>
         </div>
 
-        <div id="blocoLado1">
-          <div class="subtitulo-lado oculto" id="titLado1">⬅️ Lado esquerdo</div>
-          <div class="campo">
-            <label id="lblL1">Extensão do trecho — L <span class="dica">(entre o ponto alto e a descarga)</span></label>
-            <div class="linha-input">
-              <input type="number" id="inpL1" min="0" step="10" value="1500" oninput="calcular()">
-              <span class="unidade">m</span>
-            </div>
-          </div>
-          <div class="campo">
-            <label id="lblH1">Desnível — H <span class="dica">(cota do ponto alto − cota da descarga)</span></label>
-            <div class="linha-input">
-              <input type="number" id="inpH1" min="0" step="0.5" value="20" oninput="calcular()">
-              <span class="unidade">m</span>
-            </div>
-          </div>
-        </div>
-
-        <div id="blocoLado2" class="oculto">
-          <div class="subtitulo-lado">➡️ Lado direito</div>
-          <div class="campo">
-            <label>Extensão — L₂ <span class="dica">(do ponto alto direito até a descarga)</span></label>
-            <div class="linha-input">
-              <input type="number" id="inpL2" min="0" step="10" value="500" oninput="calcular()">
-              <span class="unidade">m</span>
-            </div>
-          </div>
-          <div class="campo">
-            <label>Desnível — H₂ <span class="dica">(cota do ponto alto direito − cota da descarga)</span></label>
-            <div class="linha-input">
-              <input type="number" id="inpH2" min="0" step="0.5" value="8" oninput="calcular()">
-              <span class="unidade">m</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2><span class="num">2</span> Dados da descarga</h2>
-
-        <div class="campo" id="campoDescarga">
-          <label>Diâmetro da descarga — d</label>
-          <div class="linha-input">
-            <select id="selDd" onchange="sincronizarSelect('selDd','inpDd')"></select>
-            <input type="number" id="inpDd" min="1" step="1" value="75" oninput="calcular()">
-            <span class="unidade">mm</span>
-          </div>
-          <div class="chips" id="chipsSugestao"></div>
-        </div>
-
-        <div class="campo oculto" id="campoTempoAlvo">
-          <label>Tempo de esvaziamento desejado — t</label>
-          <div class="linha-input">
-            <input type="number" id="inpTalvo" min="0.1" step="0.1" value="2" oninput="calcular()">
-            <span class="unidade">horas</span>
-          </div>
-        </div>
-
-        <div class="campo">
-          <label>Coeficiente de vazão — C<sub>d</sub> <span class="dica">(tipo de saída da descarga)</span></label>
-          <div class="linha-input">
-            <select id="selCd" onchange="sincronizarSelect('selCd','inpCd')">
-              <option value="0.61">Orifício / parede delgada — Cd = 0,61</option>
-              <option value="0.82" selected>Tubo curto + válvula (usual) — Cd = 0,82</option>
-              <option value="0.97">Bocal com bordas arredondadas — Cd = 0,97</option>
-              <option value="custom">Personalizado…</option>
-            </select>
-            <input type="number" id="inpCd" min="0.1" max="1" step="0.01" value="0.82" oninput="calcular()" style="max-width:6.5rem">
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>📋 Esquema do trecho</h2>
 
         <!-- ============ ESQUEMA: UM LADO ============ -->
         <svg class="esquema" id="esqUm" viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg" aria-label="Esquema do trecho com descarga na extremidade">
@@ -327,7 +260,82 @@
           <polygon points="436,168 432,160 440,160" fill="var(--vermelho)"/>
           <text x="430" y="150" font-size="11.5" fill="var(--vermelho)" font-weight="bold" text-anchor="end" id="svg2H2">H₂ = 8 m</text>
         </svg>
+
+        <div class="lados um" id="gridLados">
+        <div id="blocoLado1">
+          <div class="subtitulo-lado oculto" id="titLado1">⬅️ Lado esquerdo</div>
+          <div class="campo">
+            <label id="lblL1">Extensão do trecho — L <span class="dica">(entre o ponto alto e a descarga)</span></label>
+            <div class="linha-input">
+              <input type="number" id="inpL1" min="0" step="10" value="1500" oninput="calcular()">
+              <span class="unidade">m</span>
+            </div>
+          </div>
+          <div class="campo">
+            <label id="lblH1">Desnível — H <span class="dica">(cota do ponto alto − cota da descarga)</span></label>
+            <div class="linha-input">
+              <input type="number" id="inpH1" min="0" step="0.5" value="20" oninput="calcular()">
+              <span class="unidade">m</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="blocoLado2" class="oculto">
+          <div class="subtitulo-lado">➡️ Lado direito</div>
+          <div class="campo">
+            <label>Extensão — L₂ <span class="dica">(do ponto alto direito até a descarga)</span></label>
+            <div class="linha-input">
+              <input type="number" id="inpL2" min="0" step="10" value="500" oninput="calcular()">
+              <span class="unidade">m</span>
+            </div>
+          </div>
+          <div class="campo">
+            <label>Desnível — H₂ <span class="dica">(cota do ponto alto direito − cota da descarga)</span></label>
+            <div class="linha-input">
+              <input type="number" id="inpH2" min="0" step="0.5" value="8" oninput="calcular()">
+              <span class="unidade">m</span>
+            </div>
+          </div>
+        </div>
+        </div>
       </div>
+
+      <div class="card">
+        <h2><span class="num">2</span> Dados da descarga</h2>
+
+        <div class="campo" id="campoDescarga">
+          <label>Diâmetro da descarga — d</label>
+          <div class="linha-input">
+            <select id="selDd" onchange="sincronizarSelect('selDd','inpDd')"></select>
+            <input type="number" id="inpDd" min="1" step="1" value="75" oninput="calcular()">
+            <span class="unidade">mm</span>
+          </div>
+          <div class="chips" id="chipsSugestao"></div>
+        </div>
+
+        <div class="campo oculto" id="campoTempoAlvo">
+          <label>Tempo de esvaziamento desejado — t</label>
+          <div class="linha-input">
+            <input type="number" id="inpTalvo" min="0.1" step="0.1" value="2" oninput="calcular()">
+            <span class="unidade">horas</span>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label>Coeficiente de vazão — C<sub>d</sub> <span class="dica">(tipo de saída da descarga)</span></label>
+          <div class="linha-input">
+            <select id="selCd" onchange="sincronizarSelect('selCd','inpCd')">
+              <option value="0.61">Orifício / parede delgada — Cd = 0,61</option>
+              <option value="0.82" selected>Tubo curto + válvula (usual) — Cd = 0,82</option>
+              <option value="0.97">Bocal com bordas arredondadas — Cd = 0,97</option>
+              <option value="custom">Personalizado…</option>
+            </select>
+            <input type="number" id="inpCd" min="0.1" max="1" step="0.01" value="0.82" oninput="calcular()" style="max-width:6.5rem">
+          </div>
+        </div>
+      </div>
+
+
     </div>
 
     <!-- ===================== RESULTADOS ===================== -->
@@ -459,6 +467,7 @@ function mudarConfig(nova) {
   document.getElementById("segUm").classList.toggle("ativo", !dois);
   document.getElementById("segDois").classList.toggle("ativo", dois);
   document.getElementById("blocoLado2").classList.toggle("oculto", !dois);
+  document.getElementById("gridLados").classList.toggle("um", !dois);
   document.getElementById("titLado1").classList.toggle("oculto", !dois);
   document.getElementById("esqUm").classList.toggle("oculto", dois);
   document.getElementById("esqDois").classList.toggle("oculto", !dois);
