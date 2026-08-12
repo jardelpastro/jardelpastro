@@ -112,6 +112,7 @@
   .lados { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
   .lados.um { grid-template-columns: 1fr; }
   .lados.um #blocoLado1 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+  .lados.um #blocoLado1 .campo-dn { grid-column: 1 / -1; }
   @media (max-width: 480px) {
     .lados, .lados.um #blocoLado1 { grid-template-columns: 1fr; }
   }
@@ -150,10 +151,29 @@
     border-radius: 8px; margin-bottom: .5rem;
   }
   .memoria .passo b { color: var(--primaria-escura); }
-  .memoria .formula {
-    font-family: "Cambria Math", Georgia, serif; font-style: italic;
-    color: var(--primaria-escura);
+
+  /* ---------- notação matemática (memória de cálculo) ---------- */
+  #memoria { display: grid; grid-template-columns: 1fr; gap: .55rem; }
+  @media (min-width: 800px) { #memoria { grid-template-columns: 1fr 1fr; } }
+  #memoria .passo { margin-bottom: 0; }
+  .passo-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: .45rem; margin-bottom: .15rem; }
+  .fonte { font-size: .74rem; color: #8a9199; font-style: italic; }
+  .eq {
+    display: block; text-align: center;
+    font-family: "Cambria Math", "STIX Two Math", Cambria, Georgia, serif;
+    font-style: italic; font-size: 1.06rem; color: var(--primaria-escura);
+    margin: .5rem 0; line-height: 1.4;
   }
+  .eq .num-final { font-style: normal; font-weight: 700; }
+  .frac {
+    display: inline-flex; flex-direction: column; vertical-align: middle;
+    margin: 0 .18em; line-height: 1.25;
+  }
+  .frac > span { display: block; padding: 0 .35em; text-align: center; }
+  .frac > span:first-child { border-bottom: 1.3px solid currentColor; }
+  .sqrt { display: inline-flex; align-items: flex-start; white-space: nowrap; }
+  .sqrt::before { content: "√"; }
+  .sqrt > span { border-top: 1.3px solid currentColor; padding: 0 .12em; }
 
   .esquema { width: 100%; height: auto; display: block; margin: .2rem auto .9rem; }
   .esquema text { font-family: "Segoe UI", Roboto, Arial, sans-serif; }
@@ -183,22 +203,12 @@
         <h2><span class="num">1</span> Dados da adutora (trecho a esvaziar)</h2>
 
         <div class="campo">
-          <label>Diâmetro da adutora — DN <span class="dica">(interno)</span></label>
-          <div class="linha-input">
-            <select id="selD" onchange="aoMudarDNAdutora('sel')"></select>
-            <input type="number" id="inpD" min="1" step="1" value="300" oninput="aoMudarDNAdutora('inp')">
-            <span class="unidade">mm</span>
-          </div>
-        </div>
-
-        <div class="campo">
           <label>Posição da descarga</label>
           <div class="segmento">
             <button class="seg ativo" id="segUm" onclick="mudarConfig('um')">Extremidade<br>(um lado)</button>
             <button class="seg" id="segDois" onclick="mudarConfig('dois')">Ponto baixo<br>(dois lados)</button>
           </div>
         </div>
-
 
         <!-- ============ ESQUEMA: UM LADO ============ -->
         <svg class="esquema" id="esqUm" viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg" aria-label="Esquema do trecho com descarga na extremidade">
@@ -243,8 +253,9 @@
           <text x="230" y="210" font-size="11.5" fill="var(--primaria-escura)" font-weight="bold" text-anchor="middle" id="svg2Dd">Descarga · d = 75 mm</text>
           <!-- rótulos L1 / L2 -->
           <text x="118" y="100" font-size="12" fill="var(--primaria)" font-weight="bold" transform="rotate(27.3 118 100)" id="svg2L1">L₁ = 1.000 m</text>
-          <text x="118" y="128" font-size="10.5" fill="var(--cinza)" transform="rotate(27.3 118 128)" id="svg2D">DN 300</text>
+          <text x="118" y="128" font-size="10.5" fill="var(--cinza)" transform="rotate(27.3 118 128)" id="svg2D">DN₁ 300</text>
           <text x="325" y="120" font-size="12" fill="var(--primaria)" font-weight="bold" transform="rotate(-16.9 325 120)" id="svg2L2">L₂ = 500 m</text>
+          <text x="325" y="142" font-size="10.5" fill="var(--cinza)" transform="rotate(-16.9 325 142)" id="svg2D2">DN₂ 300</text>
           <!-- desnível H1 -->
           <line x1="30" y1="70" x2="30" y2="168" stroke="var(--vermelho)" stroke-width="1.5"/>
           <line x1="30" y1="70" x2="42" y2="70" stroke="var(--vermelho)" stroke-width="1" stroke-dasharray="3 3"/>
@@ -264,6 +275,14 @@
         <div class="lados um" id="gridLados">
         <div id="blocoLado1">
           <div class="subtitulo-lado oculto" id="titLado1">⬅️ Lado esquerdo</div>
+          <div class="campo campo-dn">
+            <label id="lblD1">Diâmetro da adutora — DN <span class="dica">(interno)</span></label>
+            <div class="linha-input">
+              <select id="selD1" onchange="aoMudarDN(1,'sel')"></select>
+              <input type="number" id="inpD1" min="1" step="1" value="300" oninput="aoMudarDN(1,'inp')">
+              <span class="unidade">mm</span>
+            </div>
+          </div>
           <div class="campo">
             <label id="lblL1">Extensão do trecho — L <span class="dica">(entre o ponto alto e a descarga)</span></label>
             <div class="linha-input">
@@ -282,6 +301,14 @@
 
         <div id="blocoLado2" class="oculto">
           <div class="subtitulo-lado">➡️ Lado direito</div>
+          <div class="campo">
+            <label>Diâmetro — DN₂ <span class="dica">(pode diferir do esquerdo)</span></label>
+            <div class="linha-input">
+              <select id="selD2" onchange="aoMudarDN(2,'sel')"></select>
+              <input type="number" id="inpD2" min="1" step="1" value="300" oninput="aoMudarDN(2,'inp')">
+              <span class="unidade">mm</span>
+            </div>
+          </div>
           <div class="campo">
             <label>Extensão — L₂ <span class="dica">(do ponto alto direito até a descarga)</span></label>
             <div class="linha-input">
@@ -334,8 +361,6 @@
           </div>
         </div>
       </div>
-
-
     </div>
 
     <!-- ===================== RESULTADOS ===================== -->
@@ -352,11 +377,6 @@
         <div id="alertas"></div>
       </div>
 
-      <div class="card memoria">
-        <h2>🧮 Memória de cálculo</h2>
-        <div id="memoria"></div>
-      </div>
-
       <div class="card">
         <h2>ℹ️ Hipóteses e observações</h2>
         <div class="memoria">
@@ -365,9 +385,16 @@
           <div class="passo">Cada lado é tratado com <b>declividade uniforme</b> até a descarga. Com dois lados de desníveis diferentes, o esvaziamento ocorre em <b>duas fases</b>: primeiro só o lado mais alto rebaixa (o outro permanece cheio, pressurizado pela coluna vizinha); quando os níveis se igualam, os dois lados esvaziam juntos.</div>
           <div class="passo">Prática usual: descarga com diâmetro entre <b>D/6 e D/4</b> da adutora e tempo de esvaziamento típico de <b>2 a 6 horas</b> (ajuste conforme a operação prevista e o corpo receptor).</div>
           <div class="passo">Prever <b>proteção anti-erosiva</b> (caixa de descarga, enrocamento) no lançamento quando a velocidade do jato for elevada.</div>
+          <div class="passo"><b>Referências:</b> Azevedo Netto — <i>Manual de Hidráulica</i> (orifícios, bocais e esvaziamento de reservatórios); Porto, R.M. — <i>Hidráulica Básica</i>, EESC-USP (escoamento por orifícios sob carga variável); Tsutiya, M.T. — <i>Abastecimento de Água</i> (descargas em adutoras).</div>
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- ===================== MEMÓRIA DE CÁLCULO (largura total) ===================== -->
+  <div class="card memoria">
+    <h2>🧮 Memória de cálculo</h2>
+    <div id="memoria"></div>
   </div>
 
   <div class="rodape">
@@ -382,6 +409,7 @@ const G = 9.81;
 const DN_COMERCIAIS = [50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1100, 1200];
 let modo = "tempo";     // "tempo" | "dim"
 let config = "um";      // "um" | "dois"
+let dn2Editada = false; // usuário já mexeu no DN do lado direito?
 
 const fmt = (v, casas = 2) =>
   isFinite(v) ? v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas }) : "—";
@@ -397,8 +425,13 @@ function fmtTempo(seg) {
   return h + " h " + min + " min";
 }
 
+/* ---------- notação matemática ---------- */
+const frac = (cima, baixo) => `<span class="frac"><span>${cima}</span><span>${baixo}</span></span>`;
+const sqrt = x => `<span class="sqrt"><span>${x}</span></span>`;
+const RES = x => `<span class="num-final">${x}</span>`;
+
 function preencherSelects() {
-  for (const [selId, inpId] of [["selD", "inpD"], ["selDd", "inpDd"]]) {
+  for (const [selId, inpId] of [["selD1", "inpD1"], ["selD2", "inpD2"], ["selDd", "inpDd"]]) {
     const sel = document.getElementById(selId);
     DN_COMERCIAIS.forEach(dn => {
       const o = document.createElement("option");
@@ -420,6 +453,13 @@ function sincronizarSelect(selId, inpId) {
   calcular();
 }
 
+/* DN de referência p/ sugestão da descarga: o maior lado */
+function dnReferencia() {
+  const D1 = num("inpD1");
+  if (config !== "dois") return D1;
+  return Math.max(D1 || 0, num("inpD2") || 0);
+}
+
 /* Faixa usual da descarga: DNs comerciais entre D/6 e D/4 (se nenhum cair
    na faixa, o DN comercial mais próximo de D/5). */
 function faixaUsualDescarga(Dmm) {
@@ -432,16 +472,17 @@ function faixaUsualDescarga(Dmm) {
   return lista;
 }
 
-/* Ao mudar o DN da adutora, já preenche a descarga com o DN sugerido
-   (maior DN comercial da faixa usual) — o usuário pode alterar depois. */
-function aoMudarDNAdutora(origem) {
+/* Ao mudar um DN da adutora, já preenche a descarga com o DN sugerido
+   (maior DN comercial da faixa usual do maior lado) — o usuário pode alterar. */
+function aoMudarDN(lado, origem) {
   if (origem === "sel") {
-    const sel = document.getElementById("selD");
-    if (sel.value !== "custom") document.getElementById("inpD").value = sel.value;
+    const sel = document.getElementById("selD" + lado);
+    if (sel.value !== "custom") document.getElementById("inpD" + lado).value = sel.value;
   }
-  const Dmm = num("inpD");
-  if (Dmm > 0) {
-    const faixa = faixaUsualDescarga(Dmm);
+  if (lado === 2 && origem !== "auto") dn2Editada = true;
+  const Dref = dnReferencia();
+  if (Dref > 0) {
+    const faixa = faixaUsualDescarga(Dref);
     document.getElementById("inpDd").value = faixa[faixa.length - 1];
   }
   calcular();
@@ -471,12 +512,19 @@ function mudarConfig(nova) {
   document.getElementById("titLado1").classList.toggle("oculto", !dois);
   document.getElementById("esqUm").classList.toggle("oculto", dois);
   document.getElementById("esqDois").classList.toggle("oculto", !dois);
+  document.getElementById("lblD1").innerHTML = dois
+    ? 'Diâmetro — DN₁ <span class="dica">(lado esquerdo)</span>'
+    : 'Diâmetro da adutora — DN <span class="dica">(interno)</span>';
   document.getElementById("lblL1").innerHTML = dois
     ? 'Extensão — L₁ <span class="dica">(do ponto alto esquerdo até a descarga)</span>'
     : 'Extensão do trecho — L <span class="dica">(entre o ponto alto e a descarga)</span>';
   document.getElementById("lblH1").innerHTML = dois
     ? 'Desnível — H₁ <span class="dica">(cota do ponto alto esquerdo − cota da descarga)</span>'
     : 'Desnível — H <span class="dica">(cota do ponto alto − cota da descarga)</span>';
+  // ao ativar o 2º lado pela primeira vez, herda o DN do esquerdo
+  if (dois && !dn2Editada) {
+    document.getElementById("inpD2").value = document.getElementById("inpD1").value;
+  }
   calcular();
 }
 
@@ -486,19 +534,19 @@ function alerta(tipo, icone, texto) {
   return `<div class="alerta ${tipo}"><span>${icone}</span><span>${texto}</span></div>`;
 }
 
-function renderChips(Dmm, dAtualMm) {
+function renderChips(Dref, dAtualMm, doisDNs) {
   const box = document.getElementById("chipsSugestao");
-  if (!(Dmm > 0)) { box.innerHTML = ""; return; }
-  const faixa = faixaUsualDescarga(Dmm);
+  if (!(Dref > 0)) { box.innerHTML = ""; return; }
+  const faixa = faixaUsualDescarga(Dref);
   const chips = faixa.map(dn =>
     `<button class="chip${Math.abs(dn - dAtualMm) < 0.01 ? " ativo" : ""}" onclick="aplicarSugestao(${dn})">DN ${dn}</button>`
   ).join("");
-  box.innerHTML = `<span class="rotulo-chip">Faixa usual p/ DN ${fmt(Dmm, 0)} (D/6 a D/4):</span>${chips}`;
+  box.innerHTML = `<span class="rotulo-chip">Faixa usual p/ DN ${fmt(Dref, 0)}${doisDNs ? " (maior lado)" : ""} — D/6 a D/4:</span>${chips}`;
 }
 
 function calcular() {
   // sincroniza selects com os inputs
-  for (const [selId, inpId] of [["selD", "inpD"], ["selDd", "inpDd"]]) {
+  for (const [selId, inpId] of [["selD1", "inpD1"], ["selD2", "inpD2"], ["selDd", "inpDd"]]) {
     const sel = document.getElementById(selId);
     const v = document.getElementById(inpId).value;
     sel.value = DN_COMERCIAIS.includes(parseFloat(v)) ? v : "custom";
@@ -508,10 +556,13 @@ function calcular() {
   selCd.value = ["0.61", "0.82", "0.97"].includes(cdVal) ? cdVal : "custom";
 
   const dois = config === "dois";
-  const Dmm = num("inpD"), Cd = num("inpCd");
+  const D1mm = num("inpD1"), Cd = num("inpCd");
+  const D2mm = dois ? num("inpD2") : D1mm;
   const L1 = num("inpL1"), H1 = num("inpH1");
   const L2 = dois ? num("inpL2") : 0;
   const H2 = dois ? num("inpH2") : 0;
+  const Dref = dois ? Math.max(D1mm || 0, D2mm || 0) : D1mm;
+  const dnsDiferentes = dois && D1mm !== D2mm;
 
   const resValor = document.getElementById("resValor");
   const resDetalhe = document.getElementById("resDetalhe");
@@ -520,10 +571,11 @@ function calcular() {
   const alertas = document.getElementById("alertas");
   const memoria = document.getElementById("memoria");
 
-  renderChips(Dmm, num("inpDd"));
+  renderChips(Dref, num("inpDd"), dnsDiferentes);
 
   const erros = [];
-  if (!(Dmm > 0)) erros.push("Informe o diâmetro da adutora.");
+  if (!(D1mm > 0)) erros.push(dois ? "Informe o diâmetro do lado esquerdo (DN₁)." : "Informe o diâmetro da adutora.");
+  if (dois && !(D2mm > 0)) erros.push("Informe o diâmetro do lado direito (DN₂).");
   if (!(L1 > 0)) erros.push(dois ? "Informe a extensão do lado esquerdo (L₁)." : "Informe a extensão do trecho.");
   if (!(H1 > 0)) erros.push(dois ? "Informe um desnível maior que zero para o lado esquerdo (H₁)." : "Informe um desnível maior que zero (a descarga deve estar abaixo do ponto alto).");
   if (dois && !(L2 > 0)) erros.push("Informe a extensão do lado direito (L₂).");
@@ -548,14 +600,15 @@ function calcular() {
     return;
   }
 
-  const D = Dmm / 1000;
-  const A = Math.PI * D * D / 4;          // seção da adutora (m²)
-  const V = A * (L1 + L2);                 // volume total (m³)
+  const D1 = D1mm / 1000, D2 = D2mm / 1000;
+  const A1 = Math.PI * D1 * D1 / 4;         // seção do lado esquerdo (m²)
+  const A2 = Math.PI * D2 * D2 / 4;         // seção do lado direito (m²)
+  const V = A1 * L1 + A2 * L2;               // volume total (m³)
   const raiz2g = Math.sqrt(2 * G);
 
   // "capacitância" de cada lado: volume por metro de carga (m³/m)
-  const c1 = A * L1 / H1;
-  const c2 = dois ? A * L2 / H2 : 0;
+  const c1 = A1 * L1 / H1;
+  const c2 = dois ? A2 * L2 / H2 : 0;
 
   // lado mais alto comanda a fase 1
   const Halto = dois ? Math.max(H1, H2) : H1;
@@ -565,10 +618,10 @@ function calcular() {
   // fator geométrico F tal que  t = 2·F / (Cd·a·√(2g))
   const F = cAlto * (Math.sqrt(Halto) - Math.sqrt(Hbaixo)) + (c1 + c2) * Math.sqrt(Hbaixo);
 
-  let d, dReq = null, dnAdotado = null;
+  let d, dReq = null, dnAdotado = null, aReq = null;
   if (modo === "dim") {
     const tAlvoS = tAlvoH * 3600;
-    const aReq = 2 * F / (Cd * tAlvoS * raiz2g);
+    aReq = 2 * F / (Cd * tAlvoS * raiz2g);
     dReq = Math.sqrt(4 * aReq / Math.PI) * 1000;   // mm
     dnAdotado = DN_COMERCIAIS.find(dn => dn >= dReq) || null;
     d = (dnAdotado || dReq) / 1000;
@@ -585,7 +638,7 @@ function calcular() {
   const Q0 = Cd * a * Math.sqrt(2 * G * Halto);   // vazão inicial (m³/s)
   const v0 = Cd * Math.sqrt(2 * G * Halto);        // velocidade inicial na seção da descarga (m/s)
   const Qm = V / t;
-  const relacao = (d * 1000) / Dmm;
+  const relacao = (d * 1000) / Dref;
 
   // ---------- resultado principal ----------
   if (modo === "tempo") {
@@ -604,16 +657,20 @@ function calcular() {
   }
 
   // ---------- resumo ----------
-  const linhas = [
-    ["Área da seção da adutora (A)", fmt(A, 4) + " m²"],
-    ["Volume do trecho (V)", fmt(V, 1) + " m³"],
-    ["Área da descarga (a)", fmt(a, 5) + " m²"],
-    ["Vazão inicial da descarga (Q₀)", fmt(Q0 * 1000, 1) + " L/s"],
-    ["Vazão média durante o esvaziamento", fmt(Qm * 1000, 1) + " L/s"],
-    ["Velocidade inicial na descarga (v₀)", fmt(v0, 2) + " m/s"],
-    ["Relação d/D", fmt(relacao, 2) + " (1/" + fmt(1 / relacao, 1) + ")"],
-  ];
-  if (modo === "dim") linhas.splice(2, 0, ["Diâmetro mínimo teórico da descarga", fmt(dReq, 1) + " mm"]);
+  const linhas = [];
+  if (dnsDiferentes) {
+    linhas.push(["Área da seção — lado esquerdo (A₁)", fmt(A1, 4) + " m²"]);
+    linhas.push(["Área da seção — lado direito (A₂)", fmt(A2, 4) + " m²"]);
+  } else {
+    linhas.push(["Área da seção da adutora (A)", fmt(A1, 4) + " m²"]);
+  }
+  linhas.push(["Volume do trecho (V)", fmt(V, 1) + " m³"]);
+  if (modo === "dim") linhas.push(["Diâmetro mínimo teórico da descarga", fmt(dReq, 1) + " mm"]);
+  linhas.push(["Área da descarga (a)", fmt(a, 5) + " m²"]);
+  linhas.push(["Vazão inicial da descarga (Q₀)", fmt(Q0 * 1000, 1) + " L/s"]);
+  linhas.push(["Vazão média durante o esvaziamento", fmt(Qm * 1000, 1) + " L/s"]);
+  linhas.push(["Velocidade inicial na descarga (v₀)", fmt(v0, 2) + " m/s"]);
+  linhas.push(["Relação d/D" + (dnsDiferentes ? " (maior lado)" : ""), fmt(relacao, 2) + " (1/" + fmt(1 / relacao, 1) + ")"]);
   if (dois) {
     linhas.push(["Fase 1 — só o lado mais alto (H " + fmt(Halto, 1) + " → " + fmt(Hbaixo, 1) + " m)", fmtTempo(t1)]);
     linhas.push(["Fase 2 — os dois lados juntos (H " + fmt(Hbaixo, 1) + " → 0)", fmtTempo(t2)]);
@@ -623,9 +680,9 @@ function calcular() {
 
   // ---------- alertas (recalculados a cada alteração) ----------
   let av = "";
-  if (modo === "tempo" && d >= D)
+  if (modo === "tempo" && d * 1000 >= Dref)
     av += alerta("aviso", "⚠️", "A descarga tem diâmetro igual ou maior que a adutora — verifique os dados.");
-  if (relacao < 1 / 6 - 0.005 && d < D)
+  if (relacao < 1 / 6 - 0.005 && d * 1000 < Dref)
     av += alerta("aviso", "⚠️", "Descarga menor que D/6 da adutora — abaixo da faixa usual (D/6 a D/4). O esvaziamento tende a ser demorado.");
   if (t > 6 * 3600)
     av += alerta("aviso", "⏱️", "Tempo de esvaziamento acima de 6 h — considere aumentar o diâmetro da descarga ou dividir o trecho com descargas intermediárias.");
@@ -641,37 +698,94 @@ function calcular() {
   alertas.innerHTML = av;
 
   // ---------- memória de cálculo ----------
+  const FONTE_GEO = "geometria";
+  const FONTE_ORIF = "eq. dos orifícios (Torricelli) — Azevedo Netto, Manual de Hidráulica";
+  const FONTE_ESVAZ = "integração da eq. dos orifícios sob carga variável — Porto, Hidráulica Básica; Azevedo Netto, Manual de Hidráulica";
+  const FONTE_FASES = "balanço de volumes por fases, integrando a eq. dos orifícios sob carga variável — a partir de Porto, Hidráulica Básica";
+  const FONTE_DIM = "eq. do tempo de esvaziamento isolada para a área da descarga";
+
+  let n = 0;
   const passos = [];
-  passos.push(`<b>1. Volume do trecho:</b><br><span class="formula">V = (π·D²/4)·(L${dois ? "₁+L₂" : ""})</span> = (π·${fmt(D, 3)}²/4)·${fmt(L1 + L2, 0)} = <b>${fmt(V, 1)} m³</b>`);
-  if (modo === "dim") {
-    passos.push(`<b>2. Área mínima da descarga para t = ${fmt(tAlvoH, 1)} h:</b><br><span class="formula">a = 2·F/(C<sub>d</sub>·t·√(2g))</span> → d<sub>mín</sub> = <b>${fmt(dReq, 1)} mm</b>${dnAdotado ? " → adotado <b>DN " + dnAdotado + "</b>" : ""}`);
-  }
-  passos.push(`<b>${modo === "dim" ? 3 : 2}. Área da descarga:</b><br><span class="formula">a = π·d²/4</span> = π·${fmt(d, 3)}²/4 = <b>${fmt(a, 5)} m²</b>`);
-  passos.push(`<b>${modo === "dim" ? 4 : 3}. Vazão inicial pela descarga</b> (orifício sob carga H = ${fmt(Halto, 1)} m):<br><span class="formula">Q₀ = C<sub>d</sub>·a·√(2gH)</span> = ${fmt(Cd, 2)}·${fmt(a, 5)}·√(2·9,81·${fmt(Halto, 1)}) = <b>${fmt(Q0 * 1000, 1)} L/s</b>`);
-  if (dois) {
-    passos.push(`<b>${modo === "dim" ? 5 : 4}. Fase 1 — rebaixamento do lado mais alto</b> (o outro lado permanece cheio enquanto H &gt; ${fmt(Hbaixo, 1)} m):<br><span class="formula">t₁ = 2·c<sub>alto</sub>·(√H<sub>alto</sub> − √H<sub>baixo</sub>)/(C<sub>d</sub>·a·√(2g))</span>, com <span class="formula">c = A·L/H</span> = ${fmt(cAlto, 2)} m³/m → <b>${fmtTempo(t1)}</b>`);
-    passos.push(`<b>${modo === "dim" ? 6 : 5}. Fase 2 — os dois lados esvaziam juntos</b> (de ${fmt(Hbaixo, 1)} m até 0):<br><span class="formula">t₂ = 2·(c₁+c₂)·√H<sub>baixo</sub>/(C<sub>d</sub>·a·√(2g))</span>, com c₁ = ${fmt(c1, 2)} e c₂ = ${fmt(c2, 2)} m³/m → <b>${fmtTempo(t2)}</b>`);
-    passos.push(`<b>${modo === "dim" ? 7 : 6}. Tempo total:</b> <span class="formula">t = t₁ + t₂</span> = <b>${fmtTempo(t)}</b>`);
+  const item = (titulo, fonte, ...eqs) =>
+    passos.push(`<div class="passo"><div class="passo-cab"><b>${++n}. ${titulo}</b><span class="fonte">${fonte}</span></div>${eqs.map(l => `<div class="eq">${l}</div>`).join("")}</div>`);
+
+  // 1. volume
+  if (dnsDiferentes) {
+    item("Volume do trecho", FONTE_GEO + " — volume do cilindro",
+      `V = ${frac("π·D₁²", "4")}·L₁ + ${frac("π·D₂²", "4")}·L₂`,
+      `V = ${frac(`π·${fmt(D1, 3)}²`, "4")}·${fmt(L1, 0)} + ${frac(`π·${fmt(D2, 3)}²`, "4")}·${fmt(L2, 0)} = ${RES(fmt(V, 1) + " m³")}`);
   } else {
-    passos.push(`<b>${modo === "dim" ? 5 : 4}. Tempo de esvaziamento</b> (carga decrescente, declividade uniforme):<br><span class="formula">t = 2V/Q₀</span> = 2·${fmt(V, 1)}/${fmt(Q0, 4)} = ${fmt(t, 0)} s = <b>${fmtTempo(t)}</b>`);
+    item("Volume do trecho", FONTE_GEO + " — volume do cilindro",
+      `V = ${frac("π·D²", "4")}·${dois ? "(L₁ + L₂)" : "L"}`,
+      `V = ${frac(`π·${fmt(D1, 3)}²`, "4")}·${fmt(L1 + L2, 0)} = ${RES(fmt(V, 1) + " m³")}`);
   }
-  memoria.innerHTML = passos.map(p => `<div class="passo">${p}</div>`).join("");
+
+  // capacitâncias (dois lados)
+  if (dois) {
+    item("Capacidade de carga de cada lado <span style='font-weight:400'>(volume por metro de carga)</span>", FONTE_GEO + " — trecho de declividade uniforme",
+      `c<sub>i</sub> = ${frac("A<sub>i</sub>·L<sub>i</sub>", "H<sub>i</sub>")}`,
+      `c₁ = ${frac(`${fmt(A1, 4)}·${fmt(L1, 0)}`, fmt(H1, 1))} = ${RES(fmt(c1, 2) + " m³/m")} &nbsp;&nbsp; c₂ = ${frac(`${fmt(A2, 4)}·${fmt(L2, 0)}`, fmt(H2, 1))} = ${RES(fmt(c2, 2) + " m³/m")}`);
+  }
+
+  // dimensionamento (área necessária)
+  if (modo === "dim") {
+    if (dois) {
+      item(`Área necessária da descarga para t = ${fmt(tAlvoH, 1)} h`, FONTE_DIM,
+        `a<sub>nec</sub> = ${frac(`2·[c<sub>alto</sub>·(${sqrt("H<sub>alto</sub>")} − ${sqrt("H<sub>baixo</sub>")}) + (c₁+c₂)·${sqrt("H<sub>baixo</sub>")}]`, `C<sub>d</sub>·t·${sqrt("2g")}`)}`,
+        `a<sub>nec</sub> = ${frac(`2·${fmt(F, 2)}`, `${fmt(Cd, 2)}·${fmt(tAlvoH * 3600, 0)}·${sqrt("2·9,81")}`)} = ${RES(fmt(aReq, 5) + " m²")}`,
+        `d<sub>mín</sub> = ${sqrt(frac("4·a<sub>nec</sub>", "π"))} = ${RES(fmt(dReq, 1) + " mm")}${dnAdotado ? " → adotado " + RES("DN " + dnAdotado) : ""}`);
+    } else {
+      item(`Área necessária da descarga para t = ${fmt(tAlvoH, 1)} h`, FONTE_DIM,
+        `a<sub>nec</sub> = ${frac("2·V", `C<sub>d</sub>·t·${sqrt("2gH")}`)}`,
+        `a<sub>nec</sub> = ${frac(`2·${fmt(V, 1)}`, `${fmt(Cd, 2)}·${fmt(tAlvoH * 3600, 0)}·${sqrt(`2·9,81·${fmt(H1, 1)}`)}`)} = ${RES(fmt(aReq, 5) + " m²")}`,
+        `d<sub>mín</sub> = ${sqrt(frac("4·a<sub>nec</sub>", "π"))} = ${RES(fmt(dReq, 1) + " mm")}${dnAdotado ? " → adotado " + RES("DN " + dnAdotado) : ""}`);
+    }
+  }
+
+  // área da descarga
+  item(modo === "dim" ? "Área da descarga adotada" : "Área da descarga", FONTE_GEO + " — área do círculo",
+    `a = ${frac("π·d²", "4")}`,
+    `a = ${frac(`π·${fmt(d, 3)}²`, "4")} = ${RES(fmt(a, 5) + " m²")}`);
+
+  // vazão inicial
+  item(`Vazão inicial pela descarga <span style='font-weight:400'>(carga inicial H = ${fmt(Halto, 1)} m)</span>`, FONTE_ORIF,
+    `Q₀ = C<sub>d</sub>·a·${sqrt("2gH")}`,
+    `Q₀ = ${fmt(Cd, 2)}·${fmt(a, 5)}·${sqrt(`2·9,81·${fmt(Halto, 1)}`)} = ${fmt(Q0, 4)} m³/s = ${RES(fmt(Q0 * 1000, 1) + " L/s")}`);
+
+  // tempo
+  if (dois) {
+    item(`Fase 1 — rebaixamento do lado mais alto <span style='font-weight:400'>(de ${fmt(Halto, 1)} m a ${fmt(Hbaixo, 1)} m; o outro lado permanece cheio)</span>`, FONTE_FASES,
+      `t₁ = ${frac(`2·c<sub>alto</sub>·(${sqrt("H<sub>alto</sub>")} − ${sqrt("H<sub>baixo</sub>")})`, `C<sub>d</sub>·a·${sqrt("2g")}`)}`,
+      `t₁ = ${frac(`2·${fmt(cAlto, 2)}·(${sqrt(fmt(Halto, 1))} − ${sqrt(fmt(Hbaixo, 1))})`, `${fmt(Cd, 2)}·${fmt(a, 5)}·${sqrt("2·9,81")}`)} = ${fmt(t1, 0)} s = ${RES(fmtTempo(t1))}`);
+    item(`Fase 2 — os dois lados esvaziam juntos <span style='font-weight:400'>(de ${fmt(Hbaixo, 1)} m até 0)</span>`, FONTE_FASES,
+      `t₂ = ${frac(`2·(c₁ + c₂)·${sqrt("H<sub>baixo</sub>")}`, `C<sub>d</sub>·a·${sqrt("2g")}`)}`,
+      `t₂ = ${frac(`2·(${fmt(c1, 2)} + ${fmt(c2, 2)})·${sqrt(fmt(Hbaixo, 1))}`, `${fmt(Cd, 2)}·${fmt(a, 5)}·${sqrt("2·9,81")}`)} = ${fmt(t2, 0)} s = ${RES(fmtTempo(t2))}`);
+    item("Tempo total de esvaziamento", FONTE_FASES,
+      `t = t₁ + t₂`,
+      `t = ${fmtTempo(t1)} + ${fmtTempo(t2)} = ${RES(fmtTempo(t))}`);
+  } else {
+    item("Tempo de esvaziamento <span style='font-weight:400'>(carga decrescente, declividade uniforme)</span>", FONTE_ESVAZ,
+      `t = ${frac("2·V", `C<sub>d</sub>·a·${sqrt("2gH")}`)} = ${frac("2·V", "Q₀")}`,
+      `t = ${frac(`2·${fmt(V, 1)}`, `${fmt(Q0, 4)}`)} = ${fmt(t, 0)} s = ${RES(fmtTempo(t))}`);
+  }
+  memoria.innerHTML = passos.join("");
 
   // ---------- esquemas ----------
   document.getElementById("svgL").textContent = "L = " + fmt(L1, 0) + " m";
   document.getElementById("svgH").textContent = "H = " + fmt(H1, 1) + " m";
-  document.getElementById("svgD").textContent = "DN " + fmt(Dmm, 0);
+  document.getElementById("svgD").textContent = "DN " + fmt(D1mm, 0);
   document.getElementById("svgDd").textContent = "d = " + fmt(d * 1000, 0) + " mm";
   document.getElementById("svg2L1").textContent = "L₁ = " + fmt(L1, 0) + " m";
   document.getElementById("svg2H1").textContent = "H₁ = " + fmt(H1, 1) + " m";
   document.getElementById("svg2L2").textContent = "L₂ = " + fmt(L2, 0) + " m";
   document.getElementById("svg2H2").textContent = "H₂ = " + fmt(H2, 1) + " m";
-  document.getElementById("svg2D").textContent = "DN " + fmt(Dmm, 0);
+  document.getElementById("svg2D").textContent = "DN₁ " + fmt(D1mm, 0);
+  document.getElementById("svg2D2").textContent = "DN₂ " + fmt(D2mm, 0);
   document.getElementById("svg2Dd").textContent = "Descarga · d = " + fmt(d * 1000, 0) + " mm";
 }
 
 preencherSelects();
-aoMudarDNAdutora("init");
+aoMudarDN(1, "auto");
 </script>
 </body>
 </html>

@@ -14,7 +14,7 @@ Dois modos de operação:
 E duas configurações de descarga:
 
 - **Extremidade (um lado)** — a descarga fica na ponta baixa do trecho;
-- **Ponto baixo (dois lados)** — a descarga fica num ponto baixo com adutora dos dois lados, cada lado com extensão e desnível próprios (ex.: 1.000 m e 15 m à esquerda, 500 m e 8 m à direita).
+- **Ponto baixo (dois lados)** — a descarga fica num ponto baixo com adutora dos dois lados, cada lado com **diâmetro, extensão e desnível próprios** (ex.: DN 300, 1.000 m e 15 m à esquerda; DN 200, 500 m e 8 m à direita). Ao ativar o segundo lado, o DN₂ herda o valor do esquerdo até ser editado.
 
 Ao escolher o DN da adutora, o app **já preenche a descarga com o DN sugerido** (maior DN comercial da faixa usual D/6 a D/4) e exibe a faixa como botões clicáveis — o usuário permanece livre para adotar qualquer outro valor.
 
@@ -22,7 +22,7 @@ Ao escolher o DN da adutora, o app **já preenche a descarga com o DN sugerido**
 
 | Dado | Símbolo | Unidade |
 |---|---|---|
-| Diâmetro (interno) da adutora | D | mm |
+| Diâmetro (interno) de cada lado da adutora | D (ou DN₁, DN₂) | mm |
 | Extensão de cada lado (ponto alto → descarga) | L (ou L₁, L₂) | m |
 | Desnível de cada lado (cota do ponto alto − cota da descarga) | H (ou H₁, H₂) | m |
 | Diâmetro da descarga *(modo 1)* | d | mm |
@@ -35,12 +35,12 @@ Valores usuais de Cd: 0,61 (orifício de parede delgada), 0,82 (tubo curto + vá
 
 Cada lado é tratado como um reservatório prismático que esvazia por um orifício, com a carga sobre a descarga decrescendo à medida que a linha esvazia (declividade uniforme):
 
-- Volume do trecho: `V = (π·D²/4)·(L₁+L₂)`
+- Volume do trecho: `V = A₁·L₁ + A₂·L₂`, com `Aᵢ = π·Dᵢ²/4`
 - Vazão inicial pela descarga: `Q₀ = Cd·a·√(2g·Hmax)`, com `a = π·d²/4`
 
 **Um lado:** `t = 2·V/Q₀ = 2·V / (Cd·a·√(2gH))` — a integração da equação do orifício com carga variável, para volume distribuído linearmente com a cota, resulta no dobro do tempo da vazão inicial constante.
 
-**Dois lados (desníveis diferentes):** definindo a "capacitância" de cada lado `cᵢ = A·Lᵢ/Hᵢ` (volume por metro de carga), o esvaziamento ocorre em duas fases:
+**Dois lados (desníveis diferentes):** definindo a "capacitância" de cada lado `cᵢ = Aᵢ·Lᵢ/Hᵢ` (volume por metro de carga), o esvaziamento ocorre em duas fases:
 
 1. **Fase 1** — enquanto o nível do lado mais alto está acima de `H_baixo`, o lado mais baixo permanece cheio (pressurizado pela coluna vizinha) e só o lado alto rebaixa:
    `t₁ = 2·c_alto·(√H_alto − √H_baixo) / (Cd·a·√(2g))`
@@ -67,5 +67,9 @@ A velocidade inicial na seção da descarga é `v₀ = Cd·√(2g·Hmax)` — el
 ## Tema / cores
 
 O tema segue a identidade visual da **Pastro Engenharia**: azul-marinho (`#1b2452`) como cor principal e verde-água (`#2aa39c`) como realce, com o cabeçalho em degradê marinho → teal. Todas as cores ficam em variáveis CSS no início do arquivo (bloco `:root`, seção "PALETA DO TEMA") — ajustando `--primaria`, `--primaria-escura`, `--realce` e derivadas, a interface e o esquema ilustrativo (SVG) acompanham automaticamente.
+
+## Memória de cálculo
+
+A memória de cálculo ocupa a largura total abaixo dos resultados e apresenta cada passo em três linhas: **fórmula em notação matemática** (frações e radicais renderizados em CSS puro, sem bibliotecas externas — o app segue 100% offline), **fórmula substituída pelos valores** e **resultado**, com a **fonte de cada fórmula** indicada ao lado do título do passo (Azevedo Netto — *Manual de Hidráulica*; Porto — *Hidráulica Básica*; Tsutiya — *Abastecimento de Água*).
 
 > ⚠️ Ferramenta de **pré-dimensionamento**: os resultados devem ser verificados nas condições específicas de cada projeto.
