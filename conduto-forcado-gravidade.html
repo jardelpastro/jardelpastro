@@ -245,7 +245,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
 
 <header class="topo">
   <h1>Conduto Forçado por Gravidade
-    <span class="sub">adutoras e emissários entre reservatórios · Hazen-Williams e Colebrook-White · estudo de cenários</span></h1>
+    <span class="sub">adutoras e emissários por gravidade · Hazen-Williams e Colebrook-White · cenários · perfil × piezométrica · tubos em paralelo</span></h1>
   <div class="acoes">
     <button class="btn" type="button" data-acao="novo">Novo</button>
     <button class="btn" type="button" data-acao="exemplo">Exemplo</button>
@@ -980,6 +980,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
         { id: U.id(), nome: 'Vazão máxima (QMH)', q: null }
       ],
       cenarios: { habilitado: false, itens: [] },
+      perfil: { pontos: [] },    /* [{id, x, cota, rot}] — perfil único da linha */
       params: {
         metodo: 'hw',            /* hw | colebrook | swamee | zigrang */
         temperatura: 20,
@@ -993,6 +994,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
   E.trechoPadrao = function (n) {
     return {
       id: U.id(), nome: 'Trecho ' + n, L: null,
+      nParalelo: 1,              /* tubos idênticos em paralelo */
       modo: 'catalogo',          /* catalogo | manual */
       catId: null, itemDn: null, /* tubo do catálogo */
       diManual: null,            /* DI direto (mm) */
@@ -1035,6 +1037,8 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
     st.projeto = Object.assign(p.projeto, st.projeto || {});
     st.params = Object.assign(p.params, st.params || {});
     st.cenarios = Object.assign({ habilitado: false, itens: [] }, st.cenarios || {});
+    st.perfil = Object.assign({ pontos: [] }, st.perfil || {});
+    if (!Array.isArray(st.perfil.pontos)) st.perfil.pontos = [];
     if (!Array.isArray(st.trechos) || !st.trechos.length) st.trechos = [E.trechoPadrao(1)];
     st.trechos = st.trechos.map(function (t, i) { return Object.assign(E.trechoPadrao(i + 1), t); });
     if (!Array.isArray(st.vazoes)) st.vazoes = [];
@@ -1084,6 +1088,11 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
           descricao: 'NA do rio 0,70 m abaixo da GI — cota de enchente estipulada pelo cliente.' }
       ]
     };
+    st.perfil = { pontos: [
+      { id: U.id(), x: 0, cota: 741.5, rot: 'Saída da caixa' },
+      { id: U.id(), x: 110, cota: 740.2, rot: 'Ponto intermediário' },
+      { id: U.id(), x: 221.45, cota: 739.6, rot: 'Lançamento no rio' }
+    ] };
     st.params.metodo = 'hw';
     return st;
   };
@@ -1102,6 +1111,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
   /* Resolve um trecho: DI (m), C, eps (m), ΣK, rótulos e avisos */
   C.resolverTrecho = function (t, st) {
     var out = { id: t.id, nome: t.nome || 'Trecho', L: t.L, di: null, rotTubo: '—',
+                n: Math.max(1, Math.round(t.nParalelo || 1)),
                 materialId: null, materialRot: '—', C: null, eps: null, K: 0,
                 pecas: [], pn: null, cotaFim: t.cotaFim, avisos: [] };
 
@@ -1164,15 +1174,31 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
     var det = [], Htot = 0, hfTot = 0, hlTot = 0;
     trechos.forEach(function (tr) {
       if (!tr.valido) { det.push(null); return; }
-      var pd = H.perdaDistribuida(Q, tr.di, tr.L, {
+      var Qp = Q / (tr.n || 1);   /* vazão por tubo — tubos idênticos em paralelo */
+      var pd = H.perdaDistribuida(Qp, tr.di, tr.L, {
         metodo: st.params.metodo, C: tr.C, eps: (tr.eps || 0) / 1000, ni: ni
       });
-      var hl = H.perdaLocalizada(Q, tr.di, tr.K);
-      var d = { v: pd.v, Re: pd.Re, J: pd.J, f: pd.f, regime: pd.regime, hf: pd.hf, hl: hl, htotal: pd.hf + hl };
+      var hl = H.perdaLocalizada(Qp, tr.di, tr.K);
+      var d = { Qp: Qp, v: pd.v, Re: pd.Re, J: pd.J, f: pd.f, regime: pd.regime, hf: pd.hf, hl: hl, htotal: pd.hf + hl };
       hfTot += pd.hf; hlTot += hl; Htot += d.htotal;
       det.push(d);
     });
     return { H: Htot, hf: hfTot, hl: hlTot, trechos: det };
+  };
+
+  /* Cota piezométrica na posição x (m desde a saída). A perda
+     localizada é distribuída uniformemente ao longo do trecho. */
+  C.piezEm = function (x, naSaida, perda, res) {
+    if (naSaida === null || naSaida === undefined) return null;
+    var piez = naSaida, acc = 0, i;
+    for (i = 0; i < res.trechos.length; i++) {
+      var t = res.trechos[i], d = perda.trechos[i];
+      if (!(t.L > 0) || !d) continue;
+      if (x <= acc + t.L + 1e-9)
+        return piez - (d.hf + d.hl) * Math.max(0, x - acc) / t.L;
+      piez -= d.hf + d.hl; acc += t.L;
+    }
+    return piez;
   };
 
   /* Vazão máxima de transporte: H(Q) = Hdisp, por bissecção */
@@ -1225,6 +1251,12 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
     res.trechos.forEach(function (t) { if (t.L > 0) Ltotal += t.L; });
     res.Ltotal = Ltotal;
 
+    ((st.perfil && st.perfil.pontos) || []).forEach(function (pp) {
+      if (pp.x !== null && pp.x !== undefined && Ltotal > 0 && pp.x > Ltotal + 0.01)
+        res.avisos.push({ tipo: 'atencao', onde: 'Perfil da linha',
+          msg: 'Ponto em ' + GCF.U.fmt(pp.x, 1) + ' m está além da extensão total da linha (' + GCF.U.fmt(Ltotal, 1) + ' m).' });
+    });
+
     var cens = C.cenariosEfetivos(st);
     var vazoes = st.vazoes.filter(function (v) { return v.q > 0; });
 
@@ -1256,6 +1288,13 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
           acum.push(piez);
         });
         rv.piezFim = acum;
+        /* perfil da linha: piezométrica e pressão em cada ponto */
+        rv.perfil = ((st.perfil && st.perfil.pontos) || []).map(function (pp) {
+          if (pp.x === null || pp.x === undefined || pp.cota === null || pp.cota === undefined) return null;
+          var pz = C.piezEm(pp.x, cen.naSaida, pt, res);
+          return { id: pp.id, x: pp.x, cota: pp.cota, rot: pp.rot || '', piez: pz,
+                   pressao: (pz === null ? null : pz - pp.cota) };
+        });
         rc.vazoes.push(rv);
 
         /* avisos de velocidade */
@@ -1292,6 +1331,20 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
         });
       });
 
+      /* pior pressão em cada ponto do perfil, entre todas as vazões */
+      ((st.perfil && st.perfil.pontos) || []).forEach(function (pp, ip) {
+        var pior = null;
+        rc.vazoes.forEach(function (rv) {
+          var r = rv.perfil && rv.perfil[ip];
+          if (r && r.pressao !== null && (pior === null || r.pressao < pior.pressao))
+            pior = { pressao: r.pressao, vaz: rv.vaz.nome };
+        });
+        if (pior && pior.pressao < 0)
+          res.avisos.push({ tipo: 'erro', onde: cen.nome + ' · Perfil — ' + (pp.rot || ('ponto em ' + GCF.U.fmt(pp.x, 0) + ' m')),
+            msg: 'Linha piezométrica ' + GCF.U.fmt(Math.abs(pior.pressao), 2) + ' m abaixo do conduto na vazão "' + pior.vaz +
+                 '" — pressão negativa; risco de funcionamento como sifão / entrada de ar.' });
+      });
+
       if (rc.hdisp !== null && rc.hdisp > 0) {
         var qm = C.vazaoMaxima(rc.hdisp, res.trechos, st);
         if (qm !== null) {
@@ -1309,6 +1362,172 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
 })(window.GCF = window.GCF || {});
 
 /* ================================================================
+   Gráfico do perfil — SVG puro (perfil do conduto × piezométrica)
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var G = {};
+  var U = GCF.U;
+
+  var CORES = ['#0E6F66', '#1c5fae', '#8a5a00', '#7b3fa0', '#a8231f', '#14A5A0', '#4a6b1f'];
+
+  function sv(tag, attrs, filhos) {
+    var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    (filhos || []).forEach(function (f) { if (f) e.appendChild(f); });
+    return e;
+  }
+  function texto(x, y, str, attrs) {
+    var t = sv('text', Object.assign({ x: x, y: y, 'font-size': 11 }, attrs || {}));
+    t.textContent = str;
+    return t;
+  }
+  function passoBonito(intervalo, n) {
+    if (!(intervalo > 0)) return 1;
+    var bruto = intervalo / n;
+    var mag = Math.pow(10, Math.floor(Math.log(bruto) / Math.LN10));
+    var r = bruto / mag;
+    return (r >= 5 ? 10 : r >= 2 ? 5 : r >= 1 ? 2 : 1) * mag;
+  }
+
+  /* Gráfico do perfil para um cenário calculado.
+     op.impressao = true usa cores fixas (papel branco).
+     Retorna {svg, legenda:[{cor, rot, tracado}]} ou null. */
+  G.perfil = function (st, res, rc, op) {
+    op = op || {};
+    var claro = !!op.impressao;
+    var corTexto = claro ? '#333' : 'var(--texto-2)';
+    var corGrade = claro ? '#e2e5ea' : 'var(--border)';
+    var corEixo = claro ? '#999' : 'var(--border-forte)';
+    var corConduto = claro ? '#1b2733' : 'var(--texto)';
+
+    var pontos = (st.perfil.pontos || []).filter(function (p) {
+      return p.x !== null && p.x !== undefined && p.cota !== null && p.cota !== undefined;
+    }).slice().sort(function (a, b) { return a.x - b.x; });
+    if (pontos.length < 2 || !(res.Ltotal > 0)) return null;
+
+    var todosValidos = res.trechos.every(function (t) { return t.valido; });
+    var naS = rc.cen.naSaida, naC = rc.cen.naChegada;
+
+    /* séries piezométricas (uma por vazão + máximo de transporte) */
+    var series = [];
+    if (todosValidos && naS !== null && naS !== undefined) {
+      rc.vazoes.forEach(function (rv, i) {
+        var pts = [{ x: 0, y: naS }], piez = naS, acc = 0;
+        res.trechos.forEach(function (t, j) {
+          var d = rv.perda.trechos[j];
+          if (!(t.L > 0) || !d) return;
+          piez -= d.hf + d.hl; acc += t.L;
+          pts.push({ x: acc, y: piez });
+        });
+        series.push({ rot: rv.vaz.nome + ' (' + U.fmt(rv.Q * 1000, 1) + ' L/s)',
+                      cor: CORES[i % CORES.length], pts: pts, tracado: 'solido' });
+      });
+      if (rc.qmax) {
+        var pq = [{ x: 0, y: naS }], pz = naS, ac = 0;
+        res.trechos.forEach(function (t, j) {
+          var d = rc.qmaxDet.trechos[j];
+          if (!(t.L > 0) || !d) return;
+          pz -= d.hf + d.hl; ac += t.L;
+          pq.push({ x: ac, y: pz });
+        });
+        series.push({ rot: 'Máximo de transporte (' + U.fmt(rc.qmax * 1000, 1) + ' L/s)',
+                      cor: claro ? '#888' : 'var(--texto-3)', pts: pq, tracado: 'tracejado' });
+      }
+    }
+
+    /* domínios */
+    var xMax = Math.max(res.Ltotal, pontos[pontos.length - 1].x);
+    var ys = [];
+    pontos.forEach(function (p) { ys.push(p.cota); });
+    series.forEach(function (sr) { sr.pts.forEach(function (p) { ys.push(p.y); }); });
+    if (naS !== null && naS !== undefined) ys.push(naS);
+    if (naC !== null && naC !== undefined) ys.push(naC);
+    var yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
+    var folga = Math.max((yMax - yMin) * 0.08, 0.3);
+    yMin -= folga; yMax += folga;
+
+    var W = 920, HH = 380, mE = 58, mD = 14, mT = 16, mB = 42;
+    function X(x) { return mE + (x / xMax) * (W - mE - mD); }
+    function Y(y) { return mT + (1 - (y - yMin) / (yMax - yMin)) * (HH - mT - mB); }
+
+    var el = [];
+
+    /* grade e eixos */
+    var px = passoBonito(xMax, 8);
+    for (var gx = 0; gx <= xMax + 1e-9; gx += px) {
+      el.push(sv('line', { x1: X(gx), y1: mT, x2: X(gx), y2: HH - mB, stroke: corGrade, 'stroke-width': 0.6 }));
+      el.push(texto(X(gx), HH - mB + 14, U.fmt(gx, 0), { fill: corTexto, 'text-anchor': 'middle' }));
+    }
+    var py = passoBonito(yMax - yMin, 6);
+    for (var gy = Math.ceil(yMin / py) * py; gy <= yMax + 1e-9; gy += py) {
+      el.push(sv('line', { x1: mE, y1: Y(gy), x2: W - mD, y2: Y(gy), stroke: corGrade, 'stroke-width': 0.6 }));
+      el.push(texto(mE - 6, Y(gy) + 3.5, U.fmt(gy, py < 1 ? 1 : 0), { fill: corTexto, 'text-anchor': 'end' }));
+    }
+    el.push(sv('line', { x1: mE, y1: HH - mB, x2: W - mD, y2: HH - mB, stroke: corEixo, 'stroke-width': 1 }));
+    el.push(sv('line', { x1: mE, y1: mT, x2: mE, y2: HH - mB, stroke: corEixo, 'stroke-width': 1 }));
+    el.push(texto((mE + W - mD) / 2, HH - 6, 'Distância desde a saída (m)', { fill: corTexto, 'text-anchor': 'middle', 'font-size': 11.5 }));
+    var ty = texto(14, (mT + HH - mB) / 2, 'Cota (m)', { fill: corTexto, 'text-anchor': 'middle', 'font-size': 11.5 });
+    ty.setAttribute('transform', 'rotate(-90 14 ' + ((mT + HH - mB) / 2) + ')');
+    el.push(ty);
+
+    /* limites entre trechos (mudança de diâmetro) */
+    if (res.trechos.length > 1) {
+      var acc2 = 0;
+      res.trechos.forEach(function (t, i) {
+        if (!(t.L > 0)) return;
+        acc2 += t.L;
+        if (i === res.trechos.length - 1) return;
+        el.push(sv('line', { x1: X(acc2), y1: mT, x2: X(acc2), y2: HH - mB,
+          stroke: corEixo, 'stroke-width': 1, 'stroke-dasharray': '5 4' }));
+      });
+    }
+
+    function caminho(pts) {
+      return pts.map(function (p, i) { return (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1); }).join(' ');
+    }
+
+    /* piezométricas */
+    series.forEach(function (sr) {
+      el.push(sv('path', { d: caminho(sr.pts), fill: 'none', stroke: sr.cor, 'stroke-width': 1.8,
+        'stroke-dasharray': sr.tracado === 'tracejado' ? '7 5' : 'none' }));
+    });
+
+    /* perfil do conduto */
+    el.push(sv('path', { d: caminho(pontos.map(function (p) { return { x: p.x, y: p.cota }; })),
+      fill: 'none', stroke: corConduto, 'stroke-width': 2.4 }));
+    pontos.forEach(function (p) {
+      var ruim = false;
+      rc.vazoes.forEach(function (rv) {
+        (rv.perfil || []).forEach(function (r) {
+          if (r && r.id === p.id && r.pressao !== null && r.pressao < 0) ruim = true;
+        });
+      });
+      el.push(sv('circle', { cx: X(p.x), cy: Y(p.cota), r: 3.4, fill: ruim ? '#a8231f' : corConduto }));
+    });
+
+    /* níveis de água */
+    if (naS !== null && naS !== undefined) {
+      el.push(sv('circle', { cx: X(0), cy: Y(naS), r: 4, fill: '#1c5fae' }));
+      el.push(texto(X(0) + 6, Y(naS) - 6, 'NA saída ' + U.fmt(naS, 2), { fill: corTexto }));
+    }
+    if (naC !== null && naC !== undefined) {
+      el.push(sv('circle', { cx: X(res.Ltotal), cy: Y(naC), r: 4, fill: '#1c5fae' }));
+      el.push(texto(X(res.Ltotal) - 6, Y(naC) - 6, 'NA chegada ' + U.fmt(naC, 2), { fill: corTexto, 'text-anchor': 'end' }));
+    }
+
+    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + HH, width: '100%', role: 'img',
+      'font-family': 'inherit', style: 'max-width:980px;display:block' }, el);
+
+    var legenda = [{ cor: corConduto, rot: 'Perfil do conduto', tracado: 'solido' }];
+    series.forEach(function (sr) { legenda.push({ cor: sr.cor, rot: 'Piezométrica — ' + sr.rot, tracado: sr.tracado }); });
+    return { svg: svg, legenda: legenda };
+  };
+
+  GCF.GRAF = G;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
    Interface — abas, formulários e resultados
    ================================================================ */
 (function (GCF) {
@@ -1323,6 +1542,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
     { id: 'trechos', rot: 'Trechos e peças' },
     { id: 'vazoes', rot: 'Vazões' },
     { id: 'cenarios', rot: 'Cenários' },
+    { id: 'perfil', rot: 'Perfil da linha' },
     { sep: true },
     { id: 'resultados', rot: 'Resultados' },
     { sep: true },
@@ -1446,6 +1666,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       case 'trechos': App.telaTrechos(main, st, res); break;
       case 'vazoes': App.telaVazoes(main, st); break;
       case 'cenarios': App.telaCenarios(main, st); break;
+      case 'perfil': App.telaPerfil(main, st, res); break;
       case 'resultados': App.telaResultados(main, st, res); break;
       case 'catalogos': App.telaCatalogos(main, st); break;
       case 'parametros': App.telaParametros(main, st); break;
@@ -1682,6 +1903,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       h('input', { type: 'text', class: 'l200', value: t.nome, 'data-foco': 'tn' + t.id, style: 'font-weight:600',
         onchange: function (ev) { t.nome = ev.target.value; App.mudou(); } }),
       rt && rt.di ? h('span', { class: 'selo neutro' }, 'DI ' + U.fmt(rt.di * 1000, 1) + ' mm') : null,
+      rt && rt.n > 1 ? h('span', { class: 'selo neutro' }, rt.n + ' tubos em paralelo') : null,
       rt && rt.K ? h('span', { class: 'selo neutro' }, 'ΣK = ' + U.fmt(rt.K, 2)) : null,
       acoes);
 
@@ -1734,6 +1956,9 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       selIdade.appendChild(h('option', { value: f.id, selected: t.idade === f.id }, f.rot));
     });
     linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Idade da tubulação'), selIdade));
+    linhaTubo.appendChild(campoNum('Tubos em paralelo', t.nParalelo,
+      function (v) { t.nParalelo = (v && v >= 1) ? Math.round(v) : 1; },
+      { un: 'un', dec: 0, classe: 'l60', foco: 'tpar' + t.id }));
     corpo.appendChild(linhaTubo);
 
     /* --- rugosidade --- */
@@ -1909,6 +2134,126 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
         'Se alguma vazão "não passa" no cenário crítico, aumente o diâmetro na aba Trechos e verifique novamente — o resumo compara todos os cenários lado a lado.')));
   };
 
+  /* ================= PERFIL DA LINHA ================= */
+
+  App.telaPerfil = function (main, st, res) {
+    var cart = h('div', { class: 'cartao' },
+      h('h2', {}, 'Perfil da linha',
+        h('span', { class: 'dica' }, 'Pontos (distância desde a saída × cota do conduto) ao longo de TODA a linha, em distância acumulada — um perfil único, mesmo com vários trechos em série.')));
+
+    var tab = h('table', { class: 'dados' },
+      h('thead', {}, h('tr', {},
+        h('th', {}, 'Distância desde a saída (m)'), h('th', {}, 'Cota do conduto (m)'), h('th', {}, 'Descrição'), h('th', {}, ''))));
+    var corpo = h('tbody');
+    st.perfil.pontos.forEach(function (p, idx) {
+      corpo.appendChild(h('tr', {},
+        h('td', {}, U.campoNum({ valor: p.x, dec: 2, classe: 'l100', gravar: function (v) { p.x = v; App.mudou(); } })),
+        h('td', {}, U.campoNum({ valor: p.cota, dec: 2, classe: 'l100', gravar: function (v) { p.cota = v; App.mudou(); } })),
+        h('td', { class: 'txt' }, h('input', { type: 'text', style: 'width:100%;min-width:160px', value: p.rot || '', 'data-foco': 'pp' + p.id,
+          onchange: function (ev) { p.rot = ev.target.value; App.mudou(); } })),
+        h('td', { class: 'c' }, h('button', { class: 'btn mini perigo', type: 'button',
+          onclick: function () { st.perfil.pontos.splice(idx, 1); App.mudou(); } }, 'Remover'))));
+    });
+    tab.appendChild(corpo);
+    cart.appendChild(h('div', { class: 'rolagem' }, tab));
+    cart.appendChild(h('div', { style: 'margin-top:10px;display:flex;gap:6px;flex-wrap:wrap' },
+      h('button', { class: 'btn primario', type: 'button', onclick: function () {
+        st.perfil.pontos.push({ id: U.id(), x: null, cota: null, rot: '' }); App.mudou();
+      } }, '+ Adicionar ponto'),
+      h('button', { class: 'btn', type: 'button', title: 'Cria pontos na saída, no fim de cada trecho e na chegada', onclick: function () {
+        var acc = 0, novos = [{ x: 0, rot: 'Saída' }];
+        st.trechos.forEach(function (t) {
+          if (t.L > 0) { acc += t.L; novos.push({ x: acc, rot: 'Fim de ' + (t.nome || 'trecho'), cota: t.cotaFim }); }
+        });
+        novos.forEach(function (nv) {
+          var existe = st.perfil.pontos.some(function (p) { return p.x !== null && p.x !== undefined && Math.abs(p.x - nv.x) < 0.005; });
+          if (!existe) st.perfil.pontos.push({ id: U.id(), x: nv.x,
+            cota: (nv.cota === undefined || nv.cota === null ? null : nv.cota), rot: nv.rot });
+        });
+        st.perfil.pontos.sort(function (a, b) { return (a.x === null ? 1e12 : a.x) - (b.x === null ? 1e12 : b.x); });
+        App.mudou();
+      } }, 'Inserir limites dos trechos'),
+      st.perfil.pontos.length > 1 ? h('button', { class: 'btn', type: 'button', onclick: function () {
+        st.perfil.pontos.sort(function (a, b) { return (a.x === null ? 1e12 : a.x) - (b.x === null ? 1e12 : b.x); });
+        App.mudou();
+      } }, 'Ordenar por distância') : null));
+    cart.appendChild(h('p', { class: 'nota' },
+      'Não é preciso lançar um perfil por trecho: como os trechos estão em série, o perfil é único e a distância é acumulada. ',
+      'Para trabalhar "por trecho", o botão ', h('b', {}, 'Inserir limites dos trechos'), ' cria os pontos exatamente onde um trecho termina e o outro começa (onde o diâmetro muda) — complete as cotas e acrescente os pontos intermediários que interessarem (pontos altos, travessias, mudanças de declividade).'));
+    main.appendChild(cart);
+
+    if (!res) return;
+
+    var pontosValidos = st.perfil.pontos.filter(function (p) {
+      return p.x !== null && p.x !== undefined && p.cota !== null && p.cota !== undefined;
+    });
+    if (pontosValidos.length < 2) {
+      main.appendChild(h('div', { class: 'cartao' },
+        h('div', { class: 'aviso info' }, h('b', {}, 'Gráfico'),
+          'Informe ao menos dois pontos completos (distância e cota) para desenhar o perfil e a linha piezométrica.')));
+      return;
+    }
+
+    /* cenário exibido */
+    var rcSel = res.cenarios[0];
+    if (st.cenarios.habilitado && res.cenarios.length > 1 && App.perfilCen) {
+      res.cenarios.forEach(function (rc) { if (rc.cen.id === App.perfilCen) rcSel = rc; });
+    }
+
+    var cg = h('div', { class: 'cartao' },
+      h('h2', {}, 'Perfil × linha piezométrica',
+        h('span', { class: 'dica' }, 'Para o traçado, a perda localizada é distribuída ao longo do trecho. Linhas verticais tracejadas: limites entre trechos. Pontos em vermelho: piezométrica abaixo do conduto (pressão negativa).')));
+    if (st.cenarios.habilitado && res.cenarios.length > 1) {
+      var selC = h('select', { onchange: function (ev) { App.perfilCen = ev.target.value; App.render(); } });
+      res.cenarios.forEach(function (rc) {
+        selC.appendChild(h('option', { value: rc.cen.id, selected: rcSel.cen.id === rc.cen.id }, rc.cen.nome));
+      });
+      cg.appendChild(h('div', { class: 'linha-campos' }, h('div', { class: 'campo' }, h('label', {}, 'Cenário'), selC)));
+    }
+    var graf = GCF.GRAF.perfil(st, res, rcSel);
+    if (graf) {
+      cg.appendChild(graf.svg);
+      var leg = h('div', { style: 'margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 16px' });
+      graf.legenda.forEach(function (l) {
+        leg.appendChild(h('span', { style: 'display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--texto-2)' },
+          h('span', { style: 'display:inline-block;width:22px;height:0;border-top:3px ' + (l.tracado === 'tracejado' ? 'dashed ' : 'solid ') + l.cor }), l.rot));
+      });
+      cg.appendChild(leg);
+    } else {
+      cg.appendChild(h('div', { class: 'aviso' }, h('b', {}, 'Gráfico indisponível'),
+        'Verifique se todos os trechos estão completos e se as cotas dos níveis de água foram informadas.'));
+    }
+    main.appendChild(cg);
+
+    /* pressões nos pontos */
+    if (rcSel.vazoes.length) {
+      var cp = h('div', { class: 'cartao' },
+        h('h2', {}, 'Pressão sobre o conduto nos pontos do perfil — ' + rcSel.cen.nome,
+          h('span', { class: 'dica' }, 'Pressão = cota piezométrica − cota do conduto (mca). Valores negativos em vermelho.')));
+      var tp = h('table', { class: 'dados' },
+        h('thead', {}, h('tr', {},
+          h('th', {}, 'Ponto'), h('th', {}, 'Dist. (m)'), h('th', {}, 'Cota (m)'),
+          rcSel.vazoes.map(function (rv) { return h('th', {}, rv.vaz.nome + ' (' + U.fmt(rv.Q * 1000, 1) + ' L/s)'); }))));
+      var tpb = h('tbody');
+      st.perfil.pontos.forEach(function (pp, ip) {
+        if (pp.x === null || pp.cota === null || pp.x === undefined || pp.cota === undefined) return;
+        tpb.appendChild(h('tr', {},
+          h('td', {}, pp.rot || 'Ponto ' + (ip + 1)),
+          h('td', {}, U.fmt(pp.x, 1)),
+          h('td', {}, U.fmt(pp.cota, 2)),
+          rcSel.vazoes.map(function (rv) {
+            var r = rv.perfil && rv.perfil[ip];
+            var v = r ? r.pressao : null;
+            return h('td', { style: v !== null && v < 0 ? 'color:var(--vermelho);font-weight:700' : '' },
+              v !== null ? U.fmt(v, 2) : '—');
+          })));
+      });
+      tp.appendChild(tpb);
+      cp.appendChild(h('div', { class: 'rolagem' }, tp));
+      main.appendChild(cp);
+    }
+  };
+
   /* ================= RESULTADOS ================= */
 
   App.telaResultados = function (main, st, res) {
@@ -1923,13 +2268,14 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
     var ct = h('div', { class: 'cartao' }, h('h2', {}, 'Características dos trechos'));
     var tt = h('table', { class: 'dados' },
       h('thead', {}, h('tr', {},
-        h('th', {}, 'Trecho'), h('th', {}, 'Tubo'), h('th', {}, 'DI (mm)'), h('th', {}, 'L (m)'),
+        h('th', {}, 'Trecho'), h('th', {}, 'Tubo'), h('th', {}, 'Tubos'), h('th', {}, 'DI (mm)'), h('th', {}, 'L (m)'),
         h('th', {}, 'C'), h('th', {}, 'ε (mm)'), h('th', {}, 'ΣK'), h('th', {}, 'Peças'))));
     var tb = h('tbody');
     res.trechos.forEach(function (t) {
       tb.appendChild(h('tr', {},
         h('td', {}, t.nome),
         h('td', { class: 'txt' }, t.rotTubo + (t.materialRot !== '—' ? ' — ' + t.materialRot : '')),
+        h('td', { class: 'c' }, (t.n || 1) + '×' + (t.n > 1 ? ' paralelo' : '')),
         h('td', {}, t.di ? U.fmt(t.di * 1000, 1) : '—'),
         h('td', {}, t.L ? U.fmt(t.L, 2) : '—'),
         h('td', {}, t.C ? U.fmt(t.C, 0) : '—'),
@@ -1938,7 +2284,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
         h('td', { class: 'txt' }, t.pecas.map(function (p) { return p.qtde + '× ' + p.rot; }).join(' · ') || '—')));
     });
     if (res.Ltotal) tb.appendChild(h('tr', { class: 'total' },
-      h('td', {}, 'Total'), h('td', {}), h('td', {}), h('td', {}, U.fmt(res.Ltotal, 2)),
+      h('td', {}, 'Total'), h('td', {}), h('td', {}), h('td', {}), h('td', {}, U.fmt(res.Ltotal, 2)),
       h('td', {}), h('td', {}), h('td', {}), h('td', {})));
     tt.appendChild(tb);
     ct.appendChild(h('div', { class: 'rolagem' }, tt));
@@ -2008,6 +2354,9 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       }
       tab.appendChild(corpo);
       cart.appendChild(h('div', { class: 'rolagem' }, tab));
+      if (res.trechos.some(function (t) { return t.n > 1; }))
+        cart.appendChild(h('p', { class: 'nota' },
+          'Trechos com tubos em paralelo: Q é a vazão total do sistema; v, J, hf e hl referem-se a cada tubo (tubos idênticos, vazão dividida igualmente).'));
 
       /* piezométrica por trecho, quando houver cota informada */
       var temCota = res.trechos.some(function (t) { return t.cotaFim !== null && t.cotaFim !== undefined; });
@@ -2196,6 +2545,8 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       h('p', {}, '2. Para cada vazão, a perda contínua é calculada trecho a trecho pelo método escolhido, e a localizada por hl = ΣK·v²/(2g) com as peças informadas.'),
       h('p', {}, '3. Folga = H disponível − perda total. Folga negativa significa que a vazão não passa por gravidade — é preciso aumentar o diâmetro, reduzir peças ou rever o traçado.'),
       h('p', {}, '4. O máximo de transporte é obtido por bissecção: a vazão em que a perda total iguala a carga disponível (folga nula), como na planilha de origem (Solver).'),
+      h('p', {}, '5. Trechos com tubos em paralelo consideram tubos idênticos com divisão igual da vazão — as perdas são calculadas para um tubo e valem para o conjunto.'),
+      h('p', {}, '6. Com o perfil da linha informado, a cota piezométrica é comparada à cota do conduto em cada ponto (perda localizada distribuída ao longo do trecho) — pressão negativa indica risco de sifão/entrada de ar em pontos altos.'),
       h('p', { class: 'nota' }, 'Todo o cálculo roda no navegador e os dados ficam gravados apenas neste dispositivo (localStorage). Use Exportar/Importar para levar o projeto a outro computador.')));
   };
 
@@ -2258,16 +2609,19 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
     s.push('</tbody></table>');
 
     s.push('<h2>2. Trechos e peças</h2>');
-    s.push('<table><thead><tr><th>Trecho</th><th>Tubo / material</th><th>DI (mm)</th><th>L (m)</th><th>C</th><th>ε (mm)</th><th>ΣK</th><th>Peças</th></tr></thead><tbody>');
+    s.push('<table><thead><tr><th>Trecho</th><th>Tubo / material</th><th>Tubos</th><th>DI (mm)</th><th>L (m)</th><th>C</th><th>ε (mm)</th><th>ΣK</th><th>Peças</th></tr></thead><tbody>');
     res.trechos.forEach(function (t) {
       s.push('<tr><td>' + esc(t.nome) + '</td><td>' + esc(t.rotTubo + (t.materialRot !== '—' ? ' — ' + t.materialRot : '')) +
-        '</td><td>' + (t.di ? fmt(t.di * 1000, 1) : '—') + '</td><td>' + (t.L ? fmt(t.L, 2) : '—') +
+        '</td><td class="c">' + (t.n || 1) + '×</td>' +
+        '<td>' + (t.di ? fmt(t.di * 1000, 1) : '—') + '</td><td>' + (t.L ? fmt(t.L, 2) : '—') +
         '</td><td>' + (t.C ? fmt(t.C, 0) : '—') + '</td><td>' + (t.eps ? fmt(t.eps, 3) : '—') +
         '</td><td>' + fmt(t.K, 2) + '</td><td>' +
         esc(t.pecas.map(function (x) { return x.qtde + '× ' + x.rot + ' (K=' + fmt(x.K, 2) + ')'; }).join('; ') || '—') +
         '</td></tr>');
     });
     s.push('</tbody></table>');
+    if (res.trechos.some(function (t) { return t.n > 1; }))
+      s.push('<p class="obs">Trechos com tubos em paralelo: tubos idênticos com divisão igual da vazão; velocidades e perdas referem-se a cada tubo.</p>');
 
     s.push('<h2>3. Verificação hidráulica' + (st.cenarios.habilitado ? ' por cenário' : '') + '</h2>');
     var mostraF = st.params.metodo !== 'hw';
@@ -2316,10 +2670,43 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       s.push('</tbody></table>');
     });
 
+    var sec = 3;
+
+    /* perfil da linha */
+    var pontosPerf = ((st.perfil && st.perfil.pontos) || []).filter(function (pp) {
+      return pp.x !== null && pp.x !== undefined && pp.cota !== null && pp.cota !== undefined;
+    });
+    if (pontosPerf.length >= 2) {
+      sec += 1;
+      s.push('<h2>' + sec + '. Perfil da linha e linha piezométrica</h2>');
+      res.cenarios.forEach(function (rc) {
+        if (st.cenarios.habilitado) s.push('<h3>' + esc(rc.cen.nome) + '</h3>');
+        var g = GCF.GRAF.perfil(st, res, rc, { impressao: true });
+        if (g) s.push(g.svg.outerHTML);
+        if (rc.vazoes.length) {
+          s.push('<table><thead><tr><th>Ponto</th><th>Dist. (m)</th><th>Cota (m)</th>' +
+            rc.vazoes.map(function (rv) { return '<th>' + esc(rv.vaz.nome) + '<br>(' + fmt(rv.Q * 1000, 1) + ' L/s)</th>'; }).join('') +
+            '</tr></thead><tbody>');
+          st.perfil.pontos.forEach(function (pp, ip) {
+            if (pp.x === null || pp.cota === null || pp.x === undefined || pp.cota === undefined) return;
+            s.push('<tr><td>' + esc(pp.rot || 'Ponto ' + (ip + 1)) + '</td><td>' + fmt(pp.x, 1) + '</td><td>' + fmt(pp.cota, 2) + '</td>' +
+              rc.vazoes.map(function (rv) {
+                var r = rv.perfil && rv.perfil[ip];
+                var v = r ? r.pressao : null;
+                return '<td class="' + (v !== null && v < 0 ? 'ruim-txt' : '') + '">' + (v !== null ? fmt(v, 2) : '—') + '</td>';
+              }).join('') + '</tr>');
+          });
+          s.push('</tbody></table>');
+          s.push('<p class="obs">Pressão sobre o conduto (cota piezométrica − cota do conduto), em mca, por vazão. Perda localizada distribuída ao longo do trecho.</p>');
+        }
+      });
+    }
+
     /* comparativo */
     var vazoes = st.vazoes.filter(function (v) { return v.q > 0; });
     if (st.cenarios.habilitado && res.cenarios.length > 1 && vazoes.length) {
-      s.push('<h2>4. Comparativo de cenários — folga (mca)</h2>');
+      sec += 1;
+      s.push('<h2>' + sec + '. Comparativo de cenários — folga (mca)</h2>');
       s.push('<table><thead><tr><th>Cenário</th><th>H disp. (mca)</th>' +
         vazoes.map(function (v) { return '<th>' + esc(v.nome) + '<br>(' + fmt(v.q, 1) + ' L/s)</th>'; }).join('') +
         '<th>Q máx (L/s)</th></tr></thead><tbody>');
@@ -2341,7 +2728,8 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       if (!vistos[k]) { vistos[k] = 1; avisos.push(a); }
     });
     if (avisos.length) {
-      s.push('<h2>' + (st.cenarios.habilitado && res.cenarios.length > 1 && vazoes.length ? '5' : '4') + '. Pontos a verificar</h2>');
+      sec += 1;
+      s.push('<h2>' + sec + '. Pontos a verificar</h2>');
       avisos.forEach(function (a) {
         s.push('<p class="obs">• <b>' + esc(a.onde) + ':</b> ' + esc(a.msg) + '</p>');
       });
