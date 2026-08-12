@@ -100,7 +100,12 @@
     background: #fff; color: var(--texto);
   }
   /* seletor compacto de DN: mostra só "DN ▾"; o valor fica no campo ao lado */
-  select.sel-dn { flex: 0 0 auto; width: auto; padding: .55rem .5rem; color: var(--cinza); font-weight: 600; }
+  select.sel-dn {
+    flex: 0 0 auto; width: auto; padding: .55rem .25rem .55rem .45rem;
+    font-size: .9rem; color: var(--cinza); font-weight: 600;
+  }
+  /* o campo manual tem prioridade de espaço: precisa exibir até 4 dígitos + milhar (1.800) */
+  .linha-input input { flex: 1 1 auto; min-width: 4.6rem; }
   .unidade { font-size: .85rem; color: var(--cinza); min-width: 2.4rem; }
 
   .segmento { display: flex; gap: .4rem; }
@@ -286,7 +291,7 @@
             <label id="lblD1">Diâmetro da adutora — DN <span class="dica">(interno)</span></label>
             <div class="linha-input">
               <select id="selD1" class="sel-dn" onchange="aoMudarDN(1,'sel')"></select>
-              <input type="number" id="inpD1" min="1" step="1" value="300" oninput="aoMudarDN(1,'inp')">
+              <input type="text" inputmode="numeric" id="inpD1" value="300" oninput="aoMudarDN(1,'inp')" onblur="formatarCampoDN(this)">
               <span class="unidade">mm</span>
             </div>
           </div>
@@ -312,7 +317,7 @@
             <label>Diâmetro — DN₂ <span class="dica">(lado direito)</span></label>
             <div class="linha-input">
               <select id="selD2" class="sel-dn" onchange="aoMudarDN(2,'sel')"></select>
-              <input type="number" id="inpD2" min="1" step="1" value="300" oninput="aoMudarDN(2,'inp')">
+              <input type="text" inputmode="numeric" id="inpD2" value="300" oninput="aoMudarDN(2,'inp')" onblur="formatarCampoDN(this)">
               <span class="unidade">mm</span>
             </div>
           </div>
@@ -341,7 +346,7 @@
           <label>Diâmetro da descarga — d</label>
           <div class="linha-input">
             <select id="selDd" class="sel-dn" onchange="escolherDN('selDd','inpDd')"></select>
-            <input type="number" id="inpDd" min="1" step="1" value="75" oninput="calcular()">
+            <input type="text" inputmode="numeric" id="inpDd" value="75" oninput="calcular()" onblur="formatarCampoDN(this)">
             <span class="unidade">mm</span>
           </div>
           <div class="chips" id="chipsSugestao"></div>
@@ -456,7 +461,7 @@ function preencherSelects() {
 
 function escolherDN(selId, inpId) {
   const sel = document.getElementById(selId);
-  if (sel.value !== "") document.getElementById(inpId).value = sel.value;
+  if (sel.value !== "") document.getElementById(inpId).value = fmtDN(parseInt(sel.value, 10));
   sel.value = "";   // o seletor volta a exibir apenas "DN"
   calcular();
 }
@@ -470,9 +475,9 @@ function sincronizarSelect(selId, inpId) {
 
 /* DN de referência p/ sugestão da descarga: o maior lado */
 function dnReferencia() {
-  const D1 = num("inpD1");
+  const D1 = numDN("inpD1");
   if (config !== "dois") return D1;
-  return Math.max(D1 || 0, num("inpD2") || 0);
+  return Math.max(D1 || 0, numDN("inpD2") || 0);
 }
 
 /* Faixa usual da descarga: DNs comerciais entre D/6 e D/4 (se nenhum cair
@@ -492,20 +497,20 @@ function faixaUsualDescarga(Dmm) {
 function aoMudarDN(lado, origem) {
   if (origem === "sel") {
     const sel = document.getElementById("selD" + lado);
-    if (sel.value !== "") document.getElementById("inpD" + lado).value = sel.value;
+    if (sel.value !== "") document.getElementById("inpD" + lado).value = fmtDN(parseInt(sel.value, 10));
     sel.value = "";   // o seletor volta a exibir apenas "DN"
   }
   if (lado === 2 && origem !== "auto") dn2Editada = true;
   const Dref = dnReferencia();
   if (Dref > 0) {
     const faixa = faixaUsualDescarga(Dref);
-    document.getElementById("inpDd").value = faixa[faixa.length - 1];
+    document.getElementById("inpDd").value = fmtDN(faixa[faixa.length - 1]);
   }
   calcular();
 }
 
 function aplicarSugestao(dn) {
-  document.getElementById("inpDd").value = dn;
+  document.getElementById("inpDd").value = fmtDN(dn);
   calcular();
 }
 
@@ -547,6 +552,14 @@ function mudarConfig(nova) {
 /* aceita vírgula como separador decimal */
 function num(id) { return parseFloat(String(document.getElementById(id).value).replace(",", ".")); }
 
+/* DNs (mm, inteiros): ignora o ponto de milhar — "1.800" → 1800 */
+function numDN(id) { return parseInt(String(document.getElementById(id).value).replace(/\D/g, ""), 10); }
+const fmtDN = v => isFinite(v) ? v.toLocaleString("pt-BR") : "";
+function formatarCampoDN(el) {
+  const v = parseInt(String(el.value).replace(/\D/g, ""), 10);
+  if (isFinite(v)) el.value = fmtDN(v);
+}
+
 function alerta(tipo, icone, texto) {
   return `<div class="alerta ${tipo}"><span>${icone}</span><span>${texto}</span></div>`;
 }
@@ -568,8 +581,8 @@ function calcular() {
   selCd.value = ["0.61", "0.82", "0.97"].includes(cdVal) ? cdVal : "custom";
 
   const dois = config === "dois";
-  const D1mm = num("inpD1"), Cd = num("inpCd");
-  const D2mm = dois ? num("inpD2") : D1mm;
+  const D1mm = numDN("inpD1"), Cd = num("inpCd");
+  const D2mm = dois ? numDN("inpD2") : D1mm;
   const L1 = num("inpL1"), H1 = num("inpH1");
   const L2 = dois ? num("inpL2") : 0;
   const H2 = dois ? num("inpH2") : 0;
@@ -583,7 +596,7 @@ function calcular() {
   const alertas = document.getElementById("alertas");
   const memoria = document.getElementById("memoria");
 
-  renderChips(Dref, num("inpDd"), dnsDiferentes);
+  renderChips(Dref, numDN("inpDd"), dnsDiferentes);
 
   const erros = [];
   if (!(D1mm > 0)) erros.push(dois ? "Informe o diâmetro do lado esquerdo (DN₁)." : "Informe o diâmetro da adutora.");
@@ -596,7 +609,7 @@ function calcular() {
 
   let dmm, tAlvoH;
   if (modo === "tempo") {
-    dmm = num("inpDd");
+    dmm = numDN("inpDd");
     if (!(dmm > 0)) erros.push("Informe o diâmetro da descarga.");
   } else {
     tAlvoH = num("inpTalvo");
@@ -682,6 +695,7 @@ function calcular() {
   linhas.push(["Vazão inicial da descarga (Q₀)", fmt(Q0 * 1000, 1) + " L/s"]);
   linhas.push(["Vazão média durante o esvaziamento", fmt(Qm * 1000, 1) + " L/s"]);
   linhas.push(["Velocidade inicial na descarga (v₀)", fmt(v0, 2) + " m/s"]);
+  linhas.push(["Velocidade média na descarga (vₘ = Qₘ/a)", fmt(Qm / a, 2) + " m/s"]);
   linhas.push(["Relação d/D" + (dnsDiferentes ? " (maior lado)" : ""), fmt(relacao, 2) + " (1/" + fmt(1 / relacao, 1) + ")"]);
   if (dois) {
     linhas.push(["Fase 1 — só o lado mais alto (H " + fmt(Halto, 1) + " → " + fmt(Hbaixo, 1) + " m)", fmtTempo(t1)]);
