@@ -7,25 +7,25 @@
 <style>
   :root {
     /* ==========================================================
-       PALETA DO TEMA — ajuste aqui para as cores da logo
-       --primaria ........ cor principal (cabeçalho, botões, tubo)
-       --primaria-escura .. variação escura da cor principal
-       --realce ........... cor de destaque (água, seleções)
-       --realce-suave ..... fundo claro derivado da cor principal
+       PALETA DO TEMA — cores da logo Pastro Engenharia
+       --primaria ........ azul-marinho da marca (cabeçalho, botões, tubo)
+       --primaria-escura .. variação escura do marinho
+       --realce ........... verde-água (teal) da gota da logo
+       --realce-suave ..... fundo claro derivado do teal
        ========================================================== */
-    --primaria: #0b5394;
-    --primaria-escura: #073763;
-    --realce: #3d85c6;
-    --realce-suave: #e8f1fa;
-    --realce-borda: #bcd3e8;
-    --tubo-interno: #8ab6e0;
+    --primaria: #1b2452;
+    --primaria-escura: #101838;
+    --realce: #2aa39c;
+    --realce-suave: #e7f5f4;
+    --realce-borda: #bfe2df;
+    --tubo-interno: #7ed3cb;
 
     --verde: #2e7d32;
     --laranja: #e65100;
     --vermelho: #c62828;
     --cinza: #5f6368;
-    --borda: #d6e0ea;
-    --fundo: #f4f7fa;
+    --borda: #d6dee4;
+    --fundo: #f4f7f8;
     --card: #ffffff;
     --texto: #202124;
     --terreno: #efe6d8;
@@ -40,7 +40,8 @@
     padding-bottom: 3rem;
   }
   header {
-    background: linear-gradient(135deg, var(--primaria-escura), var(--primaria));
+    /* degradê marinho → teal, como no letreiro "ENGENHARIA" da logo */
+    background: linear-gradient(160deg, var(--primaria-escura) 0%, var(--primaria) 55%, var(--realce) 135%);
     color: #fff;
     padding: 1.6rem 1rem 1.4rem;
     text-align: center;
@@ -622,9 +623,9 @@ function calcular() {
   // A velocidade do jato depende apenas do desnível e do Cd (v = Cd·√(2gH)) —
   // a linha abaixo é sempre exibida e atualizada para deixar isso visível.
   if (v0 > 6)
-    av += alerta("aviso", "🌊", `Velocidade inicial do jato: <b>${fmt(v0, 1)} m/s</b> — elevada; prever dissipação de energia e proteção anti-erosiva no lançamento. <i>Ela depende do desnível e do Cd, não do diâmetro da descarga.</i>`);
+    av += alerta("aviso", "🌊", `Velocidade inicial do jato: <b>${fmt(v0, 1)} m/s</b> — elevada; prever dissipação de energia e proteção anti-erosiva no lançamento. <i>v = C<sub>d</sub>·√(2gH): depende do desnível e do Cd — um DN de descarga maior aumenta a vazão (Q = v·a), não a velocidade.</i>`);
   else
-    av += alerta("ok", "🌊", `Velocidade inicial do jato: <b>${fmt(v0, 1)} m/s</b> — dentro do usual. <i>Ela depende do desnível e do Cd, não do diâmetro da descarga.</i>`);
+    av += alerta("ok", "🌊", `Velocidade inicial do jato: <b>${fmt(v0, 1)} m/s</b> — dentro do usual. <i>v = C<sub>d</sub>·√(2gH): depende do desnível e do Cd — um DN de descarga maior aumenta a vazão (Q = v·a), não a velocidade.</i>`);
   if (av.indexOf("aviso") === -1)
     av = alerta("ok", "✅", "Parâmetros dentro das faixas usuais de projeto.") + av;
   av += alerta("info", "💡", `A vazão inicial de ${fmt(Q0 * 1000, 1)} L/s decresce ao longo do esvaziamento até zero.`);

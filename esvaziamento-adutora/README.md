@@ -66,6 +66,6 @@ A velocidade inicial na seção da descarga é `v₀ = Cd·√(2g·Hmax)` — el
 
 ## Tema / cores
 
-Todas as cores ficam em variáveis CSS no início do arquivo (bloco `:root`, seção "PALETA DO TEMA"). Para aplicar as cores da logo, basta ajustar `--primaria`, `--primaria-escura`, `--realce` e derivadas — a interface e o esquema ilustrativo (SVG) acompanham automaticamente.
+O tema segue a identidade visual da **Pastro Engenharia**: azul-marinho (`#1b2452`) como cor principal e verde-água (`#2aa39c`) como realce, com o cabeçalho em degradê marinho → teal. Todas as cores ficam em variáveis CSS no início do arquivo (bloco `:root`, seção "PALETA DO TEMA") — ajustando `--primaria`, `--primaria-escura`, `--realce` e derivadas, a interface e o esquema ilustrativo (SVG) acompanham automaticamente.
 
 > ⚠️ Ferramenta de **pré-dimensionamento**: os resultados devem ser verificados nas condições específicas de cada projeto.
