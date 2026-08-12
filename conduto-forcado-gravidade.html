@@ -77,7 +77,16 @@ header.topo {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   position: sticky; top: 0; z-index: 40;
 }
+header.topo .marca { display: flex; align-items: center; gap: 13px; min-width: 0; }
 header.topo h1 { font-size: 15px; letter-spacing: -.2px; }
+.marca-bloco { display: flex; align-items: center; gap: 9px; color: var(--azul); }
+[data-tema="escuro"] .marca-bloco { color: #cfe0f5; }
+.marca-simbolo { display: block; line-height: 0; }
+.marca-nome { display: flex; flex-direction: column; line-height: 1; font-family: Georgia, "Times New Roman", serif; }
+.marca-nome b { font-size: 19px; letter-spacing: .5px; color: var(--azul); }
+.marca-nome i { font-size: 10.5px; font-style: normal; letter-spacing: 1.6px; color: var(--teal); font-weight: 600; }
+[data-tema="escuro"] .marca-nome b { color: #cfe0f5; }
+.marca-divisoria { width: 1px; align-self: stretch; background: var(--border); margin: 2px 3px; }
 header.topo h1 .sub { display: block; font-size: 11px; font-weight: 400; color: var(--texto-3); letter-spacing: .3px; }
 header.topo .acoes { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -143,7 +152,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 16px 80px; }
 .l160 { width: 164px; } .l200 { width: 208px; } .l260 { width: 264px; } .cresce { flex: 1 1 180px; }
 
 table.dados { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-table.dados th, table.dados td { border: 1px solid var(--border); padding: 4px 8px; text-align: right; }
+table.dados th, table.dados td { border: 1px solid var(--border); padding: 4px 8px; text-align: center; }
+table.dados td { font-variant-numeric: tabular-nums; }
 table.dados th {
   background: var(--azul-claro); color: var(--azul); font-weight: 600; font-size: 11.5px;
   text-align: center; vertical-align: middle;
@@ -154,6 +164,16 @@ table.dados td.num, table.dados td:not(:first-child):not(.c):not(.txt) { font-fa
 table.dados td.txt { text-align: left; font-family: inherit; }
 table.dados tr.total td { font-weight: 700; background: var(--surface-2); }
 table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); font-weight: 600; text-align: left; font-family: inherit; }
+table.dados tr.bom     td:first-child { box-shadow: inset 3px 0 var(--verde); }
+table.dados tr.atencao td:first-child { box-shadow: inset 3px 0 var(--ambar); }
+table.dados tr.ruim    td:first-child { box-shadow: inset 3px 0 var(--vermelho); }
+table.dados tr.bom     { background: var(--verde-bg); }
+table.dados tr.atencao { background: var(--ambar-bg); }
+table.dados tr.ruim    { background: var(--vermelho-bg); }
+table.dados tr.clicavel { cursor: pointer; }
+table.dados tr.clicavel:hover { filter: brightness(.97); }
+table.dados tr.selecionada { outline: 2px solid var(--azul); outline-offset: -2px; }
+table.dados tr.selecionada td { font-weight: 600; }
 .rolagem { overflow-x: auto; }
 
 .selo { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 9px; white-space: nowrap; }
@@ -244,8 +264,12 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
 <body>
 
 <header class="topo">
-  <h1>Conduto Forçado por Gravidade
-    <span class="sub">adutoras e emissários por gravidade · Hazen-Williams e Colebrook-White · cenários · perfil × piezométrica · tubos em paralelo</span></h1>
+  <div class="marca">
+    <div id="marca"></div>
+    <div class="marca-divisoria"></div>
+    <h1>Conduto Forçado por Gravidade
+      <span class="sub">adutoras e emissários por gravidade · Hazen-Williams e Colebrook-White · cenários · perfil × piezométrica · tubos em paralelo</span></h1>
+  </div>
   <div class="acoes">
     <button class="btn" type="button" data-acao="novo">Novo</button>
     <button class="btn" type="button" data-acao="exemplo">Exemplo</button>
@@ -344,6 +368,86 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
   };
 
   GCF.U = U;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
+   Marca — identidade visual (mesma do Pré-dimensionamento de Adutora)
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var M = {};
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  M.cores = { navy: '#0E2148', teal: '#14A5A0', tealEscuro: '#0E6F66' };
+
+  function sv(tag, attrs, filho) {
+    var e = document.createElementNS(SVG_NS, tag), k;
+    for (k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]);
+    if (filho) (Array.isArray(filho) ? filho : [filho]).forEach(function (f) { e.appendChild(f); });
+    return e;
+  }
+
+  /* símbolo: engrenagem envolvendo uma gota com onda */
+  M.simbolo = function (alturaPx, op) {
+    op = op || {};
+    var idSuf = op.id || 'tela';
+    var svg = sv('svg', {
+      viewBox: '0 0 120 124', width: alturaPx * 120 / 124, height: alturaPx,
+      role: 'img', 'aria-label': 'Pastro Engenharia'
+    });
+    var defs = sv('defs');
+    var grad = sv('linearGradient', { id: 'gcfOnda' + idSuf, x1: '0', y1: '1', x2: '1', y2: '0' });
+    grad.appendChild(sv('stop', { offset: '0', 'stop-color': M.cores.tealEscuro }));
+    grad.appendChild(sv('stop', { offset: '1', 'stop-color': '#1FC6BE' }));
+    defs.appendChild(grad);
+    var clip = sv('clipPath', { id: 'gcfGota' + idSuf });
+    clip.appendChild(sv('path', { d: 'M60 22 C60 22 88 58 88 76 A28 28 0 1 1 32 76 C32 58 60 22 60 22 Z' }));
+    defs.appendChild(clip);
+    svg.appendChild(defs);
+
+    var traco = op.corTraco || 'currentColor';
+    var fundo = op.corFundo || 'var(--surface)';
+
+    /* engrenagem: anel + dentes, com abertura no topo para a gota */
+    var g = sv('g', { fill: 'none', stroke: traco, 'stroke-width': 8,
+                      'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+    var i, ang, dentes = 10;
+    for (i = 0; i < dentes; i++) {
+      ang = -90 + (360 / dentes) * i;
+      if (ang > -140 && ang < -40) continue;
+      g.appendChild(sv('rect', {
+        x: 54, y: 6, width: 12, height: 16, rx: 2,
+        transform: 'rotate(' + (ang + 90) + ' 60 70)'
+      }));
+    }
+    g.appendChild(sv('circle', { cx: 60, cy: 70, r: 48 }));
+    svg.appendChild(g);
+
+    svg.appendChild(sv('path', {
+      d: 'M60 22 C60 22 88 58 88 76 A28 28 0 1 1 32 76 C32 58 60 22 60 22 Z',
+      fill: fundo, stroke: traco, 'stroke-width': 8, 'stroke-linejoin': 'round'
+    }));
+    svg.appendChild(sv('path', {
+      d: 'M32 82 C42 74 52 88 64 84 C74 81 82 74 88 68 L88 84 A28 28 0 0 1 34 92 Z',
+      fill: 'url(#gcfOnda' + idSuf + ')', 'clip-path': 'url(#gcfGota' + idSuf + ')'
+    }));
+    return svg;
+  };
+
+  M.marca = function (alturaPx) {
+    var caixa = document.createElement('div');
+    caixa.className = 'marca-bloco';
+    var simb = document.createElement('span');
+    simb.className = 'marca-simbolo';
+    simb.appendChild(M.simbolo(alturaPx || 46));
+    caixa.appendChild(simb);
+    var txt = document.createElement('span');
+    txt.className = 'marca-nome';
+    txt.innerHTML = '<b>PASTRO</b><i>ENGENHARIA</i>';
+    caixa.appendChild(txt);
+    return caixa;
+  };
+
+  GCF.M = M;
 })(window.GCF = window.GCF || {});
 
 /* ================================================================
@@ -1318,7 +1422,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
 
         if (rv.status === 'ruim')
           res.avisos.push({ tipo: 'erro', onde: cen.nome + ' · ' + vz.nome,
-            msg: 'A perda de carga (' + GCF.U.fmt(pt.H, 3) + ' mca) supera a carga disponível (' + GCF.U.fmt(rc.hdisp, 3) +
+            msg: 'A perda de carga (' + GCF.U.fmt(pt.H, 2) + ' mca) supera a carga disponível (' + GCF.U.fmt(rc.hdisp, 2) +
                  ' mca). A vazão não passa — aumentar o diâmetro ou rever o traçado.' });
 
         /* pressão na linha piezométrica × cota do terreno no fim de cada trecho */
@@ -1420,7 +1524,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
           piez -= d.hf + d.hl; acc += t.L;
           pts.push({ x: acc, y: piez });
         });
-        series.push({ rot: rv.vaz.nome + ' (' + U.fmt(rv.Q * 1000, 1) + ' L/s)',
+        series.push({ rot: rv.vaz.nome + ' (' + U.fmt(rv.Q * 1000, 2) + ' L/s)',
                       cor: CORES[i % CORES.length], pts: pts, tracado: 'solido' });
       });
       if (rc.qmax) {
@@ -1431,7 +1535,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
           pz -= d.hf + d.hl; ac += t.L;
           pq.push({ x: ac, y: pz });
         });
-        series.push({ rot: 'Máximo de transporte (' + U.fmt(rc.qmax * 1000, 1) + ' L/s)',
+        series.push({ rot: 'Máximo de transporte (' + U.fmt(rc.qmax * 1000, 2) + ' L/s)',
                       cor: claro ? '#888' : 'var(--texto-3)', pts: pq, tracado: 'tracejado' });
       }
     }
@@ -1553,6 +1657,8 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
   App.aba = 'resumo';
 
   App.iniciar = function () {
+    var alvoMarca = document.getElementById('marca');
+    if (alvoMarca) alvoMarca.appendChild(GCF.M.marca(46));
     App.st = E.carregar() || E.padrao();
     var cfg = E.carregarConfig();
     if (cfg.tema) document.documentElement.setAttribute('data-tema', cfg.tema);
@@ -1732,21 +1838,29 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       h('div', { class: 'compl' }, 'NA saída − NA chegada')));
     paineis.appendChild(h('div', { class: 'painel' },
       h('div', { class: 'rotulo' }, 'Extensão total'),
-      h('div', { class: 'valor' }, res.Ltotal ? U.fmt(res.Ltotal, 1) : '—', h('span', { class: 'un' }, 'm')),
+      h('div', { class: 'valor' }, res.Ltotal ? U.fmt(res.Ltotal, 2) : '—', h('span', { class: 'un' }, 'm')),
       h('div', { class: 'compl' }, st.trechos.length + ' trecho(s)')));
+    var vazProj = null;
+    st.vazoes.forEach(function (v) { if (v.q > 0 && (!vazProj || v.q > vazProj.q)) vazProj = v; });
+    if (vazProj) {
+      paineis.appendChild(h('div', { class: 'painel' },
+        h('div', { class: 'rotulo' }, 'Vazão de projeto'),
+        h('div', { class: 'valor' }, U.fmt(vazProj.q, 2), h('span', { class: 'un' }, 'L/s')),
+        h('div', { class: 'compl' }, vazProj.nome)));
+    }
+    var rvProj = null;
+    if (base && vazProj) base.vazoes.forEach(function (rv) { if (rv.vaz.id === vazProj.id) rvProj = rv; });
+    if (rvProj) {
+      paineis.appendChild(h('div', { class: 'painel ' + (rvProj.status === 'ok' ? 'ok' : rvProj.status === 'ruim' ? 'ruim' : 'atencao') },
+        h('div', { class: 'rotulo' }, 'Perda de carga de projeto'),
+        h('div', { class: 'valor' }, U.fmt(rvProj.perda.H, 2), h('span', { class: 'un' }, 'mca')),
+        h('div', { class: 'compl' }, 'folga ' + (rvProj.folga !== null ? U.fmt(rvProj.folga, 2) : '—') + ' mca — ' + statusTexto(rvProj.status))));
+    }
     if (base && base.qmax) {
       paineis.appendChild(h('div', { class: 'painel' },
         h('div', { class: 'rotulo' }, 'Máximo de transporte'),
-        h('div', { class: 'valor' }, U.fmt(base.qmax * 1000, 1), h('span', { class: 'un' }, 'L/s')),
-        h('div', { class: 'compl' }, 'vazão que esgota a carga disponível')));
-    }
-    var vzMaior = null;
-    if (base) base.vazoes.forEach(function (rv) { if (!vzMaior || rv.Q > vzMaior.Q) vzMaior = rv; });
-    if (vzMaior) {
-      paineis.appendChild(h('div', { class: 'painel ' + (vzMaior.status === 'ok' ? 'ok' : vzMaior.status === 'ruim' ? 'ruim' : 'atencao') },
-        h('div', { class: 'rotulo' }, 'Maior vazão · ' + vzMaior.vaz.nome),
-        h('div', { class: 'valor' }, U.fmt(vzMaior.perda.H, 3), h('span', { class: 'un' }, 'mca')),
-        h('div', { class: 'compl' }, 'perda total · folga ' + U.fmt(vzMaior.folga, 3) + ' mca — ' + statusTexto(vzMaior.status))));
+        h('div', { class: 'valor' }, U.fmt(base.qmax * 1000, 2), h('span', { class: 'un' }, 'L/s')),
+        h('div', { class: 'compl' }, 'vazão que esgota a carga disponível' + (st.cenarios.habilitado ? ' (1º cenário)' : ''))));
     }
     cart.appendChild(paineis);
 
@@ -1767,20 +1881,20 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
           rv.perda.trechos.forEach(function (d) { if (d && v0 === null) v0 = d.v; });
           corpo.appendChild(h('tr', {},
             h('td', {}, rv.vaz.nome),
-            h('td', {}, U.fmt(rv.Q * 1000, 1)),
+            h('td', {}, U.fmt(rv.Q * 1000, 2)),
             h('td', {}, v0 !== null ? U.fmt(v0, 2) : '—'),
-            h('td', {}, U.fmt(rv.perda.H, 3)),
-            h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 3) : '—'),
-            h('td', {}, rv.folga !== null ? U.fmt(rv.folga, 3) : '—'),
+            h('td', {}, U.fmt(rv.perda.H, 2)),
+            h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 2) : '—'),
+            h('td', {}, rv.folga !== null ? U.fmt(rv.folga, 2) : '—'),
             h('td', { class: 'c' }, selo(rv.status, statusTexto(rv.status)))));
         });
         if (rc.qmax) corpo.appendChild(h('tr', {},
           h('td', {}, h('i', {}, 'Máximo de transporte')),
-          h('td', {}, U.fmt(rc.qmax * 1000, 1)),
+          h('td', {}, U.fmt(rc.qmax * 1000, 2)),
           h('td', {}, '—'),
-          h('td', {}, U.fmt(rc.qmaxDet.H, 3)),
-          h('td', {}, U.fmt(rc.hdisp, 3)),
-          h('td', {}, U.fmt(rc.hdisp - rc.qmaxDet.H, 3)),
+          h('td', {}, U.fmt(rc.qmaxDet.H, 2)),
+          h('td', {}, U.fmt(rc.hdisp, 2)),
+          h('td', {}, U.fmt(rc.hdisp - rc.qmaxDet.H, 2)),
           h('td', { class: 'c' }, selo('neutro', 'Limite'))));
       });
       tab.appendChild(corpo);
@@ -2027,6 +2141,12 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       h('span', { class: 'nota' }, 'Se informada, o programa verifica se a linha piezométrica passa acima do conduto no fim do trecho (evita pressão negativa em pontos altos).')));
     corpo.appendChild(linhaZ);
 
+    /* --- comparação de diâmetros (tubo de catálogo) --- */
+    if (t.modo === 'catalogo') {
+      var comp = App.comparacaoDiametros(st, t, idx, res, rt);
+      if (comp) corpo.appendChild(comp);
+    }
+
     if (rt && rt.avisos.length) {
       rt.avisos.forEach(function (a) {
         corpo.appendChild(h('div', { class: 'aviso erro' }, a));
@@ -2034,6 +2154,113 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
     }
 
     return h('div', { class: 'trecho-cartao' }, cabecalho, corpo);
+  };
+
+  /* Varredura de diâmetros do catálogo escolhido: 5 linhas em torno da
+     sugestão (★ = menor diâmetro adequado), nas cores de classificação.
+     Clique na linha adota o diâmetro. */
+  App.comparacaoDiametros = function (st, t, idx, res, rt) {
+    var cat = CAT.buscar(CAT.padrao, t.catId);
+    if (!cat || !res || !rt || !(t.L > 0)) return null;
+    var vazoes = st.vazoes.filter(function (v) { return v.q > 0; });
+    if (!vazoes.length) return null;
+    if (st.params.metodo === 'hw' ? !(rt.C > 0) : !(rt.eps > 0 || rt.eps === 0)) return null;
+
+    var qProj = vazoes.reduce(function (a, b) { return b.q > a.q ? b : a; });
+    var qMin = vazoes.reduce(function (a, b) { return b.q < a.q ? b : a; });
+
+    /* pior cenário = menor carga disponível */
+    var pior = null;
+    res.cenarios.forEach(function (rc) {
+      if (rc.hdisp !== null && (pior === null || rc.hdisp < pior.hdisp)) pior = rc;
+    });
+
+    var n = rt.n || 1;
+    var linhas = [];
+    cat.itens.forEach(function (it) {
+      var di = CAT.diInterno(cat, it) / 1000;
+      if (!(di > 0)) return;
+      var cand = Object.assign({}, rt, { di: di, valido: true });
+      var trechosMod = res.trechos.map(function (x, i) { return i === idx ? cand : x; });
+      var ptProj = C.perdaTotal(qProj.q / 1000, trechosMod, st);
+      var dProj = ptProj.trechos[idx];
+      if (!dProj) return;
+      var vMinQ = H.velocidade(qMin.q / 1000 / n, di);
+      var folga = pior ? pior.hdisp - ptProj.H : null;
+
+      var classe = 'bom', motivos = [];
+      if (folga !== null && folga < 0) { classe = 'ruim'; motivos.push('a vazão de projeto não passa (folga ' + U.fmt(folga, 2) + ' mca)'); }
+      if (dProj.v > st.params.vMax) { classe = 'ruim'; motivos.push('v = ' + U.fmt(dProj.v, 2) + ' m/s acima da máxima de ' + U.fmt(st.params.vMax, 2) + ' m/s'); }
+      if (classe !== 'ruim') {
+        if (folga !== null && folga < (st.params.folgaMin || 0)) { classe = 'atencao'; motivos.push('folga abaixo da mínima exigida (' + U.fmt(st.params.folgaMin, 2) + ' mca)'); }
+        if (vMinQ < st.params.vMin) { classe = 'atencao'; motivos.push('v = ' + U.fmt(vMinQ, 2) + ' m/s na menor vazão, abaixo da mínima de autolimpeza de ' + U.fmt(st.params.vMin, 2) + ' m/s'); }
+        if (!motivos.length) motivos.push('vazão de projeto passa com folga e velocidades dentro dos limites');
+      }
+      linhas.push({ it: it, di: di, d: dProj, hSist: ptProj.H, folga: folga, vMinQ: vMinQ, classe: classe, motivos: motivos });
+    });
+    if (!linhas.length) return null;
+
+    /* sugestão: menor diâmetro adequado; na falta, menor em atenção */
+    var iSug = -1;
+    linhas.forEach(function (l, i) { if (iSug < 0 && l.classe === 'bom') iSug = i; });
+    if (iSug < 0) linhas.forEach(function (l, i) { if (iSug < 0 && l.classe === 'atencao') iSug = i; });
+
+    /* janela de 5: sugerido, 2 menores e 2 maiores */
+    var ini = Math.max(0, Math.min(iSug >= 0 ? iSug - 2 : 0, linhas.length - 5));
+    var fim = Math.min(linhas.length, ini + 5);
+    var visiveis = linhas.slice(ini, fim);
+    var iSel = -1;
+    linhas.forEach(function (l, i) { if (l.it.dn === t.itemDn) iSel = i; });
+    if (iSel >= 0 && (iSel < ini || iSel >= fim)) {
+      if (iSel < ini) visiveis = [linhas[iSel]].concat(visiveis);
+      else visiveis = visiveis.concat([linhas[iSel]]);
+    }
+
+    var mostraPn = visiveis.some(function (l) { return l.it.pn; });
+    var tab = h('table', { class: 'dados' },
+      h('thead', {}, h('tr', {},
+        h('th', {}, 'Diâmetro'), h('th', {}, 'DI (mm)'), h('th', {}, 'e (mm)'),
+        mostraPn ? h('th', {}, 'PN') : null,
+        h('th', {}, 'v (m/s)'), h('th', {}, 'J (m/km)'), h('th', {}, 'hf (mca)'), h('th', {}, 'Σhl (mca)'),
+        h('th', { title: 'Perda total do sistema com este diâmetro no trecho' }, 'H sist. (mca)'),
+        h('th', {}, 'Folga (mca)'),
+        h('th', { title: 'Velocidade na menor vazão informada (' + qMin.nome + ' = ' + U.fmt(qMin.q, 2) + ' L/s) — autolimpeza' }, 'v Qmín (m/s)'),
+        h('th', {}, 'Situação'))));
+    var corpoT = h('tbody');
+    visiveis.forEach(function (l) {
+      var sug = iSug >= 0 && linhas[iSug] === l;
+      var sel = l.it.dn === t.itemDn;
+      corpoT.appendChild(h('tr', {
+        class: l.classe + ' clicavel' + (sel ? ' selecionada' : ''),
+        title: l.motivos.join('; ') + ' — clique para adotar este diâmetro',
+        onclick: function () { t.itemDn = l.it.dn; App.mudou(); }
+      },
+        h('td', {}, (sug ? '★ ' : '') + l.it.rot),
+        h('td', {}, U.fmt(l.di * 1000, 2)),
+        h('td', {}, l.it.e !== undefined && l.it.e !== null ? U.fmt(l.it.e, 1) : '—'),
+        mostraPn ? h('td', {}, l.it.pn ? String(l.it.pn).replace('.', ',') : '—') : null,
+        h('td', {}, U.fmt(l.d.v, 2)),
+        h('td', {}, U.fmt(l.d.J * 1000, 2)),
+        h('td', {}, U.fmt(l.d.hf, 2)),
+        h('td', {}, U.fmt(l.d.hl, 2)),
+        h('td', {}, U.fmt(l.hSist, 2)),
+        h('td', {}, l.folga !== null ? U.fmt(l.folga, 2) : '—'),
+        h('td', {}, U.fmt(l.vMinQ, 2)),
+        h('td', { class: 'c' }, selo(l.classe === 'bom' ? 'ok' : l.classe === 'atencao' ? 'atencao' : 'ruim',
+          l.classe === 'bom' ? 'Adequado' : l.classe === 'atencao' ? 'Atenção' : 'Inadequado'))));
+    });
+    tab.appendChild(corpoT);
+
+    return h('div', {},
+      h('h3', {}, 'Comparação de diâmetros'),
+      h('p', { class: 'nota', style: 'margin:0 0 6px' },
+        'Vazão de projeto: ', h('b', {}, qProj.nome + ' = ' + U.fmt(qProj.q, 2) + ' L/s'),
+        (n > 1 ? ' · ' + n + ' tubos em paralelo (valores por tubo)' : ''),
+        pior ? ' · H disponível' + (st.cenarios.habilitado && pior.cen ? ' (pior cenário: ' + pior.cen.nome + ')' : '') + ': ' + U.fmt(pior.hdisp, 2) + ' mca' : '',
+        ' · Critério: v de ' + U.fmt(st.params.vMin, 2) + ' a ' + U.fmt(st.params.vMax, 2) + ' m/s'),
+      h('div', { class: 'rolagem' }, tab),
+      h('p', { class: 'nota' },
+        'Clique em uma linha para adotar o diâmetro. ★ é a sugestão do programa: o menor diâmetro que atende integralmente aos critérios (a vazão de projeto passa no pior cenário e as velocidades ficam dentro dos limites).'));
   };
 
   /* ================= VAZÕES ================= */
@@ -2233,7 +2460,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       var tp = h('table', { class: 'dados' },
         h('thead', {}, h('tr', {},
           h('th', {}, 'Ponto'), h('th', {}, 'Dist. (m)'), h('th', {}, 'Cota (m)'),
-          rcSel.vazoes.map(function (rv) { return h('th', {}, rv.vaz.nome + ' (' + U.fmt(rv.Q * 1000, 1) + ' L/s)'); }))));
+          rcSel.vazoes.map(function (rv) { return h('th', {}, rv.vaz.nome + ' (' + U.fmt(rv.Q * 1000, 2) + ' L/s)'); }))));
       var tpb = h('tbody');
       st.perfil.pontos.forEach(function (pp, ip) {
         if (pp.x === null || pp.cota === null || pp.x === undefined || pp.cota === undefined) return;
@@ -2298,12 +2525,12 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
             (rc.cen.descricao ? rc.cen.descricao + ' · ' : '') +
             'NA saída ' + (rc.cen.naSaida !== null && rc.cen.naSaida !== undefined ? U.fmt(rc.cen.naSaida, 2) + ' m' : '—') +
             ' · NA chegada ' + (rc.cen.naChegada !== null && rc.cen.naChegada !== undefined ? U.fmt(rc.cen.naChegada, 2) + ' m' : '—') +
-            ' · H disponível ' + (rc.hdisp !== null ? U.fmt(rc.hdisp, 3) + ' mca' : '—'))));
+            ' · H disponível ' + (rc.hdisp !== null ? U.fmt(rc.hdisp, 2) + ' mca' : '—'))));
 
       var mostraF = st.params.metodo !== 'hw';
       var tab = h('table', { class: 'dados' },
         h('thead', {}, h('tr', {},
-          h('th', {}, 'Vazão / trecho'), h('th', {}, 'Q (m³/s)'), h('th', {}, 'DI (m)'), h('th', {}, 'L (m)'),
+          h('th', {}, 'Vazão / trecho'), h('th', {}, 'Q (L/s)'), h('th', {}, 'DI (mm)'), h('th', {}, 'L (m)'),
           mostraF ? h('th', {}, 'Re') : h('th', {}, 'C'),
           mostraF ? h('th', {}, 'f') : null,
           h('th', {}, 'v (m/s)'), h('th', {}, 'J (m/km)'), h('th', {}, 'hf (mca)'), h('th', {}, 'hl (mca)'),
@@ -2311,36 +2538,35 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       var corpo = h('tbody');
       var nCol = mostraF ? 14 : 13;
 
-      function linhasVazao(nome, Q, pt, folga, status, italico) {
+      function linhasVazao(nome, Q, pt, folga, status) {
         var multi = res.trechos.length > 1;
         pt.trechos.forEach(function (d, i) {
           if (!d) return;
           var t = res.trechos[i];
-          var primeira = i === (function () { for (var j = 0; j < pt.trechos.length; j++) if (pt.trechos[j]) return j; return 0; })();
           corpo.appendChild(h('tr', {},
-            h('td', {}, multi ? (primeira ? nome + ' — ' : '') + t.nome : nome),
-            h('td', {}, U.fmt(Q, 4)),
-            h('td', {}, U.fmt(t.di, 4)),
+            h('td', {}, multi ? t.nome : nome),
+            h('td', {}, U.fmt(Q * 1000, 2)),
+            h('td', {}, U.fmt(t.di * 1000, 2)),
             h('td', {}, U.fmt(t.L, 2)),
             mostraF ? h('td', {}, d.Re ? d.Re.toExponential(2).replace('.', ',') : '—') : h('td', {}, U.fmt(t.C, 0)),
             mostraF ? h('td', {}, d.f !== null && d.f !== undefined ? U.fmt(d.f, 4) : '—') : null,
-            h('td', {}, U.fmt(d.v, 3)),
-            h('td', {}, U.fmt(d.J * 1000, 3)),
-            h('td', {}, U.fmt(d.hf, 3)),
-            h('td', {}, U.fmt(d.hl, 3)),
-            multi ? h('td', {}, U.fmt(d.htotal, 3)) : h('td', {}, U.fmt(pt.H, 3)),
-            multi ? h('td', {}, '') : h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 3) : '—'),
-            multi ? h('td', {}, '') : h('td', {}, folga !== null ? U.fmt(folga, 3) : '—'),
+            h('td', {}, U.fmt(d.v, 2)),
+            h('td', {}, U.fmt(d.J * 1000, 2)),
+            h('td', {}, U.fmt(d.hf, 2)),
+            h('td', {}, U.fmt(d.hl, 2)),
+            multi ? h('td', {}, U.fmt(d.htotal, 2)) : h('td', {}, U.fmt(pt.H, 2)),
+            multi ? h('td', {}, '') : h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 2) : '—'),
+            multi ? h('td', {}, '') : h('td', {}, folga !== null ? U.fmt(folga, 2) : '—'),
             multi ? h('td', {}) : h('td', { class: 'c' }, selo(status, statusTexto(status)))));
         });
         if (multi) {
           corpo.appendChild(h('tr', { class: 'total' },
             h('td', {}, nome + ' — total'),
-            h('td', {}, U.fmt(Q, 4)), h('td', {}), h('td', {}, U.fmt(res.Ltotal, 2)),
+            h('td', {}, U.fmt(Q * 1000, 2)), h('td', {}), h('td', {}, U.fmt(res.Ltotal, 2)),
             h('td', {}), mostraF ? h('td', {}) : null, h('td', {}), h('td', {}),
-            h('td', {}, U.fmt(pt.hf, 3)), h('td', {}, U.fmt(pt.hl, 3)), h('td', {}, U.fmt(pt.H, 3)),
-            h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 3) : '—'),
-            h('td', {}, folga !== null ? U.fmt(folga, 3) : '—'),
+            h('td', {}, U.fmt(pt.hf, 2)), h('td', {}, U.fmt(pt.hl, 2)), h('td', {}, U.fmt(pt.H, 2)),
+            h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 2) : '—'),
+            h('td', {}, folga !== null ? U.fmt(folga, 2) : '—'),
             h('td', { class: 'c' }, selo(status, statusTexto(status)))));
         }
       }
@@ -2349,7 +2575,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
         linhasVazao(rv.vaz.nome, rv.Q, rv.perda, rv.folga, rv.status);
       });
       if (rc.qmax) {
-        linhasVazao('Máximo de transporte (' + U.fmt(rc.qmax * 1000, 1) + ' L/s)', rc.qmax, rc.qmaxDet,
+        linhasVazao('Máximo de transporte (' + U.fmt(rc.qmax * 1000, 2) + ' L/s)', rc.qmax, rc.qmaxDet,
           rc.hdisp - rc.qmaxDet.H, 'indef');
       }
       tab.appendChild(corpo);
@@ -2393,7 +2619,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       var tc = h('table', { class: 'dados' },
         h('thead', {}, h('tr', {},
           h('th', {}, 'Cenário'), h('th', {}, 'H disp. (mca)'),
-          vazoes.map(function (v) { return h('th', {}, v.nome + ' (' + U.fmt(v.q, 1) + ' L/s)'); }),
+          vazoes.map(function (v) { return h('th', {}, v.nome + ' (' + U.fmt(v.q, 2) + ' L/s)'); }),
           h('th', {}, 'Q máx (L/s)'))));
       var cb = h('tbody');
       res.cenarios.forEach(function (rc) {
@@ -2402,9 +2628,9 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
           h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 2) : '—'),
           rc.vazoes.map(function (rv) {
             return h('td', { style: rv.status === 'ruim' ? 'color:var(--vermelho);font-weight:700' : '' },
-              (rv.folga !== null ? U.fmt(rv.folga, 3) : '—') + (rv.status === 'ruim' ? ' ✗' : rv.status === 'ok' ? ' ✓' : ''));
+              (rv.folga !== null ? U.fmt(rv.folga, 2) : '—') + (rv.status === 'ruim' ? ' ✗' : rv.status === 'ok' ? ' ✓' : ''));
           }),
-          h('td', {}, rc.qmax ? U.fmt(rc.qmax * 1000, 1) : '—')));
+          h('td', {}, rc.qmax ? U.fmt(rc.qmax * 1000, 2) : '—')));
       });
       tc.appendChild(cb);
       cc.appendChild(h('div', { class: 'rolagem' }, tc));
@@ -2587,6 +2813,11 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
 
     var p = st.projeto;
     var s = [];
+    s.push('<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+      GCF.M.simbolo(42, { id: 'imp', corTraco: '#0E2148', corFundo: '#ffffff' }).outerHTML +
+      '<span style="font-family:Georgia,\'Times New Roman\',serif;line-height:1.05">' +
+      '<b style="font-size:15pt;letter-spacing:.5px;color:#0E2148">PASTRO</b><br>' +
+      '<span style="font-size:7.5pt;letter-spacing:1.6px;color:#0E6F66;font-weight:600">ENGENHARIA</span></span></div>');
     s.push('<h1>' + esc(p.nome || 'Dimensionamento de conduto forçado por gravidade') + '</h1>');
     s.push('<div class="subtitulo">' +
       esc((p.local ? p.local + ' · ' : '') + (p.autor ? p.autor + ' · ' : '') + (p.data || '')) +
@@ -2632,7 +2863,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       }
       s.push('<p class="obs">NA saída ' + (rc.cen.naSaida !== null && rc.cen.naSaida !== undefined ? fmt(rc.cen.naSaida, 2) : '—') +
         ' m · NA chegada ' + (rc.cen.naChegada !== null && rc.cen.naChegada !== undefined ? fmt(rc.cen.naChegada, 2) : '—') +
-        ' m · <b>carga disponível ' + (rc.hdisp !== null ? fmt(rc.hdisp, 3) : '—') + ' mca</b></p>');
+        ' m · <b>carga disponível ' + (rc.hdisp !== null ? fmt(rc.hdisp, 2) : '—') + ' mca</b></p>');
 
       s.push('<table><thead><tr><th>Vazão / trecho</th><th>Q (L/s)</th>' +
         (mostraF ? '<th>Re</th><th>f</th>' : '<th>C</th>') +
@@ -2643,21 +2874,21 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
         pt.trechos.forEach(function (d, i) {
           if (!d) return;
           var t = res.trechos[i];
-          s.push('<tr><td>' + esc(multi ? nome + ' — ' + t.nome : nome) + '</td><td>' + fmt(Q * 1000, 2) + '</td>' +
+          s.push('<tr><td>' + esc(multi ? t.nome : nome) + '</td><td>' + fmt(Q * 1000, 2) + '</td>' +
             (mostraF ? '<td>' + (d.Re ? d.Re.toExponential(2).replace('.', ',') : '—') + '</td><td>' + (d.f !== null && d.f !== undefined ? fmt(d.f, 4) : '—') + '</td>'
                      : '<td>' + (t.C ? fmt(t.C, 0) : '—') + '</td>') +
-            '<td>' + fmt(d.v, 3) + '</td><td>' + fmt(d.J * 1000, 3) + '</td><td>' + fmt(d.hf, 3) +
-            '</td><td>' + fmt(d.hl, 3) + '</td><td>' + fmt(multi ? d.htotal : pt.H, 3) + '</td>' +
+            '<td>' + fmt(d.v, 2) + '</td><td>' + fmt(d.J * 1000, 2) + '</td><td>' + fmt(d.hf, 2) +
+            '</td><td>' + fmt(d.hl, 2) + '</td><td>' + fmt(multi ? d.htotal : pt.H, 2) + '</td>' +
             (multi ? '<td></td><td></td>' :
-              '<td>' + (folga !== null ? fmt(folga, 3) : '—') + '</td><td class="c ' +
+              '<td>' + (folga !== null ? fmt(folga, 2) : '—') + '</td><td class="c ' +
               (status === 'ruim' ? 'ruim-txt' : status === 'ok' ? 'ok-txt' : '') + '">' + esc(txtStatus(status)) + '</td>') +
             '</tr>');
         });
         if (multi) {
           s.push('<tr class="total"><td>' + esc(nome) + ' — total</td><td>' + fmt(Q * 1000, 2) + '</td>' +
             (mostraF ? '<td></td><td></td>' : '<td></td>') +
-            '<td></td><td></td><td>' + fmt(pt.hf, 3) + '</td><td>' + fmt(pt.hl, 3) + '</td><td>' + fmt(pt.H, 3) + '</td>' +
-            '<td>' + (folga !== null ? fmt(folga, 3) : '—') + '</td><td class="c ' +
+            '<td></td><td></td><td>' + fmt(pt.hf, 2) + '</td><td>' + fmt(pt.hl, 2) + '</td><td>' + fmt(pt.H, 2) + '</td>' +
+            '<td>' + (folga !== null ? fmt(folga, 2) : '—') + '</td><td class="c ' +
             (status === 'ruim' ? 'ruim-txt' : status === 'ok' ? 'ok-txt' : '') + '">' + esc(txtStatus(status)) + '</td></tr>');
         }
       }
@@ -2685,7 +2916,7 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
         if (g) s.push(g.svg.outerHTML);
         if (rc.vazoes.length) {
           s.push('<table><thead><tr><th>Ponto</th><th>Dist. (m)</th><th>Cota (m)</th>' +
-            rc.vazoes.map(function (rv) { return '<th>' + esc(rv.vaz.nome) + '<br>(' + fmt(rv.Q * 1000, 1) + ' L/s)</th>'; }).join('') +
+            rc.vazoes.map(function (rv) { return '<th>' + esc(rv.vaz.nome) + '<br>(' + fmt(rv.Q * 1000, 2) + ' L/s)</th>'; }).join('') +
             '</tr></thead><tbody>');
           st.perfil.pontos.forEach(function (pp, ip) {
             if (pp.x === null || pp.cota === null || pp.x === undefined || pp.cota === undefined) return;
@@ -2708,15 +2939,15 @@ table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); fon
       sec += 1;
       s.push('<h2>' + sec + '. Comparativo de cenários — folga (mca)</h2>');
       s.push('<table><thead><tr><th>Cenário</th><th>H disp. (mca)</th>' +
-        vazoes.map(function (v) { return '<th>' + esc(v.nome) + '<br>(' + fmt(v.q, 1) + ' L/s)</th>'; }).join('') +
+        vazoes.map(function (v) { return '<th>' + esc(v.nome) + '<br>(' + fmt(v.q, 2) + ' L/s)</th>'; }).join('') +
         '<th>Q máx (L/s)</th></tr></thead><tbody>');
       res.cenarios.forEach(function (rc) {
         s.push('<tr><td>' + esc(rc.cen.nome) + '</td><td>' + (rc.hdisp !== null ? fmt(rc.hdisp, 2) : '—') + '</td>' +
           rc.vazoes.map(function (rv) {
             return '<td class="' + (rv.status === 'ruim' ? 'ruim-txt' : rv.status === 'ok' ? 'ok-txt' : '') + '">' +
-              (rv.folga !== null ? fmt(rv.folga, 3) : '—') + '</td>';
+              (rv.folga !== null ? fmt(rv.folga, 2) : '—') + '</td>';
           }).join('') +
-          '<td>' + (rc.qmax ? fmt(rc.qmax * 1000, 1) : '—') + '</td></tr>');
+          '<td>' + (rc.qmax ? fmt(rc.qmax * 1000, 2) : '—') + '</td></tr>');
       });
       s.push('</tbody></table>');
     }
