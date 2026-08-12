@@ -1,0 +1,2370 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dimensionamento de Conduto Forçado por Gravidade</title>
+<meta name="description" content="Dimensionamento de adutoras e emissários por gravidade (conduto forçado) — Hazen-Williams e Fórmula Universal (Colebrook-White), com estudo de cenários de nível de lançamento.">
+<style>
+/* ==================================================================
+   Dimensionamento de Conduto Forçado por Gravidade
+   Mesmo conceito visual do Pré-dimensionamento de Adutora
+   ================================================================== */
+:root {
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --surface-2: #fafbfc;
+  --border: #d6dde6;
+  --border-forte: #b3bdca;
+  --texto: #1b2733;
+  --texto-2: #5b6875;
+  --texto-3: #8a97a4;
+  --azul: #0E2148;
+  --azul-claro: #e7ecf4;
+  --azul-escuro: #060f24;
+  --teal: #0E6F66;
+  --teal-claro: #e2f4f2;
+  --teal-vivo: #14A5A0;
+  --verde: #0f7b3f;
+  --verde-bg: #e4f4ea;
+  --ambar: #8a5a00;
+  --ambar-bg: #fff3d4;
+  --vermelho: #a8231f;
+  --vermelho-bg: #fdeaea;
+  --sombra: 0 1px 2px rgba(16,30,46,.06), 0 2px 8px rgba(16,30,46,.05);
+  --r: 6px;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+[data-tema="escuro"] {
+  --bg: #12171d;
+  --surface: #1a2129;
+  --surface-2: #202832;
+  --border: #2e3945;
+  --border-forte: #3d4a59;
+  --texto: #e6ebf0;
+  --texto-2: #a4b1bf;
+  --texto-3: #76838f;
+  --azul: #7fb2e8;
+  --azul-claro: #17253c;
+  --azul-escuro: #a9cdf5;
+  --teal: #35c3ba;
+  --teal-claro: #10302e;
+  --teal-vivo: #3ad2c8;
+  --verde: #56c98a;
+  --verde-bg: #14301f;
+  --ambar: #e0b050;
+  --ambar-bg: #33260c;
+  --vermelho: #f0837f;
+  --vermelho-bg: #351717;
+  --sombra: 0 1px 2px rgba(0,0,0,.3);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--texto);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { margin: 0; font-weight: 600; line-height: 1.25; }
+p { margin: 0 0 .6em; }
+a { color: var(--azul); }
+
+header.topo {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  position: sticky; top: 0; z-index: 40;
+}
+header.topo h1 { font-size: 15px; letter-spacing: -.2px; }
+header.topo h1 .sub { display: block; font-size: 11px; font-weight: 400; color: var(--texto-3); letter-spacing: .3px; }
+header.topo .acoes { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+
+nav.abas {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 12px;
+  display: flex; gap: 2px; overflow-x: auto;
+  position: sticky; top: 55px; z-index: 39;
+}
+nav.abas button {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 13px; color: var(--texto-2);
+  padding: 9px 11px; border-bottom: 2px solid transparent; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+}
+nav.abas button:hover { color: var(--texto); }
+nav.abas button[aria-selected="true"] { color: var(--azul); border-bottom-color: var(--teal-vivo); font-weight: 600; }
+nav.abas .sep { width: 1px; background: var(--border); margin: 8px 4px; }
+nav.abas .marcador {
+  background: var(--vermelho); color: #fff; font-size: 10px; font-weight: 700;
+  border-radius: 9px; padding: 0 5px; min-width: 16px; text-align: center; line-height: 15px;
+}
+
+main { max-width: 1180px; margin: 0 auto; padding: 18px 16px 80px; }
+
+.btn {
+  appearance: none; font: inherit; font-size: 12.5px; cursor: pointer;
+  background: var(--surface); color: var(--texto);
+  border: 1px solid var(--border-forte); border-radius: var(--r);
+  padding: 5px 11px; line-height: 1.4;
+}
+.btn:hover { border-color: var(--teal); color: var(--teal); }
+.btn.primario { background: var(--azul); border-color: var(--azul); color: #fff; }
+[data-tema="escuro"] .btn.primario { color: #0c1220; }
+.btn.primario:hover { filter: brightness(1.15); }
+.btn.perigo:hover { border-color: var(--vermelho); color: var(--vermelho); }
+.btn.mini { font-size: 11.5px; padding: 2px 8px; }
+
+.cartao {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); box-shadow: var(--sombra);
+  padding: 14px 16px; margin-bottom: 14px;
+}
+.cartao > h2 { font-size: 14px; color: var(--azul); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.cartao > h2 .dica { font-weight: 400; font-size: 11.5px; color: var(--texto-3); display: block; margin-top: 2px; }
+.cartao h3 { font-size: 12.5px; color: var(--texto-2); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: .5px; }
+
+.linha-campos { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 6px; }
+.campo { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.campo > label { font-size: 11.5px; color: var(--texto-2); }
+.campo > label b { color: var(--texto); font-weight: 600; }
+.campo input, .campo select, .campo textarea {
+  font: inherit; font-size: 13px; color: var(--texto);
+  background: var(--surface-2); border: 1px solid var(--border-forte);
+  border-radius: var(--r); padding: 5px 8px; min-width: 0;
+}
+.campo input:focus, .campo select:focus, .campo textarea:focus { outline: 2px solid var(--teal-vivo); outline-offset: -1px; }
+.campo input[type="number"], .campo input.num { font-family: var(--mono); text-align: right; }
+.campo .un { font-size: 11px; color: var(--texto-3); }
+.campo.invalido input { border-color: var(--vermelho); background: var(--vermelho-bg); }
+.l60 { width: 60px; } .l80 { width: 84px; } .l100 { width: 104px; } .l120 { width: 124px; }
+.l160 { width: 164px; } .l200 { width: 208px; } .l260 { width: 264px; } .cresce { flex: 1 1 180px; }
+
+table.dados { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.dados th, table.dados td { border: 1px solid var(--border); padding: 4px 8px; text-align: right; }
+table.dados th {
+  background: var(--azul-claro); color: var(--azul); font-weight: 600; font-size: 11.5px;
+  text-align: center; vertical-align: middle;
+}
+table.dados td:first-child, table.dados th:first-child { text-align: left; }
+table.dados td.c { text-align: center; }
+table.dados td.num, table.dados td:not(:first-child):not(.c):not(.txt) { font-family: var(--mono); font-size: 12px; }
+table.dados td.txt { text-align: left; font-family: inherit; }
+table.dados tr.total td { font-weight: 700; background: var(--surface-2); }
+table.dados tr.grupo td { background: var(--teal-claro); color: var(--teal); font-weight: 600; text-align: left; font-family: inherit; }
+.rolagem { overflow-x: auto; }
+
+.selo { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 9px; white-space: nowrap; }
+.selo.ok { background: var(--verde-bg); color: var(--verde); }
+.selo.atencao { background: var(--ambar-bg); color: var(--ambar); }
+.selo.ruim { background: var(--vermelho-bg); color: var(--vermelho); }
+.selo.neutro { background: var(--azul-claro); color: var(--azul); }
+
+.aviso { border-left: 3px solid var(--ambar); background: var(--ambar-bg); color: var(--texto); border-radius: 0 var(--r) var(--r) 0; padding: 8px 12px; margin: 8px 0; font-size: 12.5px; }
+.aviso.erro { border-left-color: var(--vermelho); background: var(--vermelho-bg); }
+.aviso.info { border-left-color: var(--teal); background: var(--teal-claro); }
+.aviso b { display: block; }
+
+.nota { font-size: 11.5px; color: var(--texto-3); margin-top: 6px; }
+.nota b { color: var(--texto-2); }
+.formula { font-family: var(--mono); font-size: 12px; background: var(--surface-2); border: 1px dashed var(--border-forte); border-radius: var(--r); padding: 6px 10px; display: inline-block; margin: 4px 0; }
+
+.paineis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.painel { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 10px 12px; }
+.painel .rotulo { font-size: 11px; color: var(--texto-3); text-transform: uppercase; letter-spacing: .5px; }
+.painel .valor { font-size: 21px; font-weight: 700; font-family: var(--mono); color: var(--azul); margin-top: 2px; }
+.painel .valor .un { font-size: 12px; font-weight: 400; color: var(--texto-3); margin-left: 3px; }
+.painel .compl { font-size: 11.5px; color: var(--texto-2); margin-top: 2px; }
+.painel.ok { border-left: 3px solid var(--verde); }
+.painel.ruim { border-left: 3px solid var(--vermelho); }
+.painel.atencao { border-left: 3px solid var(--ambar); }
+
+.trecho-cartao { border: 1px solid var(--border-forte); border-radius: var(--r); margin-bottom: 12px; background: var(--surface); }
+.trecho-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; background: var(--azul-claro); border-bottom: 1px solid var(--border); border-radius: var(--r) var(--r) 0 0; }
+.trecho-cab .titulo { font-weight: 700; color: var(--azul); font-size: 13px; }
+.trecho-cab .acoes-trecho { margin-left: auto; display: flex; gap: 5px; }
+.trecho-corpo { padding: 10px 12px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--teal-claro); color: var(--teal); border: 1px solid var(--teal);
+  border-radius: 14px; font-size: 12px; padding: 2px 4px 2px 10px;
+}
+.chip input { width: 44px; font: inherit; font-family: var(--mono); font-size: 11.5px; text-align: center; border: 1px solid var(--border-forte); border-radius: 8px; background: var(--surface); color: var(--texto); padding: 0 2px; }
+.chip button { appearance: none; border: 0; background: none; color: inherit; cursor: pointer; font-size: 13px; line-height: 1; padding: 0 4px; }
+.chip button:hover { color: var(--vermelho); }
+.chip .k { font-family: var(--mono); font-size: 11px; opacity: .8; }
+
+.interruptor { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.interruptor input { position: absolute; opacity: 0; }
+.interruptor .pista { width: 38px; height: 20px; border-radius: 10px; background: var(--border-forte); position: relative; transition: background .15s; flex: none; }
+.interruptor .pista::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 8px; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.interruptor input:checked + .pista { background: var(--teal-vivo); }
+.interruptor input:checked + .pista::after { left: 20px; }
+.interruptor .rot { font-weight: 600; font-size: 13px; }
+
+.duas-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 860px) { .duas-colunas { grid-template-columns: 1fr; } }
+
+.fonte-item { border-bottom: 1px solid var(--border); padding: 8px 0; }
+.fonte-item:last-child { border-bottom: 0; }
+.fonte-item b { font-size: 13px; }
+.fonte-item .tipo { font-size: 10.5px; font-weight: 700; color: var(--teal); text-transform: uppercase; letter-spacing: .5px; margin-left: 6px; }
+.fonte-item p { font-size: 12.5px; color: var(--texto-2); margin: 2px 0 0; }
+
+/* ---------------- impressão ---------------- */
+#impressao { display: none; }
+@media print {
+  @page { size: A4; margin: 18mm 15mm; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  header.topo, nav.abas, main, .naoimprime { display: none !important; }
+  #impressao { display: block; }
+  #impressao h1 { font-size: 16pt; color: #0E2148; border-bottom: 2px solid #0E2148; padding-bottom: 6px; margin-bottom: 4px; }
+  #impressao .subtitulo { font-size: 10pt; color: #444; margin-bottom: 14px; }
+  #impressao h2 { font-size: 12.5pt; color: #0E2148; margin: 16px 0 6px; border-bottom: 1px solid #999; padding-bottom: 3px; }
+  #impressao h3 { font-size: 11pt; color: #0E6F66; margin: 10px 0 4px; }
+  #impressao table { border-collapse: collapse; width: 100%; font-size: 8.5pt; margin: 4px 0 8px; page-break-inside: avoid; }
+  #impressao th, #impressao td { border: 1px solid #999; padding: 2.5pt 5pt; text-align: right; }
+  #impressao th { background: #e7ecf4; text-align: center; }
+  #impressao td:first-child, #impressao th:first-child { text-align: left; }
+  #impressao td.c { text-align: center; }
+  #impressao tr.total td { font-weight: 700; background: #f2f4f7; }
+  #impressao tr.grupo td { background: #e2f4f2; font-weight: 700; text-align: left; }
+  #impressao p { font-size: 10pt; margin: 2px 0 6px; }
+  #impressao .obs { font-size: 8.5pt; color: #333; }
+  #impressao .quebra { page-break-before: always; }
+  #impressao .ok-txt { color: #0f7b3f; font-weight: 700; }
+  #impressao .ruim-txt { color: #a8231f; font-weight: 700; }
+}
+</style>
+</head>
+<body>
+
+<header class="topo">
+  <h1>Conduto Forçado por Gravidade
+    <span class="sub">adutoras e emissários entre reservatórios · Hazen-Williams e Colebrook-White · estudo de cenários</span></h1>
+  <div class="acoes">
+    <button class="btn" type="button" data-acao="novo">Novo</button>
+    <button class="btn" type="button" data-acao="exemplo">Exemplo</button>
+    <button class="btn" type="button" data-acao="exportar" title="Baixar o projeto em arquivo .json">Exportar</button>
+    <button class="btn" type="button" data-acao="importar" title="Abrir um projeto .json exportado">Importar</button>
+    <button class="btn" type="button" data-acao="imprimir">Imprimir</button>
+    <button class="btn" type="button" data-acao="tema" title="Alternar tema claro/escuro">Tema</button>
+  </div>
+</header>
+
+<nav class="abas" id="abas" role="tablist"></nav>
+<main id="conteudo"></main>
+<div id="impressao" aria-hidden="true"></div>
+<input type="file" id="arquivo-json" accept=".json,application/json" hidden>
+
+<noscript>
+  <div style="padding:20px">
+    <h2>É necessário habilitar o JavaScript</h2>
+    <p>Todo o cálculo roda no próprio navegador, sem enviar dados para nenhum servidor.</p>
+  </div>
+</noscript>
+
+<script>
+/* ================================================================
+   Utilidades
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var U = {};
+
+  /* criador de elementos: h('div', {class:'x', onclick:fn}, filhos...) */
+  U.h = function (tag, attrs) {
+    var e = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k.slice(0, 2) === 'on' && typeof v === 'function') e.addEventListener(k.slice(2), v);
+      else if (k === 'checked' || k === 'disabled' || k === 'selected') e[k] = !!v;
+      else if (k === 'value') e.value = v;
+      else e.setAttribute(k, v === true ? '' : String(v));
+    });
+    for (var i = 2; i < arguments.length; i++) U.anexar(e, arguments[i]);
+    return e;
+  };
+  U.anexar = function (e, f) {
+    if (f === null || f === undefined || f === false) return;
+    if (Array.isArray(f)) { f.forEach(function (x) { U.anexar(e, x); }); return; }
+    e.appendChild(typeof f === 'object' && f.nodeType ? f : document.createTextNode(String(f)));
+  };
+  U.limpar = function (e) { while (e.firstChild) e.removeChild(e.firstChild); };
+
+  /* números pt-BR */
+  U.fmt = function (x, dec) {
+    if (x === null || x === undefined || isNaN(x) || !isFinite(x)) return '—';
+    if (dec === undefined) dec = 2;
+    if (Math.abs(x) < Math.pow(10, -dec) / 2) x = 0;  /* evita "-0,000" */
+    return x.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  };
+  /* casas decimais automáticas conforme a ordem de grandeza */
+  U.fmtAuto = function (x) {
+    if (x === null || x === undefined || isNaN(x) || !isFinite(x)) return '—';
+    var a = Math.abs(x);
+    if (a >= 100) return U.fmt(x, 1);
+    if (a >= 1) return U.fmt(x, 2);
+    if (a >= 0.01) return U.fmt(x, 3);
+    return U.fmt(x, 4);
+  };
+  U.num = function (s) {
+    if (s === null || s === undefined) return NaN;
+    if (typeof s === 'number') return s;
+    s = String(s).trim();
+    if (!s) return NaN;
+    s = s.replace(/\./g, function (m, i, str) { return str.indexOf(',') > -1 ? '' : m; });
+    s = s.replace(',', '.');
+    return parseFloat(s);
+  };
+  U.id = function () { return 'id' + Math.random().toString(36).slice(2, 9); };
+  U.clonar = function (o) { return JSON.parse(JSON.stringify(o)); };
+  U.escapar = function (s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+
+  /* campo numérico com edição livre (aceita vírgula) — grava no blur/change */
+  U.campoNum = function (op) {
+    var input = U.h('input', {
+      type: 'text', class: 'num ' + (op.classe || 'l100'), inputmode: 'decimal',
+      value: (op.valor === null || op.valor === undefined || isNaN(op.valor)) ? '' : U.fmt(op.valor, op.dec !== undefined ? op.dec : 2),
+      placeholder: op.placeholder || '',
+      onchange: function () {
+        var v = U.num(input.value);
+        op.gravar(isNaN(v) ? null : v);
+      }
+    });
+    return input;
+  };
+
+  GCF.U = U;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
+   Hidráulica — perda de carga em conduto forçado
+   (mesmas rotinas do Pré-dimensionamento de Adutora)
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var H = {};
+
+  H.g = 9.80665;               /* m/s² — aceleração da gravidade normal */
+
+  /* Constantes de Hazen-Williams expostas para ajuste fino.
+     Padrão: J = 10,643 · Q^1,852 · C^-1,852 · D^-4,871 (Azevedo Netto) */
+  H.HW = { k: 10.643, expQ: 1.852, expD: 4.871 };
+
+  /* Viscosidade cinemática da água [m²/s] em função da temperatura [°C] */
+  H.viscosidadeAgua = function (T) {
+    if (T === undefined || T === null || isNaN(T)) T = 20;
+    return 1.792e-6 / (1 + 0.0337 * T + 0.000221 * T * T);
+  };
+
+  H.area = function (D) { return Math.PI * D * D / 4; };
+  H.velocidade = function (Q, D) { return Q / H.area(D); };
+  H.reynolds = function (v, D, ni) { return v * D / ni; };
+
+  /* Colebrook-White resolvido iterativamente (ponto fixo):
+       1/sqrt(f) = -2 log10( eps/(3,7 D) + 2,51/(Re sqrt(f)) ) */
+  H.fColebrook = function (Re, epsRel) {
+    if (!(Re > 0)) return { f: 0, iter: 0, regime: 'nulo' };
+    if (Re < 2000) return { f: 64 / Re, iter: 0, regime: 'laminar' };
+    var regime = (Re < 4000) ? 'transicao' : 'turbulento';
+    var x = 1 / Math.sqrt(H.fSwameeJain(Re, epsRel));
+    var i, xn;
+    for (i = 0; i < 60; i++) {
+      xn = -2 * Math.log10(epsRel / 3.7 + 2.51 * x / Re);
+      if (Math.abs(xn - x) < 1e-12) { x = xn; break; }
+      x = xn;
+    }
+    return { f: 1 / (x * x), iter: i, regime: regime };
+  };
+
+  /* Swamee-Jain (1976) — explícita, erro < 1 % para
+     1e-6 <= eps/D <= 1e-2 e 5e3 <= Re <= 1e8 */
+  H.fSwameeJain = function (Re, epsRel) {
+    if (!(Re > 0)) return 0;
+    if (Re < 2000) return 64 / Re;
+    var a = Math.log10(epsRel / 3.7 + 5.74 / Math.pow(Re, 0.9));
+    return 0.25 / (a * a);
+  };
+
+  /* Zigrang-Sylvester (1982) — forma usada nas planilhas Colebrook de origem */
+  H.fZigrangSylvester = function (Re, epsRel) {
+    if (!(Re > 0)) return 0;
+    if (Re < 2000) return 64 / Re;
+    var t = epsRel / 3.7;
+    var a = Math.log10(t - (5.02 / Re) * Math.log10(t + 14.5 / Re));
+    return 0.25 / (a * a);
+  };
+
+  H.fatorAtrito = function (Re, epsRel, metodo) {
+    var reg = Re < 2000 ? 'laminar' : (Re < 4000 ? 'transicao' : 'turbulento');
+    switch (metodo) {
+      case 'swamee':  return { f: H.fSwameeJain(Re, epsRel), regime: reg };
+      case 'zigrang': return { f: H.fZigrangSylvester(Re, epsRel), regime: reg };
+      default:        return H.fColebrook(Re, epsRel);
+    }
+  };
+
+  /* Hazen-Williams: J [m/m]. C adimensional, Q [m³/s], D [m] */
+  H.jHazenWilliams = function (Q, D, C) {
+    if (!(Q > 0) || !(D > 0) || !(C > 0)) return 0;
+    return H.HW.k * Math.pow(Q, H.HW.expQ) /
+           (Math.pow(C, H.HW.expQ) * Math.pow(D, H.HW.expD));
+  };
+
+  /* Fórmula Universal (Darcy-Weisbach): J [m/m]. eps [m] */
+  H.jUniversal = function (Q, D, eps, ni, metodo) {
+    if (!(Q > 0) || !(D > 0)) return { J: 0, f: 0, Re: 0, v: 0, regime: 'nulo' };
+    var v = H.velocidade(Q, D);
+    var Re = H.reynolds(v, D, ni);
+    var r = H.fatorAtrito(Re, eps / D, metodo);
+    var J = r.f * v * v / (2 * H.g * D);
+    return { J: J, f: r.f, Re: Re, v: v, regime: r.regime };
+  };
+
+  /* Fórmula única de acesso.
+     op = {metodo:'hw'|'colebrook'|'swamee'|'zigrang', C, eps [m], ni} */
+  H.perdaDistribuida = function (Q, D, L, op) {
+    var out = { J: 0, hf: 0, v: 0, Re: 0, f: null, regime: null, metodo: op.metodo };
+    if (!(D > 0)) return out;
+    out.v = H.velocidade(Q, D);
+    out.Re = H.reynolds(out.v, D, op.ni || H.viscosidadeAgua(20));
+    if (op.metodo === 'hw') {
+      out.J = H.jHazenWilliams(Q, D, op.C);
+    } else {
+      var r = H.jUniversal(Q, D, op.eps, op.ni || H.viscosidadeAgua(20), op.metodo);
+      out.J = r.J; out.f = r.f; out.regime = r.regime;
+    }
+    out.hf = out.J * L;
+    return out;
+  };
+
+  /* Perda localizada pelo método dos coeficientes: hl = K · v²/(2g) */
+  H.perdaLocalizada = function (Q, D, K) {
+    if (!(D > 0) || !(K > 0)) return 0;
+    var v = H.velocidade(Q, D);
+    return K * v * v / (2 * H.g);
+  };
+
+  GCF.H = H;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
+   Rugosidade — coeficiente C (Hazen-Williams) e ε (rugosidade
+   absoluta) por material, idade e fluido
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var R = {};
+
+  R.faixasIdade = [
+    { id: 'novo',   rot: 'Novo (0 a 5 anos)' },
+    { id: 'a5_15',  rot: 'Usado (5 a 15 anos)' },
+    { id: 'a15_30', rot: 'Usado (15 a 30 anos)' },
+    { id: 'a30',    rot: 'Antigo (acima de 30 anos)' }
+  ];
+
+  /* Ajustes por fluido — prática de projeto, não norma */
+  R.fluidos = [
+    { id: 'agua_tratada', rot: 'Água tratada',    dC:   0, dEps: 0.00, nota: 'Condição de referência das tabelas.' },
+    { id: 'agua_bruta',   rot: 'Água bruta',      dC:  -5, dEps: 0.02, nota: 'Sólidos em suspensão e possível deposição.' },
+    { id: 'esgoto_trat',  rot: 'Efluente tratado', dC:  -5, dEps: 0.03, nota: 'Biofilme leve. Prática usual de projeto.' },
+    { id: 'esgoto_bruto', rot: 'Esgoto bruto',    dC: -15, dEps: 0.10, nota: 'Biofilme/limo aderido — TSUTIYA & ALEM SOBRINHO recomendam C reduzido.' },
+    { id: 'lodo',         rot: 'Lodo / adensado', dC: -25, dEps: 0.20, nota: 'Fluido não newtoniano — cálculo por água é apenas indicativo.' }
+  ];
+
+  /* [mín, máx, adotado] por faixa de idade */
+  R.materiais = {
+    pead: {
+      rot: 'PEAD / PE (polietileno)',
+      hw:  { novo: [140, 150, 145], a5_15: [135, 145, 140], a15_30: [130, 140, 135], a30: [125, 135, 130] },
+      eps: { novo: [0.0015, 0.01, 0.01], a5_15: [0.01, 0.05, 0.03], a15_30: [0.03, 0.10, 0.06], a30: [0.05, 0.15, 0.10] },
+      fontes: ['az_plastico', 'porto_eps', 'iso4427']
+    },
+    pvc: {
+      rot: 'PVC rígido (PBA / DEFoFo / soldável)',
+      hw:  { novo: [140, 150, 145], a5_15: [135, 145, 140], a15_30: [130, 140, 135], a30: [125, 135, 130] },
+      eps: { novo: [0.0015, 0.01, 0.01], a5_15: [0.01, 0.05, 0.03], a15_30: [0.03, 0.10, 0.06], a30: [0.05, 0.15, 0.10] },
+      fontes: ['az_plastico', 'porto_eps', 'nbr5647']
+    },
+    pvc_o: {
+      rot: 'PVC-O (orientado biaxialmente)',
+      hw:  { novo: [145, 155, 150], a5_15: [140, 150, 145], a15_30: [135, 145, 140], a30: [130, 140, 135] },
+      eps: { novo: [0.0015, 0.007, 0.005], a5_15: [0.005, 0.03, 0.02], a15_30: [0.02, 0.06, 0.04], a30: [0.04, 0.10, 0.07] },
+      fontes: ['az_plastico', 'iso16422'],
+      nota: 'Parede mais lisa que o PVC-U convencional; fabricantes indicam C ≈ 150.'
+    },
+    pvc_m: {
+      rot: 'PVC-M (modificado / MPVC)',
+      hw:  { novo: [140, 150, 145], a5_15: [135, 145, 140], a15_30: [130, 140, 135], a30: [125, 135, 130] },
+      eps: { novo: [0.0015, 0.01, 0.01], a5_15: [0.01, 0.05, 0.03], a15_30: [0.03, 0.10, 0.06], a30: [0.05, 0.15, 0.10] },
+      fontes: ['az_plastico', 'porto_eps']
+    },
+    prfv: {
+      rot: 'PRFV / GRP (poliéster com fibra de vidro)',
+      hw:  { novo: [145, 155, 150], a5_15: [140, 150, 145], a15_30: [135, 145, 140], a30: [130, 140, 135] },
+      eps: { novo: [0.005, 0.03, 0.02], a5_15: [0.02, 0.06, 0.04], a15_30: [0.04, 0.10, 0.07], a30: [0.07, 0.15, 0.10] },
+      fontes: ['az_plastico', 'nbr15536']
+    },
+    fd_cimento: {
+      rot: 'Ferro fundido dúctil c/ revestimento de cimento',
+      hw:  { novo: [130, 140, 130], a5_15: [120, 130, 125], a15_30: [110, 125, 115], a30: [100, 115, 105] },
+      eps: { novo: [0.05, 0.15, 0.10], a5_15: [0.15, 0.40, 0.25], a15_30: [0.40, 1.00, 0.60], a30: [1.00, 3.00, 1.50] },
+      fontes: ['az_c', 'az_eps', 'nbr7675'],
+      nota: 'Revestimento interno de argamassa de cimento centrifugada (NBR 8682).'
+    },
+    fd_asfalto: {
+      rot: 'Ferro fundido c/ revestimento asfáltico (betuminoso)',
+      hw:  { novo: [125, 135, 130], a5_15: [110, 125, 118], a15_30: [95, 115, 105], a30: [85, 105, 95] },
+      eps: { novo: [0.12, 0.20, 0.15], a5_15: [0.20, 0.50, 0.35], a15_30: [0.50, 1.20, 0.80], a30: [1.20, 3.00, 2.00] },
+      fontes: ['az_c', 'az_eps']
+    },
+    fd_sem_rev: {
+      rot: 'Ferro fundido sem revestimento',
+      hw:  { novo: [125, 130, 128], a5_15: [100, 115, 110], a15_30: [90, 100, 95], a30: [75, 90, 85] },
+      eps: { novo: [0.25, 0.50, 0.30], a5_15: [0.50, 1.20, 0.80], a15_30: [1.20, 2.50, 1.50], a30: [2.50, 5.00, 3.00] },
+      fontes: ['az_c', 'az_eps'],
+      nota: 'AZEVEDO NETTO: ferro fundido novo C = 130; em uso C = 90.'
+    },
+    aco_sold_novo: {
+      rot: 'Aço soldado / com costura (revestimento comum)',
+      hw:  { novo: [125, 135, 130], a5_15: [110, 125, 115], a15_30: [95, 110, 100], a30: [85, 100, 90] },
+      eps: { novo: [0.04, 0.10, 0.05], a5_15: [0.10, 0.40, 0.20], a15_30: [0.40, 1.00, 0.60], a30: [1.00, 3.00, 1.50] },
+      fontes: ['az_c', 'az_eps', 'nbr5590']
+    },
+    aco_rev_esp: {
+      rot: 'Aço com revestimento interno especial (epóxi / cimento)',
+      hw:  { novo: [130, 140, 135], a5_15: [125, 135, 130], a15_30: [118, 130, 122], a30: [110, 125, 115] },
+      eps: { novo: [0.03, 0.10, 0.05], a5_15: [0.05, 0.20, 0.12], a15_30: [0.12, 0.40, 0.25], a30: [0.25, 0.80, 0.45] },
+      fontes: ['az_c', 'az_eps']
+    },
+    aco_galv: {
+      rot: 'Aço galvanizado (ferro galvanizado)',
+      hw:  { novo: [120, 130, 125], a5_15: [110, 125, 120], a15_30: [100, 115, 108], a30: [90, 105, 95] },
+      eps: { novo: [0.10, 0.20, 0.15], a5_15: [0.20, 0.50, 0.30], a15_30: [0.50, 1.20, 0.80], a30: [1.20, 3.00, 1.80] },
+      fontes: ['az_c', 'az_eps', 'nbr5580']
+    },
+    aco_inox: {
+      rot: 'Aço inoxidável',
+      hw:  { novo: [140, 150, 145], a5_15: [135, 148, 140], a15_30: [130, 145, 138], a30: [128, 142, 135] },
+      eps: { novo: [0.015, 0.05, 0.03], a5_15: [0.03, 0.08, 0.05], a15_30: [0.05, 0.12, 0.08], a30: [0.08, 0.20, 0.12] },
+      fontes: ['porto_eps']
+    },
+    concreto_liso: {
+      rot: 'Concreto — acabamento liso (forma metálica / centrifugado)',
+      hw:  { novo: [130, 140, 130], a5_15: [125, 135, 128], a15_30: [118, 130, 122], a30: [110, 125, 115] },
+      eps: { novo: [0.30, 0.80, 0.50], a5_15: [0.50, 1.20, 0.80], a15_30: [0.80, 2.00, 1.20], a30: [1.20, 3.00, 2.00] },
+      fontes: ['az_c', 'az_eps', 'nbr8890']
+    },
+    concreto_comum: {
+      rot: 'Concreto — acabamento comum',
+      hw:  { novo: [118, 125, 120], a5_15: [112, 122, 118], a15_30: [105, 118, 110], a30: [95, 110, 102] },
+      eps: { novo: [1.00, 3.00, 2.00], a5_15: [2.00, 4.00, 3.00], a15_30: [3.00, 6.00, 4.00], a30: [4.00, 10.00, 6.00] },
+      fontes: ['az_c', 'az_eps', 'nbr8890']
+    },
+    cimento_amianto: {
+      rot: 'Cimento-amianto (fibrocimento)',
+      hw:  { novo: [135, 145, 140], a5_15: [125, 138, 130], a15_30: [115, 130, 122], a30: [105, 122, 112] },
+      eps: { novo: [0.05, 0.10, 0.08], a5_15: [0.10, 0.30, 0.20], a15_30: [0.30, 0.80, 0.50], a30: [0.80, 2.00, 1.20] },
+      fontes: ['az_c', 'az_eps'],
+      nota: 'Sem fabricação no Brasil (Lei 12.687/2012); mantido para avaliação de redes existentes.'
+    },
+    manilha_ceramica: {
+      rot: 'Grés cerâmico vidrado (manilha)',
+      hw:  { novo: [108, 115, 110], a5_15: [100, 112, 105], a15_30: [95, 108, 100], a30: [88, 100, 94] },
+      eps: { novo: [0.30, 1.00, 0.60], a5_15: [0.60, 1.50, 1.00], a15_30: [1.00, 3.00, 1.80], a30: [1.80, 5.00, 3.00] },
+      fontes: ['az_c', 'az_eps']
+    }
+  };
+
+  R.fontes = {
+    az_c: {
+      titulo: 'AZEVEDO NETTO, J. M.; FERNÁNDEZ, M. F. — Manual de Hidráulica',
+      detalhe: '9ª ed., Blucher, 2015. Tabela de valores do coeficiente C de Hazen-Williams (cap. 8).',
+      tipo: 'Literatura consagrada'
+    },
+    az_eps: {
+      titulo: 'AZEVEDO NETTO — Manual de Hidráulica (rugosidade absoluta)',
+      detalhe: 'Tabela de rugosidade equivalente ε (cap. 8): aço soldado novo 0,05–0,10 mm; ferro fundido novo 0,25–0,50 mm; concreto liso 0,3–0,8 mm; concreto rugoso 1–3 mm.',
+      tipo: 'Literatura consagrada'
+    },
+    az_plastico: {
+      titulo: 'AZEVEDO NETTO — tubos de material plástico',
+      detalhe: 'C = 140 para plástico (valor de tabela). Fabricantes e a prática de projeto brasileira adotam C entre 140 e 150 para PVC e PEAD novos.',
+      tipo: 'Literatura consagrada'
+    },
+    porto_eps: {
+      titulo: 'PORTO, R. M. — Hidráulica Básica',
+      detalhe: '4ª ed., EESC-USP. Tabela de rugosidade equivalente: tubos de plástico (PVC, PEAD) ε = 0,0015 a 0,010 mm.',
+      tipo: 'Literatura consagrada'
+    },
+    az_k: {
+      titulo: 'AZEVEDO NETTO — Manual de Hidráulica (perdas localizadas)',
+      detalhe: 'Tabela de coeficientes K de perda de carga localizada: hl = K·v²/(2g).',
+      tipo: 'Literatura consagrada'
+    },
+    nbr7675: { titulo: 'ABNT NBR 7675 — Tubos e conexões de ferro fundido dúctil', detalhe: 'Classes de espessura K pela expressão e = K·(0,5 + 0,001·DN) mm e diâmetros externos padronizados (ISO 2531 / EN 545).', tipo: 'Norma ABNT' },
+    nbr8682: { titulo: 'ABNT NBR 8682 — Revestimento interno de argamassa de cimento (FD)', detalhe: 'Espessuras nominais do revestimento de argamassa centrifugada, que reduz o diâmetro hidráulico útil.', tipo: 'Norma ABNT' },
+    iso4427: { titulo: 'ABNT NBR 15561 / ISO 4427-2 — Tubos de PE para água sob pressão', detalhe: 'Séries SDR e espessuras mínimas de parede. PN = 2·MRS/(C·(SDR−1)); para PE 100: SDR 11 → PN 16; SDR 17 → PN 10; SDR 21 → PN 8; SDR 26 → PN 6,3; SDR 33 → PN 5.', tipo: 'Norma ABNT / ISO' },
+    iso16422: { titulo: 'ABNT NBR 16631 / ISO 16422 — Tubos de PVC-O', detalhe: 'Classe 450 (MRS 45 MPa) com coeficiente de projeto C = 1,4 resulta σ = 32 MPa.', tipo: 'Norma ABNT / ISO' },
+    nbr5647: { titulo: 'ABNT NBR 5647 — Tubos e conexões de PVC-U com junta elástica', detalhe: 'Séries PBA (classes 12, 15 e 20) e DEFoFo.', tipo: 'Norma ABNT' },
+    nbr7665: { titulo: 'ABNT NBR 7665 — Tubos de PVC-U, série DEFoFo', detalhe: 'Diâmetros externos compatíveis com o ferro fundido: DN 100 → DE 118; 150 → 170; 200 → 222; 250 → 274; 300 → 326; 400 → 429; 500 → 532 mm.', tipo: 'Norma ABNT' },
+    nbr5580: { titulo: 'ABNT NBR 5580 — Tubos de aço-carbono (rosca gás)', detalhe: 'Classes leve, média e pesada; base dos tubos galvanizados comercializados no Brasil.', tipo: 'Norma ABNT' },
+    nbr5590: { titulo: 'ABNT NBR 5590 — Tubos de aço-carbono com costura', detalhe: 'Dimensões e espessuras para condução de fluidos.', tipo: 'Norma ABNT' },
+    asme_b3610: { titulo: 'ASME B36.10M — Welded and Seamless Wrought Steel Pipe', detalhe: 'Diâmetros externos por NPS e espessuras por Schedule.', tipo: 'Norma internacional' },
+    nbr8890: { titulo: 'ABNT NBR 8890 — Tubo de concreto de seção circular', detalhe: 'Diâmetros nominais (DN = diâmetro interno) e classes de resistência.', tipo: 'Norma ABNT' },
+    nbr15536: { titulo: 'ABNT NBR 15536 — Tubos de PRFV', detalhe: 'Diâmetros nominais correspondem ao diâmetro interno; classes de pressão e rigidez.', tipo: 'Norma ABNT' },
+    nbr12215: { titulo: 'ABNT NBR 12215 — Projeto de adutora de água para abastecimento público', detalhe: 'Critérios de traçado, velocidades e pressões admissíveis em adutoras, inclusive por gravidade em conduto forçado.', tipo: 'Norma ABNT' },
+    nbr9649: { titulo: 'ABNT NBR 9649 / NBR 12208 — Redes e elevatórias de esgoto', detalhe: 'Velocidade mínima de autolimpeza (0,6 m/s) em linhas de esgoto sob pressão.', tipo: 'Norma ABNT' },
+    tsutiya: { titulo: 'TSUTIYA, M. T. — Abastecimento de Água', detalhe: '4ª ed., EPUSP. Adutoras por gravidade em conduto forçado: dimensionamento pela carga disponível entre os níveis extremos.', tipo: 'Literatura consagrada' },
+    tsutiya_esgoto: { titulo: 'TSUTIYA, M. T.; ALEM SOBRINHO, P. — Coleta e Transporte de Esgoto Sanitário', detalhe: '3ª ed., EPUSP. Emissários por gravidade sob pressão e coeficientes de rugosidade afetados por biofilme.', tipo: 'Literatura consagrada' }
+  };
+
+  /* Retorna {C, eps, faixaC, faixaEps, fontes, nota} já com ajuste de fluido */
+  R.consultar = function (materialId, idadeId, fluidoId) {
+    var m = R.materiais[materialId];
+    if (!m) return null;
+    var idade = idadeId || 'novo';
+    var hw = m.hw[idade] || m.hw.novo;
+    var ep = m.eps[idade] || m.eps.novo;
+    var fl = null, i;
+    for (i = 0; i < R.fluidos.length; i++) if (R.fluidos[i].id === fluidoId) fl = R.fluidos[i];
+    var dC = fl ? fl.dC : 0;
+    var dE = fl ? fl.dEps : 0;
+    return {
+      material: materialId, rot: m.rot, idade: idade,
+      C: Math.max(40, hw[2] + dC),
+      eps: Math.max(0.0015, ep[2] + dE),
+      faixaC: [Math.max(40, hw[0] + dC), Math.max(40, hw[1] + dC)],
+      faixaEps: [Math.max(0.0015, ep[0] + dE), Math.max(0.0015, ep[1] + dE)],
+      ajusteFluido: fl ? { rot: fl.rot, dC: dC, dEps: dE, nota: fl.nota } : null,
+      fontes: (m.fontes || []).slice(),
+      nota: m.nota || ''
+    };
+  };
+
+  R.listaMateriais = function () {
+    return Object.keys(R.materiais).map(function (k) {
+      return { id: k, rot: R.materiais[k].rot };
+    });
+  };
+
+  GCF.R = R;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
+   Catálogos de tubos
+   Cada catálogo: id, nome, familia, material (chave de GCF.R),
+   designacao ('DN'|'DE'|'NPS'), revMm, fonteIds, itens[{rot,dn,de,e,di,pn}]
+   DI (mm) = de − 2·e − 2·revMm, ou "di" quando informado direto.
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var CAT = {};
+  var lista = [];
+
+  function r1(x) { return Math.round(x * 10) / 10; }
+
+  /* ============ Ferro fundido dúctil ============ */
+  var FD_DE = {
+    80: 98, 100: 118, 125: 144, 150: 170, 200: 222, 250: 274, 300: 326,
+    350: 378, 400: 429, 450: 480, 500: 532, 600: 635, 700: 738, 800: 842,
+    900: 945, 1000: 1048, 1100: 1152, 1200: 1255, 1400: 1462, 1500: 1565,
+    1600: 1668, 1800: 1875, 2000: 2082
+  };
+  var FD_K7 = { 150: 5.2, 200: 5.4, 250: 5.5, 300: 5.7, 350: 5.9, 400: 6.3,
+                450: 6.7, 500: 7.0, 600: 7.7, 700: 8.4, 800: 9.1, 900: 9.8,
+                1000: 10.5, 1200: 11.9 };
+  var FD_K9 = { 80: 6.0, 100: 6.0, 150: 6.0, 200: 6.3, 250: 6.8, 300: 7.2,
+                350: 7.7, 400: 8.1, 450: 8.6, 500: 9.0, 600: 9.9, 700: 10.8,
+                800: 11.7, 900: 12.6, 1000: 13.5, 1200: 15.3, 1400: 17.1,
+                1500: 18.0, 1600: 18.9, 1800: 20.7, 2000: 22.5 };
+  function fdK12(dn) { return Math.max(6.0, r1(12 * (0.5 + 0.001 * dn))); }
+
+  function catFD(id, nome, esp, nota) {
+    var itens = Object.keys(esp).map(function (k) {
+      var dn = Number(k);
+      return { rot: 'DN ' + dn, dn: dn, de: FD_DE[dn], e: esp[k] };
+    }).sort(function (a, b) { return a.dn - b.dn; });
+    return { id: id, nome: nome, familia: 'Ferro fundido dúctil', material: 'fd_cimento',
+             designacao: 'DN', revMm: 0, fonteIds: ['nbr7675', 'nbr8682'], nota: nota || '', itens: itens };
+  }
+  var espK12 = {};
+  Object.keys(FD_DE).forEach(function (k) { espK12[k] = fdK12(Number(k)); });
+
+  lista.push(catFD('fd_k7', 'Ferro Fundido Dúctil — Classe K7 (junta elástica)', FD_K7,
+    'Classe K7 — usual em adutoras de DN 150 a 1200. Verificar a PFA por DN no catálogo do fabricante.'));
+  lista.push(catFD('fd_k9', 'Ferro Fundido Dúctil — Classe K9 (junta elástica)', FD_K9,
+    'Classe K9 — padrão histórico de fornecimento no Brasil, e = 9·(0,5 + 0,001·DN), mínimo 6,0 mm.'));
+  lista.push(catFD('fd_k12', 'Ferro Fundido Dúctil — Classe K12', espK12,
+    'Espessuras calculadas por e = 12·(0,5 + 0,001·DN), mínimo 6,0 mm.'));
+  lista.push({
+    id: 'fd_esgoto_je', nome: 'Ferro Fundido Dúctil — Esgoto, junta elástica',
+    familia: 'Ferro fundido dúctil', material: 'fd_cimento', designacao: 'DN',
+    revMm: 0, fonteIds: ['nbr7675'],
+    nota: 'Série para esgoto. Revestimento interno usual: argamassa de cimento de alto-forno ou epóxi — confirmar com o fabricante.',
+    itens: [[80, 6.0], [100, 6.0], [150, 5.2], [200, 5.4], [250, 5.5], [300, 5.7], [350, 5.9],
+            [400, 6.3], [450, 6.7], [500, 7.0], [600, 7.7], [700, 9.6], [800, 10.4],
+            [900, 11.2], [1000, 12.0], [1200, 15.3]].map(function (p) {
+      return { rot: 'DN ' + p[0], dn: p[0], de: FD_DE[p[0]], e: p[1] };
+    })
+  });
+
+  /* ============ PEAD ============ */
+  /* Espessuras mínimas por SDR (mm) — NBR 15561 / tabelas de fabricante */
+  var PEAD_E = {
+    '33': { 315: 9.7, 355: 10.9, 400: 12.3, 450: 13.8, 500: 15.3, 560: 17.2, 630: 19.3,
+            710: 21.8, 800: 24.5, 900: 27.6, 1000: 30.6, 1200: 36.7, 1400: 42.9, 1600: 49.0 },
+    '26': { 50: 2.0, 63: 2.5, 75: 2.9, 90: 3.5, 110: 4.2, 125: 4.8, 140: 5.4, 160: 6.2,
+            180: 6.9, 200: 7.7, 225: 8.6, 250: 9.6, 280: 10.7, 315: 12.1, 355: 13.6,
+            400: 15.3, 450: 17.2, 500: 19.1, 560: 21.4, 630: 24.1, 710: 27.2, 800: 30.6,
+            900: 34.4, 1000: 38.2, 1200: 45.9, 1400: 53.5, 1600: 61.2 },
+    '21': { 40: 2.0, 50: 2.4, 63: 3.0, 75: 3.6, 90: 4.3, 110: 5.3, 125: 6.0, 140: 6.7,
+            160: 7.7, 180: 8.6, 200: 9.6, 225: 10.8, 250: 11.9, 280: 13.4, 315: 15.0,
+            355: 16.9, 400: 19.1, 450: 21.5, 500: 23.9, 560: 26.7, 630: 30.0, 710: 33.9,
+            800: 38.1, 900: 42.9, 1000: 47.7, 1200: 57.2, 1400: 66.7, 1600: 76.2 },
+    '17': { 32: 2.0, 40: 2.4, 50: 3.0, 63: 3.8, 75: 4.5, 90: 5.4, 110: 6.6, 125: 7.4,
+            140: 8.3, 160: 9.5, 180: 10.7, 200: 11.9, 225: 13.4, 250: 14.8, 280: 16.6,
+            315: 18.7, 355: 21.1, 400: 23.7, 450: 26.7, 500: 29.7, 560: 33.2, 630: 37.4,
+            710: 42.1, 800: 47.4, 900: 53.3, 1000: 59.3, 1200: 70.6 },
+    '13.6': { 25: 2.0, 32: 2.4, 40: 3.0, 50: 3.7, 63: 4.7, 75: 5.6, 90: 6.7, 110: 8.1,
+              125: 9.2, 140: 10.3, 160: 11.8, 180: 13.3, 200: 14.7, 225: 16.6, 250: 18.4,
+              280: 20.6, 315: 23.2, 355: 26.1, 400: 29.4, 450: 33.1, 500: 36.8, 560: 41.2,
+              630: 46.3, 710: 52.2, 800: 58.8, 900: 66.2, 1000: 73.5, 1200: 88.2,
+              1400: 102.9, 1600: 117.6 },
+    '11': { 20: 2.0, 25: 2.3, 32: 3.0, 40: 3.7, 50: 4.6, 63: 5.8, 75: 6.8, 90: 8.2,
+            110: 10.0, 125: 11.4, 140: 12.7, 160: 14.6, 180: 16.4, 200: 18.2, 225: 20.5,
+            250: 22.7, 280: 25.4, 315: 28.6, 355: 32.2, 400: 36.3, 450: 40.9, 500: 45.4,
+            560: 50.8, 630: 57.2, 710: 64.5, 800: 72.6, 900: 81.7, 1000: 90.2 },
+    '9': { 20: 2.3, 25: 3.0, 32: 3.6, 40: 4.5, 50: 5.6, 63: 7.1, 75: 8.4, 90: 10.1,
+           110: 12.3, 125: 14.0, 140: 15.7, 160: 17.9, 180: 20.1, 200: 22.4, 225: 25.2,
+           250: 27.9, 280: 31.3, 315: 35.2, 355: 39.7, 400: 44.7, 450: 50.3, 500: 55.8 },
+    '7.4': { 20: 3.0, 25: 3.5, 32: 4.4, 40: 5.5, 50: 6.9, 63: 8.6, 75: 10.3, 90: 12.3,
+             110: 15.1, 125: 17.1, 140: 19.2, 160: 21.9, 180: 24.6, 200: 27.4, 225: 30.8,
+             250: 34.2, 280: 38.3, 315: 43.1, 355: 48.5, 400: 54.7, 450: 61.5 },
+    '6': { 20: 3.4, 25: 4.2, 32: 5.4, 40: 6.7, 50: 8.3, 63: 10.5, 75: 12.5, 90: 15.0,
+           110: 18.3, 125: 20.8, 140: 23.3, 160: 26.6, 180: 29.9, 200: 33.2, 225: 37.4,
+           250: 41.5, 280: 46.5, 315: 52.3, 355: 59.0 }
+  };
+  /* PN = 2·MRS/(C·(SDR−1)) com C = 1,25 */
+  var PN_PE100 = { '33': 5, '26': 6.3, '21': 8, '17': 10, '13.6': 12.5, '11': 16, '9': 20, '7.4': 25, '6': 32 };
+  var PN_PE80  = { '33': 4, '26': 5, '21': 6.3, '17': 8, '13.6': 10, '11': 12.5, '9': 16, '7.4': 20, '6': 25 };
+
+  ['100', '80'].forEach(function (pe) {
+    Object.keys(PEAD_E).forEach(function (sdr) {
+      var pn = (pe === '100' ? PN_PE100 : PN_PE80)[sdr];
+      var tab = PEAD_E[sdr];
+      var itens = Object.keys(tab).map(function (de) {
+        return { rot: 'DE ' + de, dn: Number(de), de: Number(de), e: tab[de], pn: pn };
+      }).sort(function (a, b) { return a.de - b.de; });
+      lista.push({
+        id: 'pead_pe' + pe + '_sdr' + sdr.replace('.', '_'),
+        nome: 'PEAD PE ' + pe + ' — SDR ' + sdr.replace('.', ',') + ' (PN ' + String(pn).replace('.', ',') + ')',
+        familia: 'PEAD', material: 'pead', designacao: 'DE', revMm: 0,
+        fonteIds: ['iso4427'],
+        nota: 'PN válido para água a 20 °C, 50 anos. Para esgoto/efluente e temperaturas acima de 20 °C aplicar os fatores de redução da NBR 15561.',
+        itens: itens
+      });
+    });
+  });
+
+  /* ============ PVC ============ */
+  var DEFOFO = { 100: 118, 150: 170, 200: 222, 250: 274, 300: 326, 350: 378, 400: 429, 500: 532 };
+  lista.push({
+    id: 'pvc_defofo', nome: 'PVC-U DEFoFo — JEI (NBR 7665)',
+    familia: 'PVC', material: 'pvc', designacao: 'DN', revMm: 0,
+    fonteIds: ['nbr7665', 'nbr5647'],
+    nota: 'Série DEFoFo (DE compatível com ferro fundido), SDR 25 → PN 1,0 MPa (100 mca).',
+    itens: [[100, 4.8], [150, 6.8], [200, 8.9], [250, 11.0], [300, 13.1], [350, 15.2],
+            [400, 17.2], [500, 21.3]].map(function (p) {
+      return { rot: 'DN ' + p[0], dn: p[0], de: DEFOFO[p[0]], e: p[1], pn: 10 };
+    })
+  });
+  lista.push({
+    id: 'pvc_m_defofo', nome: 'PVC-M (modificado) DEFoFo',
+    familia: 'PVC', material: 'pvc_m', designacao: 'DN', revMm: 0,
+    fonteIds: ['nbr7665'],
+    nota: 'PVC modificado com maior tenacidade; mesmas dimensões externas da série DEFoFo.',
+    itens: [[100, 4.8], [150, 6.8], [200, 8.9], [250, 11.0], [300, 13.1], [350, 15.2],
+            [400, 17.2], [500, 21.3]].map(function (p) {
+      return { rot: 'DN ' + p[0], dn: p[0], de: DEFOFO[p[0]], e: p[1], pn: 10 };
+    })
+  });
+  /* PBA — NBR 5647, classes 12 / 15 / 20 */
+  var PBA_DE = { 50: 60, 75: 85, 100: 110 };
+  [[12, 0.6], [15, 0.75], [20, 1.0]].forEach(function (cl) {
+    var sdr = 2 * 10 / cl[1] + 1;
+    lista.push({
+      id: 'pvc_pba_' + cl[0], nome: 'PVC-U PBA classe ' + cl[0] + ' (' + (cl[1] * 100) + ' mca)',
+      familia: 'PVC', material: 'pvc', designacao: 'DN', revMm: 0,
+      fonteIds: ['nbr5647'],
+      nota: 'Série PBA (bolsa e anel). Espessuras estimadas por e = DE/SDR — confirmar na tabela do fabricante.',
+      itens: Object.keys(PBA_DE).map(function (dn) {
+        return { rot: 'DN ' + dn, dn: Number(dn), de: PBA_DE[dn],
+                 e: Math.max(1.8, r1(PBA_DE[dn] / sdr)), pn: cl[1] * 10 };
+      })
+    });
+  });
+  /* PVC-O — classe 450 */
+  [[12.5], [16], [20], [25]].forEach(function (p) {
+    var sdr = 2 * 32 / (p[0] / 10) + 1;
+    lista.push({
+      id: 'pvc_o_pn' + String(p[0]).replace('.', '_'),
+      nome: 'PVC-O classe 450 — PN ' + String(p[0]).replace('.', ',') + ' (DE série DEFoFo)',
+      familia: 'PVC-O', material: 'pvc_o', designacao: 'DN', revMm: 0,
+      fonteIds: ['iso16422'],
+      nota: 'Espessuras estimadas por e = DE/SDR com σ = 45/1,4 = 32 MPa — conferir a tabela do fabricante.',
+      itens: Object.keys(DEFOFO).map(function (dn) {
+        return { rot: 'DN ' + dn, dn: Number(dn), de: DEFOFO[dn],
+                 e: Math.max(2.0, r1(DEFOFO[dn] / sdr)), pn: p[0] };
+      })
+    });
+  });
+
+  /* ============ Aço (ASME B36.10M) ============ */
+  var ACO = [
+    ['1/2"',   21.3,  2.77,  3.73], ['3/4"',   26.7,  2.87,  3.91],
+    ['1"',     33.4,  3.38,  4.55], ['1.1/4"', 42.2,  3.56,  4.85],
+    ['1.1/2"', 48.3,  3.68,  5.08], ['2"',     60.3,  3.91,  5.54],
+    ['2.1/2"', 73.0,  5.16,  7.01], ['3"',     88.9,  5.49,  7.62],
+    ['4"',    114.3,  6.02,  8.56], ['5"',    141.3,  6.55,  9.53],
+    ['6"',    168.3,  7.11, 10.97], ['8"',    219.1,  8.18, 12.70],
+    ['10"',   273.0,  9.27, 15.09], ['12"',   323.8, 10.31, 17.48],
+    ['14"',   355.6, 11.13, 19.05], ['16"',   406.4, 12.70, 21.44],
+    ['18"',   457.0, 14.27, 23.83], ['20"',   508.0, 15.09, 26.19],
+    ['24"',   610.0, 17.48, 30.96]
+  ];
+  [[2, 'SCH 40'], [3, 'SCH 80']].forEach(function (cfg) {
+    lista.push({
+      id: 'aco_' + cfg[1].toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+      nome: 'Aço-carbono — ' + cfg[1] + ' (ASME B36.10M)',
+      familia: 'Aço', material: 'aco_sold_novo', designacao: 'NPS', revMm: 0,
+      fonteIds: ['asme_b3610', 'nbr5590'],
+      nota: 'Para tubos revestidos internamente com argamassa de cimento, o DI útil é menor — considerar no diâmetro manual.',
+      itens: ACO.map(function (l) { return { rot: l[0], dn: l[1], de: l[1], e: l[cfg[0]] }; })
+    });
+  });
+
+  /* ============ Concreto e PRFV (DN = diâmetro interno) ============ */
+  lista.push({
+    id: 'concreto', nome: 'Concreto armado (NBR 8890) — DN = diâmetro interno',
+    familia: 'Concreto', material: 'concreto_liso', designacao: 'DN', revMm: 0,
+    fonteIds: ['nbr8890'],
+    nota: 'Nos tubos de concreto o DN corresponde ao diâmetro interno. Em conduto forçado verificar a classe de pressão.',
+    itens: [300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1500, 1750, 2000].map(function (dn) {
+      return { rot: 'DN ' + dn, dn: dn, di: dn };
+    })
+  });
+  lista.push({
+    id: 'prfv', nome: 'PRFV / GRP (NBR 15536) — DN = diâmetro interno',
+    familia: 'PRFV', material: 'prfv', designacao: 'DN', revMm: 0,
+    fonteIds: ['nbr15536'],
+    nota: 'O DN dos tubos de PRFV corresponde ao diâmetro interno nominal.',
+    itens: [100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000,
+            1200, 1400, 1500, 1600, 1800, 2000].map(function (dn) {
+      return { rot: 'DN ' + dn, dn: dn, di: dn };
+    })
+  });
+
+  CAT.padrao = lista;
+
+  CAT.diInterno = function (cat, item) {
+    if (item.di !== undefined && item.di !== null) return item.di;
+    return item.de - 2 * item.e - 2 * (cat.revMm || 0);
+  };
+  CAT.porFamilia = function (todos) {
+    var g = {};
+    todos.forEach(function (c) { (g[c.familia] = g[c.familia] || []).push(c); });
+    return g;
+  };
+  CAT.buscar = function (todos, id) {
+    for (var i = 0; i < todos.length; i++) if (todos[i].id === id) return todos[i];
+    return null;
+  };
+
+  GCF.CAT = CAT;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
+   Peças e conexões — coeficientes K de perda localizada
+   hl = K · v²/(2g)   (Azevedo Netto e planilhas de origem)
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var P = {};
+
+  P.pecas = [
+    { id: 'entrada_normal', rot: 'Entrada normal em canalização',  K: 0.50, cat: 'Entrada / Saída' },
+    { id: 'entrada_borda',  rot: 'Entrada de borda',               K: 1.00, cat: 'Entrada / Saída' },
+    { id: 'saida',          rot: 'Saída de canalização',           K: 1.00, cat: 'Entrada / Saída' },
+    { id: 'crivo',          rot: 'Crivo / grade na tomada',        K: 0.75, cat: 'Entrada / Saída' },
+
+    { id: 'curva90',        rot: 'Curva 90°',                      K: 0.40, cat: 'Curvas' },
+    { id: 'curva45',        rot: 'Curva 45°',                      K: 0.20, cat: 'Curvas' },
+    { id: 'curva22',        rot: 'Curva 22,5°',                    K: 0.10, cat: 'Curvas' },
+    { id: 'curva11',        rot: 'Curva 11,25°',                   K: 0.05, cat: 'Curvas' },
+    { id: 'cotovelo90',     rot: 'Cotovelo 90° (raio curto)',      K: 0.90, cat: 'Curvas' },
+    { id: 'cotovelo45',     rot: 'Cotovelo 45°',                   K: 0.40, cat: 'Curvas' },
+
+    { id: 'reducao_exc',    rot: 'Redução excêntrica',             K: 0.13, cat: 'Transições' },
+    { id: 'reducao_conc',   rot: 'Redução concêntrica',            K: 0.30, cat: 'Transições' },
+    { id: 'reducao_gradual',rot: 'Redução gradual',                K: 0.15, cat: 'Transições' },
+    { id: 'ampliacao',      rot: 'Ampliação gradual',              K: 0.30, cat: 'Transições' },
+    { id: 'junta_montagem', rot: 'Junta de montagem / dilatação',  K: 0.10, cat: 'Transições' },
+
+    { id: 'te_direta',      rot: 'Tê — passagem direta',           K: 0.60, cat: 'Derivações' },
+    { id: 'te_lateral',     rot: 'Tê — saída de lado',             K: 1.30, cat: 'Derivações' },
+    { id: 'te_bilateral',   rot: 'Tê — saída bilateral',           K: 1.80, cat: 'Derivações' },
+    { id: 'juncao',         rot: 'Junção',                         K: 0.40, cat: 'Derivações' },
+
+    { id: 'vg',             rot: 'Válvula de gaveta aberta',       K: 0.20, cat: 'Válvulas' },
+    { id: 'vb',             rot: 'Válvula borboleta aberta',       K: 0.30, cat: 'Válvulas' },
+    { id: 'vr',             rot: 'Válvula de retenção',            K: 2.50, cat: 'Válvulas' },
+    { id: 'v_globo',        rot: 'Válvula de globo aberta',        K: 10.0, cat: 'Válvulas' },
+    { id: 'v_angulo',       rot: 'Válvula de ângulo aberta',       K: 5.00, cat: 'Válvulas' },
+    { id: 'v_esfera',       rot: 'Válvula de esfera aberta',       K: 0.10, cat: 'Válvulas' },
+    { id: 'comporta',       rot: 'Comporta aberta',                K: 1.00, cat: 'Válvulas' },
+
+    { id: 'medidor_vazao',  rot: 'Medidor de vazão (eletromagnético)', K: 0.20, cat: 'Acessórios' },
+    { id: 'venturi',        rot: 'Medidor Venturi',                K: 2.50, cat: 'Acessórios' },
+    { id: 'ventosa',        rot: 'Ventosa',                        K: 0.20, cat: 'Acessórios' },
+    { id: 'descarga',       rot: 'Descarga (ponta seca)',          K: 0.20, cat: 'Acessórios' },
+    { id: 'hidrante',       rot: 'Hidrante',                       K: 0.20, cat: 'Acessórios' }
+  ];
+
+  P.buscarPeca = function (id) {
+    for (var i = 0; i < P.pecas.length; i++) if (P.pecas[i].id === id) return P.pecas[i];
+    return null;
+  };
+
+  P.categorias = function () {
+    var g = {};
+    P.pecas.forEach(function (p) { (g[p.cat] = g[p.cat] || []).push(p); });
+    return g;
+  };
+
+  GCF.P = P;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
+   Estado — modelo de dados, persistência e exemplo
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var E = {};
+  var U = GCF.U;
+  var CHAVE = 'gcf_projeto_v1';
+  var CHAVE_CFG = 'gcf_config_v1';
+
+  E.padrao = function () {
+    return {
+      versao: 1,
+      projeto: {
+        nome: '', local: '', autor: '', data: new Date().toISOString().slice(0, 10),
+        descricao: '',
+        saidaNome: '', naSaida: null,     /* cota do NA de montante (m) */
+        chegadaNome: '', naChegada: null, /* cota do NA de jusante / lançamento (m) */
+        fluido: 'agua_tratada'
+      },
+      trechos: [E.trechoPadrao(1)],
+      vazoes: [
+        { id: U.id(), nome: 'Vazão média', q: null },
+        { id: U.id(), nome: 'Vazão máxima (QMH)', q: null }
+      ],
+      cenarios: { habilitado: false, itens: [] },
+      params: {
+        metodo: 'hw',            /* hw | colebrook | swamee | zigrang */
+        temperatura: 20,
+        hwK: 10.643, hwExpQ: 1.852, hwExpD: 4.871,
+        vMin: 0.6, vMax: 3.0,    /* faixa de velocidade admitida (m/s) */
+        folgaMin: 0              /* folga mínima exigida (mca) */
+      }
+    };
+  };
+
+  E.trechoPadrao = function (n) {
+    return {
+      id: U.id(), nome: 'Trecho ' + n, L: null,
+      modo: 'catalogo',          /* catalogo | manual */
+      catId: null, itemDn: null, /* tubo do catálogo */
+      diManual: null,            /* DI direto (mm) */
+      materialManual: 'pead',    /* material p/ modo manual */
+      idade: 'novo',
+      cFonte: 'auto',            /* auto | manual */
+      cManual: null, epsManual: null,
+      pecas: [],                 /* [{id, qtde}] */
+      kExtra: null,              /* ΣK adicional livre */
+      cotaFim: null              /* cota do terreno/GI no fim do trecho (opcional) */
+    };
+  };
+
+  E.cenarioPadrao = function (n) {
+    return { id: U.id(), nome: 'Cenário ' + n, naChegada: null, naSaida: null, descricao: '' };
+  };
+
+  E.carregar = function () {
+    try {
+      var s = localStorage.getItem(CHAVE);
+      if (!s) return null;
+      var st = JSON.parse(s);
+      return E.migrar(st);
+    } catch (e) { return null; }
+  };
+  E.gravar = function (st) {
+    try { localStorage.setItem(CHAVE, JSON.stringify(st)); } catch (e) { /* sem espaço */ }
+  };
+  E.carregarConfig = function () {
+    try { return JSON.parse(localStorage.getItem(CHAVE_CFG)) || {}; } catch (e) { return {}; }
+  };
+  E.gravarConfig = function (cfg) {
+    try { localStorage.setItem(CHAVE_CFG, JSON.stringify(cfg)); } catch (e) { /* ignora */ }
+  };
+
+  /* completa campos ausentes de projetos antigos/importados */
+  E.migrar = function (st) {
+    var p = E.padrao();
+    st = st || {};
+    st.projeto = Object.assign(p.projeto, st.projeto || {});
+    st.params = Object.assign(p.params, st.params || {});
+    st.cenarios = Object.assign({ habilitado: false, itens: [] }, st.cenarios || {});
+    if (!Array.isArray(st.trechos) || !st.trechos.length) st.trechos = [E.trechoPadrao(1)];
+    st.trechos = st.trechos.map(function (t, i) { return Object.assign(E.trechoPadrao(i + 1), t); });
+    if (!Array.isArray(st.vazoes)) st.vazoes = [];
+    st.versao = 1;
+    return st;
+  };
+
+  /* Exemplo — Emissário ETE C3 (planilha de origem "Emissário Gravidade Cenários") */
+  E.exemplo = function () {
+    var st = E.padrao();
+    st.projeto = {
+      nome: 'Emissário ETE C3 — verificação da capacidade de transporte',
+      local: 'ETE C3', autor: '', data: new Date().toISOString().slice(0, 10),
+      descricao: 'Emissário por gravidade em conduto forçado, da caixa de saída da ETE até o lançamento no Rio Iguaçu. ' +
+                 'Reprodução do estudo de cenários da planilha de origem: o nível do rio varia e define a carga disponível.',
+      saidaNome: 'Caixa de saída (GI)', naSaida: 742.9,
+      chegadaNome: 'Rio Iguaçu', naChegada: 741.0,
+      fluido: 'esgoto_trat'
+    };
+    var t = E.trechoPadrao(1);
+    t.nome = 'Emissário — trecho único';
+    t.L = 221.45;
+    t.modo = 'catalogo';
+    t.catId = 'pead_pe100_sdr26';  /* PEAD PE100 PN 6,3 — DE 200, e 7,7 → DI 184,6 mm */
+    t.itemDn = 200;
+    t.idade = 'novo';
+    t.cFonte = 'manual';
+    t.cManual = 140; t.epsManual = 0.06;
+    t.pecas = [
+      { id: 'curva90', qtde: 1 },
+      { id: 'curva45', qtde: 3 },
+      { id: 'entrada_borda', qtde: 1 },
+      { id: 'saida', qtde: 1 }
+    ];
+    st.trechos = [t];
+    st.vazoes = [
+      { id: U.id(), nome: 'Vazão média atual', q: 15 },
+      { id: U.id(), nome: 'QMH atual', q: 22.5 },
+      { id: U.id(), nome: 'Vazão média futura', q: 30 }
+    ];
+    st.cenarios = {
+      habilitado: true,
+      itens: [
+        { id: U.id(), nome: 'Rio em nível baixo', naChegada: 741.0, naSaida: null,
+          descricao: 'NA do rio 1,90 m abaixo da geratriz inferior da saída.' },
+        { id: U.id(), nome: 'Rio em cheia (cota de enchente)', naChegada: 742.2, naSaida: null,
+          descricao: 'NA do rio 0,70 m abaixo da GI — cota de enchente estipulada pelo cliente.' }
+      ]
+    };
+    st.params.metodo = 'hw';
+    return st;
+  };
+
+  GCF.E = E;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
+   Cálculo — resolução dos trechos, cenários e vazões
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var C = {};
+  var H = GCF.H, R = GCF.R, CAT = GCF.CAT, P = GCF.P;
+
+  /* Resolve um trecho: DI (m), C, eps (m), ΣK, rótulos e avisos */
+  C.resolverTrecho = function (t, st) {
+    var out = { id: t.id, nome: t.nome || 'Trecho', L: t.L, di: null, rotTubo: '—',
+                materialId: null, materialRot: '—', C: null, eps: null, K: 0,
+                pecas: [], pn: null, cotaFim: t.cotaFim, avisos: [] };
+
+    if (!(t.L > 0)) out.avisos.push('Extensão não informada.');
+
+    if (t.modo === 'manual') {
+      if (t.diManual > 0) { out.di = t.diManual / 1000; out.rotTubo = 'DI ' + GCF.U.fmt(t.diManual, 1) + ' mm (manual)'; }
+      else out.avisos.push('Diâmetro interno não informado.');
+      out.materialId = t.materialManual || 'pead';
+    } else {
+      var cat = CAT.buscar(CAT.padrao, t.catId);
+      if (!cat) { out.avisos.push('Tubo do catálogo não escolhido.'); }
+      else {
+        var item = null;
+        for (var i = 0; i < cat.itens.length; i++) if (cat.itens[i].dn === t.itemDn) item = cat.itens[i];
+        if (!item) out.avisos.push('Diâmetro não escolhido no catálogo.');
+        else {
+          out.di = CAT.diInterno(cat, item) / 1000;
+          out.rotTubo = cat.nome + ' · ' + item.rot + ' (DI ' + GCF.U.fmt(CAT.diInterno(cat, item), 1) + ' mm)';
+          out.pn = item.pn || null;
+        }
+        out.materialId = cat.material;
+      }
+    }
+
+    var mat = out.materialId ? R.consultar(out.materialId, t.idade, st.projeto.fluido) : null;
+    out.materialRot = mat ? mat.rot : '—';
+    out.consulta = mat;
+    if (t.cFonte === 'manual') {
+      out.C = t.cManual;
+      out.eps = t.epsManual;
+      if (!(out.C > 0)) out.avisos.push('Coeficiente C manual não informado.');
+      if (!(out.eps > 0) && st.params.metodo !== 'hw') out.avisos.push('Rugosidade ε manual não informada.');
+    } else if (mat) {
+      out.C = mat.C;
+      out.eps = mat.eps;
+    } else {
+      out.avisos.push('Material não identificado — informe C/ε manualmente.');
+    }
+
+    /* peças */
+    var K = 0;
+    (t.pecas || []).forEach(function (pi) {
+      var p = P.buscarPeca(pi.id);
+      if (!p || !(pi.qtde > 0)) return;
+      K += p.K * pi.qtde;
+      out.pecas.push({ id: p.id, rot: p.rot, K: p.K, qtde: pi.qtde, ki: p.K * pi.qtde });
+    });
+    if (t.kExtra > 0) { K += t.kExtra; out.pecas.push({ id: '_extra', rot: 'ΣK adicional (informado)', K: t.kExtra, qtde: 1, ki: t.kExtra }); }
+    out.K = K;
+
+    out.valido = (out.di > 0) && (t.L > 0) && (out.C > 0 || st.params.metodo !== 'hw') &&
+                 (st.params.metodo === 'hw' ? out.C > 0 : out.eps > 0 || out.eps === 0);
+    return out;
+  };
+
+  /* Perda total do sistema para uma vazão Q (m³/s), trechos resolvidos */
+  C.perdaTotal = function (Q, trechos, st) {
+    var ni = H.viscosidadeAgua(st.params.temperatura);
+    var det = [], Htot = 0, hfTot = 0, hlTot = 0;
+    trechos.forEach(function (tr) {
+      if (!tr.valido) { det.push(null); return; }
+      var pd = H.perdaDistribuida(Q, tr.di, tr.L, {
+        metodo: st.params.metodo, C: tr.C, eps: (tr.eps || 0) / 1000, ni: ni
+      });
+      var hl = H.perdaLocalizada(Q, tr.di, tr.K);
+      var d = { v: pd.v, Re: pd.Re, J: pd.J, f: pd.f, regime: pd.regime, hf: pd.hf, hl: hl, htotal: pd.hf + hl };
+      hfTot += pd.hf; hlTot += hl; Htot += d.htotal;
+      det.push(d);
+    });
+    return { H: Htot, hf: hfTot, hl: hlTot, trechos: det };
+  };
+
+  /* Vazão máxima de transporte: H(Q) = Hdisp, por bissecção */
+  C.vazaoMaxima = function (Hdisp, trechos, st) {
+    if (!(Hdisp > 0)) return 0;
+    var ok = trechos.some(function (t) { return t.valido; });
+    if (!ok) return null;
+    var lo = 0, hi = 0.001;
+    var i;
+    for (i = 0; i < 60; i++) {          /* expande até cruzar */
+      if (C.perdaTotal(hi, trechos, st).H >= Hdisp) break;
+      hi *= 2;
+      if (hi > 1000) return null;       /* sem perda apreciável — dado inconsistente */
+    }
+    for (i = 0; i < 80; i++) {
+      var m = (lo + hi) / 2;
+      if (C.perdaTotal(m, trechos, st).H > Hdisp) hi = m; else lo = m;
+    }
+    return (lo + hi) / 2;
+  };
+
+  /* Lista de cenários efetiva: sem estudo habilitado, um único cenário-base */
+  C.cenariosEfetivos = function (st) {
+    var base = {
+      id: '_base', nome: 'Condição de projeto',
+      naSaida: st.projeto.naSaida, naChegada: st.projeto.naChegada,
+      descricao: '', base: true
+    };
+    if (!st.cenarios.habilitado || !st.cenarios.itens.length) return [base];
+    return st.cenarios.itens.map(function (c) {
+      return {
+        id: c.id, nome: c.nome || 'Cenário',
+        naSaida: (c.naSaida === null || c.naSaida === undefined) ? st.projeto.naSaida : c.naSaida,
+        naChegada: (c.naChegada === null || c.naChegada === undefined) ? st.projeto.naChegada : c.naChegada,
+        descricao: c.descricao || '', base: false
+      };
+    });
+  };
+
+  /* Cálculo completo do projeto */
+  C.calcular = function (st) {
+    var res = { trechos: [], cenarios: [], avisos: [] };
+    res.trechos = st.trechos.map(function (t) { return C.resolverTrecho(t, st); });
+
+    res.trechos.forEach(function (tr) {
+      tr.avisos.forEach(function (a) { res.avisos.push({ tipo: 'erro', onde: tr.nome, msg: a }); });
+    });
+
+    var Ltotal = 0;
+    res.trechos.forEach(function (t) { if (t.L > 0) Ltotal += t.L; });
+    res.Ltotal = Ltotal;
+
+    var cens = C.cenariosEfetivos(st);
+    var vazoes = st.vazoes.filter(function (v) { return v.q > 0; });
+
+    cens.forEach(function (cen) {
+      var rc = { cen: cen, hdisp: null, vazoes: [], qmax: null };
+      if (cen.naSaida !== null && cen.naSaida !== undefined &&
+          cen.naChegada !== null && cen.naChegada !== undefined) {
+        rc.hdisp = cen.naSaida - cen.naChegada;
+        if (rc.hdisp <= 0) {
+          res.avisos.push({ tipo: 'erro', onde: cen.nome,
+            msg: 'Carga disponível nula ou negativa (NA de chegada acima do NA de saída) — não há escoamento por gravidade.' });
+        }
+      } else {
+        res.avisos.push({ tipo: 'erro', onde: cen.nome, msg: 'Cotas dos níveis de água não informadas.' });
+      }
+
+      vazoes.forEach(function (vz) {
+        var Q = vz.q / 1000;
+        var pt = C.perdaTotal(Q, res.trechos, st);
+        var folga = (rc.hdisp !== null) ? rc.hdisp - pt.H : null;
+        var rv = { vaz: vz, Q: Q, perda: pt, folga: folga };
+        rv.status = folga === null ? 'indef'
+                  : folga < 0 ? 'ruim'
+                  : folga < (st.params.folgaMin || 0) ? 'atencao' : 'ok';
+        /* piezométrica acumulada por trecho */
+        var piez = cen.naSaida, acum = [];
+        pt.trechos.forEach(function (d, i) {
+          if (d && piez !== null && piez !== undefined) piez -= d.htotal;
+          acum.push(piez);
+        });
+        rv.piezFim = acum;
+        rc.vazoes.push(rv);
+
+        /* avisos de velocidade */
+        pt.trechos.forEach(function (d, i) {
+          if (!d || !(d.v > 0)) return;
+          var tn = res.trechos[i].nome;
+          if (d.v < st.params.vMin) res.avisos.push({ tipo: 'atencao', onde: cen.nome + ' · ' + vz.nome + ' · ' + tn,
+            msg: 'Velocidade de ' + GCF.U.fmt(d.v, 2) + ' m/s abaixo da mínima de autolimpeza (' + GCF.U.fmt(st.params.vMin, 2) + ' m/s).' });
+          if (d.v > st.params.vMax) res.avisos.push({ tipo: 'atencao', onde: cen.nome + ' · ' + vz.nome + ' · ' + tn,
+            msg: 'Velocidade de ' + GCF.U.fmt(d.v, 2) + ' m/s acima da máxima admitida (' + GCF.U.fmt(st.params.vMax, 2) + ' m/s).' });
+          if (st.params.metodo !== 'hw') {
+            var epsRel = (res.trechos[i].eps || 0) / 1000 / res.trechos[i].di;
+            if (d.Re > 4000 && (epsRel < 1e-5 || epsRel > 1e-2))
+              res.avisos.push({ tipo: 'atencao', onde: tn,
+                msg: 'Rugosidade relativa ε/D = ' + epsRel.toExponential(2) + ' fora da faixa usual de validade (10⁻⁵ a 10⁻²).' });
+            if (d.Re > 0 && d.Re < 4000)
+              res.avisos.push({ tipo: 'atencao', onde: cen.nome + ' · ' + vz.nome + ' · ' + tn,
+                msg: 'Re = ' + GCF.U.fmt(d.Re, 0) + ' — escoamento fora do regime turbulento pleno; verificar o resultado.' });
+          }
+        });
+
+        if (rv.status === 'ruim')
+          res.avisos.push({ tipo: 'erro', onde: cen.nome + ' · ' + vz.nome,
+            msg: 'A perda de carga (' + GCF.U.fmt(pt.H, 3) + ' mca) supera a carga disponível (' + GCF.U.fmt(rc.hdisp, 3) +
+                 ' mca). A vazão não passa — aumentar o diâmetro ou rever o traçado.' });
+
+        /* pressão na linha piezométrica × cota do terreno no fim de cada trecho */
+        acum.forEach(function (pz, i) {
+          var cf = res.trechos[i].cotaFim;
+          if (pz === null || pz === undefined || cf === null || cf === undefined) return;
+          if (pz < cf) res.avisos.push({ tipo: 'erro', onde: cen.nome + ' · ' + vz.nome + ' · ' + res.trechos[i].nome,
+            msg: 'Linha piezométrica (' + GCF.U.fmt(pz, 2) + ' m) abaixo da cota do conduto no fim do trecho (' +
+                 GCF.U.fmt(cf, 2) + ' m) — pressão negativa; risco de funcionamento como sifão / entrada de ar.' });
+        });
+      });
+
+      if (rc.hdisp !== null && rc.hdisp > 0) {
+        var qm = C.vazaoMaxima(rc.hdisp, res.trechos, st);
+        if (qm !== null) {
+          rc.qmax = qm;
+          rc.qmaxDet = C.perdaTotal(qm, res.trechos, st);
+        }
+      }
+      res.cenarios.push(rc);
+    });
+
+    return res;
+  };
+
+  GCF.C = C;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
+   Interface — abas, formulários e resultados
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var App = {};
+  var U = GCF.U, H = GCF.H, R = GCF.R, CAT = GCF.CAT, P = GCF.P, E = GCF.E, C = GCF.C;
+  var h = U.h;
+
+  App.abas = [
+    { id: 'resumo', rot: 'Resumo' },
+    { id: 'projeto', rot: 'Projeto' },
+    { id: 'trechos', rot: 'Trechos e peças' },
+    { id: 'vazoes', rot: 'Vazões' },
+    { id: 'cenarios', rot: 'Cenários' },
+    { sep: true },
+    { id: 'resultados', rot: 'Resultados' },
+    { sep: true },
+    { id: 'catalogos', rot: 'Catálogos' },
+    { id: 'parametros', rot: 'Parâmetros de cálculo' },
+    { id: 'fontes', rot: 'Fontes' }
+  ];
+  App.aba = 'resumo';
+
+  App.iniciar = function () {
+    App.st = E.carregar() || E.padrao();
+    var cfg = E.carregarConfig();
+    if (cfg.tema) document.documentElement.setAttribute('data-tema', cfg.tema);
+    if (cfg.aba) App.aba = cfg.aba;
+    App.ligarCabecalho();
+    App.render();
+  };
+
+  App.mudou = function () {
+    E.gravar(App.st);
+    App.render();
+  };
+
+  App.irPara = function (aba) {
+    App.aba = aba;
+    var cfg = E.carregarConfig(); cfg.aba = aba; E.gravarConfig(cfg);
+    App.render();
+    window.scrollTo(0, 0);
+  };
+
+  /* ---------------- cabeçalho ---------------- */
+
+  App.ligarCabecalho = function () {
+    document.querySelectorAll('header .btn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        switch (b.getAttribute('data-acao')) {
+          case 'novo':
+            if (confirm('Começar um projeto novo? Os dados atuais serão substituídos.')) {
+              App.st = E.padrao(); App.mudou(); App.irPara('projeto');
+            }
+            break;
+          case 'exemplo':
+            if (confirm('Carregar o exemplo (Emissário ETE C3 com estudo de cenários)? Os dados atuais serão substituídos.')) {
+              App.st = E.exemplo(); App.mudou(); App.irPara('resumo');
+            }
+            break;
+          case 'exportar': App.exportar(); break;
+          case 'importar': document.getElementById('arquivo-json').click(); break;
+          case 'imprimir': GCF.REL.imprimir(App.st); break;
+          case 'tema': App.alternarTema(); break;
+        }
+      });
+    });
+    document.getElementById('arquivo-json').addEventListener('change', function (ev) {
+      var f = ev.target.files[0];
+      if (!f) return;
+      var r = new FileReader();
+      r.onload = function () {
+        try {
+          App.st = E.migrar(JSON.parse(r.result));
+          App.mudou();
+          App.irPara('resumo');
+        } catch (e) { alert('Arquivo inválido: ' + e.message); }
+      };
+      r.readAsText(f);
+      ev.target.value = '';
+    });
+  };
+
+  App.exportar = function () {
+    var nome = (App.st.projeto.nome || 'conduto-gravidade').toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    var blob = new Blob([JSON.stringify(App.st, null, 2)], { type: 'application/json' });
+    var a = h('a', { href: URL.createObjectURL(blob), download: (nome || 'projeto') + '.json' });
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+
+  App.alternarTema = function () {
+    var raiz = document.documentElement;
+    var novo = raiz.getAttribute('data-tema') === 'escuro' ? 'claro' : 'escuro';
+    raiz.setAttribute('data-tema', novo);
+    var cfg = E.carregarConfig(); cfg.tema = novo; E.gravarConfig(cfg);
+  };
+
+  /* ---------------- renderização ---------------- */
+
+  App.render = function () {
+    var st = App.st;
+    H.HW.k = st.params.hwK; H.HW.expQ = st.params.hwExpQ; H.HW.expD = st.params.hwExpD;
+    var res = null, erroCalc = null;
+    try { res = C.calcular(st); } catch (e) { erroCalc = e; }
+
+    /* abas */
+    var nav = document.getElementById('abas');
+    U.limpar(nav);
+    var nErros = res ? res.avisos.filter(function (a) { return a.tipo === 'erro'; }).length : 0;
+    var nAvisos = res ? res.avisos.length : 0;
+    App.abas.forEach(function (a) {
+      if (a.sep) { nav.appendChild(h('div', { class: 'sep' })); return; }
+      var marcador = null;
+      if (a.id === 'resultados' && nAvisos)
+        marcador = h('span', { class: 'marcador', title: nAvisos + ' ponto(s) a verificar' }, String(nAvisos));
+      if (a.id === 'cenarios' && st.cenarios.habilitado)
+        marcador = h('span', { class: 'marcador', style: 'background:var(--teal)' }, String(st.cenarios.itens.length));
+      nav.appendChild(h('button', {
+        type: 'button', 'aria-selected': App.aba === a.id ? 'true' : 'false',
+        onclick: function () { App.irPara(a.id); }
+      }, a.rot, marcador));
+    });
+
+    var main = document.getElementById('conteudo');
+    var foco = App.guardarFoco();
+    U.limpar(main);
+    if (erroCalc) {
+      main.appendChild(h('div', { class: 'aviso erro' },
+        h('b', {}, 'Não foi possível concluir o cálculo'), String(erroCalc.message || erroCalc)));
+    }
+    switch (App.aba) {
+      case 'resumo': App.telaResumo(main, st, res); break;
+      case 'projeto': App.telaProjeto(main, st); break;
+      case 'trechos': App.telaTrechos(main, st, res); break;
+      case 'vazoes': App.telaVazoes(main, st); break;
+      case 'cenarios': App.telaCenarios(main, st); break;
+      case 'resultados': App.telaResultados(main, st, res); break;
+      case 'catalogos': App.telaCatalogos(main, st); break;
+      case 'parametros': App.telaParametros(main, st); break;
+      case 'fontes': App.telaFontes(main, st); break;
+    }
+    App.devolverFoco(foco);
+  };
+
+  App.guardarFoco = function () {
+    var el = document.activeElement;
+    if (!el || !el.getAttribute) return null;
+    return el.getAttribute('data-foco') || null;
+  };
+  App.devolverFoco = function (chave) {
+    if (!chave) return;
+    var el = document.querySelector('[data-foco="' + chave + '"]');
+    if (el) { el.focus(); if (el.select) try { el.select(); } catch (e) {} }
+  };
+
+  /* helper: campo de texto simples ligado ao estado */
+  function campoTexto(rot, valor, gravar, classe, foco) {
+    return h('div', { class: 'campo' },
+      h('label', {}, rot),
+      h('input', { type: 'text', class: classe || 'l200', value: valor || '', 'data-foco': foco || null,
+        onchange: function (ev) { gravar(ev.target.value); App.mudou(); } }));
+  }
+  function campoNum(rot, valor, gravar, op) {
+    op = op || {};
+    var input = U.campoNum({
+      valor: valor, dec: op.dec, classe: op.classe || 'l100', placeholder: op.placeholder,
+      gravar: function (v) { gravar(v); App.mudou(); }
+    });
+    if (op.foco) input.setAttribute('data-foco', op.foco);
+    return h('div', { class: 'campo' },
+      h('label', {}, rot, op.un ? h('span', { class: 'un' }, ' (' + op.un + ')') : null), input);
+  }
+
+  function selo(status, texto) {
+    var cls = status === 'ok' ? 'ok' : status === 'atencao' ? 'atencao' : status === 'ruim' ? 'ruim' : 'neutro';
+    return h('span', { class: 'selo ' + cls }, texto);
+  }
+  function statusTexto(s) {
+    return s === 'ok' ? 'Passa' : s === 'atencao' ? 'Passa (folga justa)' : s === 'ruim' ? 'Não passa' : '—';
+  }
+
+  /* ================= RESUMO ================= */
+
+  App.telaResumo = function (main, st, res) {
+    var cart = h('div', { class: 'cartao' },
+      h('h2', {}, st.projeto.nome || 'Projeto sem nome',
+        h('span', { class: 'dica' },
+          (st.projeto.saidaNome || 'Saída') + ' → ' + (st.projeto.chegadaNome || 'Chegada') +
+          (res && res.Ltotal ? ' · ' + U.fmt(res.Ltotal, 2) + ' m' : '') +
+          ' · método: ' + App.rotuloMetodo(st.params.metodo))));
+
+    if (!res) { main.appendChild(cart); return; }
+
+    var base = res.cenarios[0];
+    var paineis = h('div', { class: 'paineis' });
+    paineis.appendChild(h('div', { class: 'painel' },
+      h('div', { class: 'rotulo' }, 'Carga disponível' + (st.cenarios.habilitado ? ' (1º cenário)' : '')),
+      h('div', { class: 'valor' }, base && base.hdisp !== null ? U.fmt(base.hdisp, 2) : '—', h('span', { class: 'un' }, 'mca')),
+      h('div', { class: 'compl' }, 'NA saída − NA chegada')));
+    paineis.appendChild(h('div', { class: 'painel' },
+      h('div', { class: 'rotulo' }, 'Extensão total'),
+      h('div', { class: 'valor' }, res.Ltotal ? U.fmt(res.Ltotal, 1) : '—', h('span', { class: 'un' }, 'm')),
+      h('div', { class: 'compl' }, st.trechos.length + ' trecho(s)')));
+    if (base && base.qmax) {
+      paineis.appendChild(h('div', { class: 'painel' },
+        h('div', { class: 'rotulo' }, 'Máximo de transporte'),
+        h('div', { class: 'valor' }, U.fmt(base.qmax * 1000, 1), h('span', { class: 'un' }, 'L/s')),
+        h('div', { class: 'compl' }, 'vazão que esgota a carga disponível')));
+    }
+    var vzMaior = null;
+    if (base) base.vazoes.forEach(function (rv) { if (!vzMaior || rv.Q > vzMaior.Q) vzMaior = rv; });
+    if (vzMaior) {
+      paineis.appendChild(h('div', { class: 'painel ' + (vzMaior.status === 'ok' ? 'ok' : vzMaior.status === 'ruim' ? 'ruim' : 'atencao') },
+        h('div', { class: 'rotulo' }, 'Maior vazão · ' + vzMaior.vaz.nome),
+        h('div', { class: 'valor' }, U.fmt(vzMaior.perda.H, 3), h('span', { class: 'un' }, 'mca')),
+        h('div', { class: 'compl' }, 'perda total · folga ' + U.fmt(vzMaior.folga, 3) + ' mca — ' + statusTexto(vzMaior.status))));
+    }
+    cart.appendChild(paineis);
+
+    /* tabela de verificação por cenário × vazão */
+    if (base && base.vazoes.length) {
+      var tab = h('table', { class: 'dados' },
+        h('thead', {}, h('tr', {},
+          h('th', {}, st.cenarios.habilitado ? 'Cenário / Vazão' : 'Vazão'),
+          h('th', {}, 'Q (L/s)'), h('th', {}, 'v (m/s)'), h('th', {}, 'Perda total (mca)'),
+          h('th', {}, 'H disp. (mca)'), h('th', {}, 'Folga (mca)'), h('th', {}, 'Situação'))));
+      var corpo = h('tbody');
+      res.cenarios.forEach(function (rc) {
+        if (st.cenarios.habilitado) corpo.appendChild(h('tr', { class: 'grupo' },
+          h('td', { colspan: 7 }, rc.cen.nome +
+            (rc.hdisp !== null ? ' — H disponível ' + U.fmt(rc.hdisp, 2) + ' mca' : ''))));
+        rc.vazoes.forEach(function (rv) {
+          var v0 = null;
+          rv.perda.trechos.forEach(function (d) { if (d && v0 === null) v0 = d.v; });
+          corpo.appendChild(h('tr', {},
+            h('td', {}, rv.vaz.nome),
+            h('td', {}, U.fmt(rv.Q * 1000, 1)),
+            h('td', {}, v0 !== null ? U.fmt(v0, 2) : '—'),
+            h('td', {}, U.fmt(rv.perda.H, 3)),
+            h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 3) : '—'),
+            h('td', {}, rv.folga !== null ? U.fmt(rv.folga, 3) : '—'),
+            h('td', { class: 'c' }, selo(rv.status, statusTexto(rv.status)))));
+        });
+        if (rc.qmax) corpo.appendChild(h('tr', {},
+          h('td', {}, h('i', {}, 'Máximo de transporte')),
+          h('td', {}, U.fmt(rc.qmax * 1000, 1)),
+          h('td', {}, '—'),
+          h('td', {}, U.fmt(rc.qmaxDet.H, 3)),
+          h('td', {}, U.fmt(rc.hdisp, 3)),
+          h('td', {}, U.fmt(rc.hdisp - rc.qmaxDet.H, 3)),
+          h('td', { class: 'c' }, selo('neutro', 'Limite'))));
+      });
+      tab.appendChild(corpo);
+      cart.appendChild(h('div', { class: 'rolagem' }, tab));
+    } else {
+      cart.appendChild(h('div', { class: 'aviso info' },
+        h('b', {}, 'Comece pelo Projeto'),
+        'Informe as cotas dos níveis de água, os trechos e ao menos uma vazão — ou carregue o botão "Exemplo" no topo para ver o programa preenchido.'));
+    }
+    main.appendChild(cart);
+
+    /* avisos */
+    if (res.avisos.length) {
+      var ca = h('div', { class: 'cartao' }, h('h2', {}, 'Pontos a verificar'));
+      var vistos = {};
+      res.avisos.forEach(function (a) {
+        var chave = a.onde + '|' + a.msg;
+        if (vistos[chave]) return; vistos[chave] = 1;
+        ca.appendChild(h('div', { class: 'aviso' + (a.tipo === 'erro' ? ' erro' : '') },
+          h('b', {}, a.onde), a.msg));
+      });
+      main.appendChild(ca);
+    }
+  };
+
+  App.rotuloMetodo = function (m) {
+    return m === 'hw' ? 'Hazen-Williams'
+         : m === 'colebrook' ? 'Universal — Colebrook-White (iterativo)'
+         : m === 'swamee' ? 'Universal — Swamee-Jain'
+         : m === 'zigrang' ? 'Universal — Zigrang-Sylvester' : m;
+  };
+
+  /* ================= PROJETO ================= */
+
+  App.telaProjeto = function (main, st) {
+    var p = st.projeto;
+    main.appendChild(h('div', { class: 'cartao' },
+      h('h2', {}, 'Identificação do projeto'),
+      h('div', { class: 'linha-campos' },
+        campoTexto('Nome do projeto', p.nome, function (v) { p.nome = v; }, 'l260 cresce', 'p-nome'),
+        campoTexto('Local / obra', p.local, function (v) { p.local = v; }, 'l200', 'p-local'),
+        campoTexto('Responsável', p.autor, function (v) { p.autor = v; }, 'l160', 'p-autor'),
+        h('div', { class: 'campo' }, h('label', {}, 'Data'),
+          h('input', { type: 'date', value: p.data || '', onchange: function (ev) { p.data = ev.target.value; App.mudou(); } }))),
+      h('div', { class: 'linha-campos' },
+        h('div', { class: 'campo cresce' }, h('label', {}, 'Descrição / observações'),
+          h('textarea', { rows: 2, 'data-foco': 'p-desc',
+            onchange: function (ev) { p.descricao = ev.target.value; App.mudou(); } }, p.descricao || '')))));
+
+    main.appendChild(h('div', { class: 'cartao' },
+      h('h2', {}, 'Níveis de água — condição de projeto',
+        h('span', { class: 'dica' }, 'A carga disponível é a diferença entre o NA de montante (saída) e o NA de jusante (chegada). Para variações do nível de lançamento, use a aba Cenários.')),
+      h('div', { class: 'duas-colunas' },
+        h('div', {},
+          h('h3', {}, 'Saída (montante)'),
+          h('div', { class: 'linha-campos' },
+            campoTexto('Identificação (reservatório, caixa, tanque…)', p.saidaNome, function (v) { p.saidaNome = v; }, 'l260', 'p-snome'),
+            campoNum('Cota do NA de saída', p.naSaida, function (v) { p.naSaida = v; }, { un: 'm', dec: 2, classe: 'l120', foco: 'p-nas' }))),
+        h('div', {},
+          h('h3', {}, 'Chegada (jusante)'),
+          h('div', { class: 'linha-campos' },
+            campoTexto('Identificação (reservatório, rio, entrada de rede…)', p.chegadaNome, function (v) { p.chegadaNome = v; }, 'l260', 'p-cnome'),
+            campoNum('Cota do NA de chegada / lançamento', p.naChegada, function (v) { p.naChegada = v; }, { un: 'm', dec: 2, classe: 'l120', foco: 'p-nac' })))),
+      (p.naSaida !== null && p.naChegada !== null && p.naSaida !== undefined && p.naChegada !== undefined) ?
+        h('div', { class: 'aviso ' + (p.naSaida - p.naChegada > 0 ? 'info' : 'erro') },
+          h('b', {}, 'Carga disponível: ' + U.fmt(p.naSaida - p.naChegada, 2) + ' mca'),
+          p.naSaida - p.naChegada > 0
+            ? 'Toda a perda de carga (contínua + localizada) precisa caber nessa diferença de níveis.'
+            : 'O NA de chegada está igual ou acima do NA de saída — não há escoamento por gravidade nessa condição.') : null));
+
+    var lf = h('div', { class: 'linha-campos' });
+    var selF = h('select', { onchange: function (ev) { p.fluido = ev.target.value; App.mudou(); } });
+    R.fluidos.forEach(function (f) {
+      selF.appendChild(h('option', { value: f.id, selected: p.fluido === f.id }, f.rot));
+    });
+    lf.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Fluido transportado'), selF));
+    var fl = R.fluidos.filter(function (f) { return f.id === p.fluido; })[0];
+    main.appendChild(h('div', { class: 'cartao' },
+      h('h2', {}, 'Fluido', h('span', { class: 'dica' }, 'O fluido ajusta automaticamente o C e a rugosidade ε dos materiais (biofilme em esgoto, deposição em água bruta).')),
+      lf,
+      fl ? h('p', { class: 'nota' }, h('b', {}, 'Ajuste aplicado: '), 'ΔC = ' + fl.dC + ' · Δε = +' + U.fmt(fl.dEps, 2) + ' mm — ' + fl.nota) : null));
+  };
+
+  /* ================= TRECHOS ================= */
+
+  App.telaTrechos = function (main, st, res) {
+    var cab = h('div', { class: 'cartao' },
+      h('h2', {}, 'Trechos do conduto',
+        h('span', { class: 'dica' }, 'Trechos em série, da saída para a chegada. Cada trecho tem o próprio tubo, extensão e peças — a perda total é a soma de todos.')),
+      h('button', { class: 'btn primario', type: 'button', onclick: function () {
+        st.trechos.push(E.trechoPadrao(st.trechos.length + 1));
+        var ant = st.trechos[st.trechos.length - 2];
+        if (ant) { var novo = st.trechos[st.trechos.length - 1];
+          novo.modo = ant.modo; novo.catId = ant.catId; novo.itemDn = ant.itemDn;
+          novo.diManual = ant.diManual; novo.materialManual = ant.materialManual; novo.idade = ant.idade; }
+        App.mudou();
+      } }, '+ Adicionar trecho'));
+    main.appendChild(cab);
+
+    st.trechos.forEach(function (t, idx) {
+      main.appendChild(App.cartaoTrecho(st, t, idx, res));
+    });
+  };
+
+  App.cartaoTrecho = function (st, t, idx, res) {
+    var rt = res ? res.trechos[idx] : null;
+
+    var acoes = h('div', { class: 'acoes-trecho' },
+      idx > 0 ? h('button', { class: 'btn mini', type: 'button', title: 'Mover para cima',
+        onclick: function () { var x = st.trechos.splice(idx, 1)[0]; st.trechos.splice(idx - 1, 0, x); App.mudou(); } }, '↑') : null,
+      idx < st.trechos.length - 1 ? h('button', { class: 'btn mini', type: 'button', title: 'Mover para baixo',
+        onclick: function () { var x = st.trechos.splice(idx, 1)[0]; st.trechos.splice(idx + 1, 0, x); App.mudou(); } }, '↓') : null,
+      h('button', { class: 'btn mini', type: 'button', title: 'Duplicar trecho',
+        onclick: function () { var c = U.clonar(t); c.id = U.id(); c.nome = t.nome + ' (cópia)'; st.trechos.splice(idx + 1, 0, c); App.mudou(); } }, 'Duplicar'),
+      st.trechos.length > 1 ? h('button', { class: 'btn mini perigo', type: 'button',
+        onclick: function () { if (confirm('Remover "' + t.nome + '"?')) { st.trechos.splice(idx, 1); App.mudou(); } } }, 'Remover') : null);
+
+    var cabecalho = h('div', { class: 'trecho-cab' },
+      h('span', { class: 'titulo' }, (idx + 1) + '.'),
+      h('input', { type: 'text', class: 'l200', value: t.nome, 'data-foco': 'tn' + t.id, style: 'font-weight:600',
+        onchange: function (ev) { t.nome = ev.target.value; App.mudou(); } }),
+      rt && rt.di ? h('span', { class: 'selo neutro' }, 'DI ' + U.fmt(rt.di * 1000, 1) + ' mm') : null,
+      rt && rt.K ? h('span', { class: 'selo neutro' }, 'ΣK = ' + U.fmt(rt.K, 2)) : null,
+      acoes);
+
+    var corpo = h('div', { class: 'trecho-corpo' });
+
+    /* --- tubo --- */
+    var linhaTubo = h('div', { class: 'linha-campos' });
+    linhaTubo.appendChild(campoNum('Extensão', t.L, function (v) { t.L = v; }, { un: 'm', dec: 2, classe: 'l100', foco: 'tl' + t.id }));
+
+    var selModo = h('select', { onchange: function (ev) { t.modo = ev.target.value; App.mudou(); } },
+      h('option', { value: 'catalogo', selected: t.modo === 'catalogo' }, 'Tubo do catálogo'),
+      h('option', { value: 'manual', selected: t.modo === 'manual' }, 'Diâmetro interno manual'));
+    linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Escolha do tubo'), selModo));
+
+    if (t.modo === 'catalogo') {
+      var fams = CAT.porFamilia(CAT.padrao);
+      var selCat = h('select', { class: 'l260', onchange: function (ev) {
+        t.catId = ev.target.value || null; t.itemDn = null; App.mudou(); } });
+      selCat.appendChild(h('option', { value: '' }, '— escolher catálogo —'));
+      Object.keys(fams).forEach(function (fam) {
+        var og = h('optgroup', { label: fam });
+        fams[fam].forEach(function (c) {
+          og.appendChild(h('option', { value: c.id, selected: t.catId === c.id }, c.nome));
+        });
+        selCat.appendChild(og);
+      });
+      linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Catálogo'), selCat));
+
+      var cat = CAT.buscar(CAT.padrao, t.catId);
+      if (cat) {
+        var selDn = h('select', { onchange: function (ev) { t.itemDn = U.num(ev.target.value); App.mudou(); } });
+        selDn.appendChild(h('option', { value: '' }, '—'));
+        cat.itens.forEach(function (it) {
+          selDn.appendChild(h('option', { value: it.dn, selected: t.itemDn === it.dn },
+            it.rot + ' · DI ' + U.fmt(CAT.diInterno(cat, it), 1) + ' mm' + (it.pn ? ' · PN ' + String(it.pn).replace('.', ',') : '')));
+        });
+        linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, cat.designacao), selDn));
+      }
+    } else {
+      linhaTubo.appendChild(campoNum('Diâmetro interno (DI)', t.diManual, function (v) { t.diManual = v; }, { un: 'mm', dec: 1, classe: 'l100', foco: 'td' + t.id }));
+      var selMat = h('select', { class: 'l260', onchange: function (ev) { t.materialManual = ev.target.value; App.mudou(); } });
+      R.listaMateriais().forEach(function (m) {
+        selMat.appendChild(h('option', { value: m.id, selected: t.materialManual === m.id }, m.rot));
+      });
+      linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Material'), selMat));
+    }
+
+    var selIdade = h('select', { onchange: function (ev) { t.idade = ev.target.value; App.mudou(); } });
+    R.faixasIdade.forEach(function (f) {
+      selIdade.appendChild(h('option', { value: f.id, selected: t.idade === f.id }, f.rot));
+    });
+    linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Idade da tubulação'), selIdade));
+    corpo.appendChild(linhaTubo);
+
+    /* --- rugosidade --- */
+    var linhaC = h('div', { class: 'linha-campos' });
+    var selC = h('select', { onchange: function (ev) { t.cFonte = ev.target.value; App.mudou(); } },
+      h('option', { value: 'auto', selected: t.cFonte === 'auto' }, 'Automático (material + idade + fluido)'),
+      h('option', { value: 'manual', selected: t.cFonte === 'manual' }, 'Manual'));
+    linhaC.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Coeficientes de rugosidade'), selC));
+    if (t.cFonte === 'manual') {
+      linhaC.appendChild(campoNum('C (Hazen-Williams)', t.cManual, function (v) { t.cManual = v; }, { dec: 0, classe: 'l80', foco: 'tc' + t.id }));
+      linhaC.appendChild(campoNum('ε — rugosidade absoluta', t.epsManual, function (v) { t.epsManual = v; }, { un: 'mm', dec: 3, classe: 'l100', foco: 'te' + t.id }));
+    } else if (rt && rt.consulta) {
+      linhaC.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Valores adotados'),
+        h('div', { style: 'padding-top:4px' },
+          h('span', { class: 'selo neutro' }, 'C = ' + U.fmt(rt.C, 0)),
+          ' ',
+          h('span', { class: 'selo neutro' }, 'ε = ' + U.fmt(rt.eps, 3) + ' mm'),
+          h('span', { class: 'nota', style: 'display:inline;margin-left:8px' },
+            'faixa C: ' + U.fmt(rt.consulta.faixaC[0], 0) + '–' + U.fmt(rt.consulta.faixaC[1], 0) +
+            ' · faixa ε: ' + U.fmt(rt.consulta.faixaEps[0], 3) + '–' + U.fmt(rt.consulta.faixaEps[1], 3) + ' mm'))));
+    }
+    corpo.appendChild(linhaC);
+
+    /* --- peças --- */
+    corpo.appendChild(h('h3', {}, 'Peças e conexões (perda localizada)'));
+    var chips = h('div', { class: 'chips' });
+    (t.pecas || []).forEach(function (pi, pidx) {
+      var p = P.buscarPeca(pi.id);
+      if (!p) return;
+      chips.appendChild(h('span', { class: 'chip' },
+        p.rot, h('span', { class: 'k' }, 'K=' + U.fmt(p.K, 2)),
+        '×', h('input', { type: 'text', inputmode: 'numeric', value: pi.qtde,
+          onchange: function (ev) { var n = U.num(ev.target.value); pi.qtde = (n > 0) ? Math.round(n) : 1; App.mudou(); } }),
+        h('button', { type: 'button', title: 'Remover peça',
+          onclick: function () { t.pecas.splice(pidx, 1); App.mudou(); } }, '×')));
+    });
+    var selPeca = h('select', { onchange: function (ev) {
+      if (!ev.target.value) return;
+      var existe = (t.pecas || []).filter(function (x) { return x.id === ev.target.value; })[0];
+      if (existe) existe.qtde += 1;
+      else t.pecas.push({ id: ev.target.value, qtde: 1 });
+      App.mudou();
+    } });
+    selPeca.appendChild(h('option', { value: '' }, '+ adicionar peça…'));
+    var cats = P.categorias();
+    Object.keys(cats).forEach(function (cat) {
+      var og = h('optgroup', { label: cat });
+      cats[cat].forEach(function (p) {
+        og.appendChild(h('option', { value: p.id }, p.rot + '  (K = ' + U.fmt(p.K, 2) + ')'));
+      });
+      selPeca.appendChild(og);
+    });
+    var linhaP = h('div', { class: 'linha-campos' },
+      h('div', { class: 'campo' }, h('label', {}, 'Incluir peça'), selPeca),
+      campoNum('ΣK adicional', t.kExtra, function (v) { t.kExtra = v; }, { dec: 2, classe: 'l80', foco: 'tk' + t.id }),
+      h('div', { class: 'campo' }, h('label', {}, 'ΣK do trecho'),
+        h('div', { style: 'padding-top:4px' }, h('span', { class: 'selo neutro' }, 'ΣK = ' + U.fmt(rt ? rt.K : 0, 2)))));
+    corpo.appendChild(chips);
+    corpo.appendChild(linhaP);
+
+    /* --- verificação piezométrica opcional --- */
+    var linhaZ = h('div', { class: 'linha-campos' });
+    linhaZ.appendChild(campoNum('Cota do conduto no fim do trecho (opcional)', t.cotaFim, function (v) { t.cotaFim = v; },
+      { un: 'm', dec: 2, classe: 'l120', foco: 'tz' + t.id }));
+    linhaZ.appendChild(h('div', { class: 'campo cresce' }, h('label', {}, ' '),
+      h('span', { class: 'nota' }, 'Se informada, o programa verifica se a linha piezométrica passa acima do conduto no fim do trecho (evita pressão negativa em pontos altos).')));
+    corpo.appendChild(linhaZ);
+
+    if (rt && rt.avisos.length) {
+      rt.avisos.forEach(function (a) {
+        corpo.appendChild(h('div', { class: 'aviso erro' }, a));
+      });
+    }
+
+    return h('div', { class: 'trecho-cartao' }, cabecalho, corpo);
+  };
+
+  /* ================= VAZÕES ================= */
+
+  App.telaVazoes = function (main, st) {
+    var cart = h('div', { class: 'cartao' },
+      h('h2', {}, 'Vazões de verificação',
+        h('span', { class: 'dica' }, 'Cada vazão é verificada contra a carga disponível em todos os cenários — ex.: vazão média atual, QMH atual, vazão média futura (fim de plano).')));
+
+    var tab = h('table', { class: 'dados' },
+      h('thead', {}, h('tr', {},
+        h('th', {}, 'Identificação'), h('th', {}, 'Vazão (L/s)'), h('th', {}, 'Vazão (m³/h)'), h('th', {}, ''))));
+    var corpo = h('tbody');
+    st.vazoes.forEach(function (v, idx) {
+      corpo.appendChild(h('tr', {},
+        h('td', {}, h('input', { type: 'text', class: 'cresce', style: 'width:100%;min-width:180px', value: v.nome, 'data-foco': 'vn' + v.id,
+          onchange: function (ev) { v.nome = ev.target.value; App.mudou(); } })),
+        h('td', {}, U.campoNum({ valor: v.q, dec: 2, classe: 'l100',
+          gravar: function (x) { v.q = x; App.mudou(); } })),
+        h('td', {}, v.q > 0 ? U.fmt(v.q * 3.6, 1) : '—'),
+        h('td', { class: 'c' }, h('button', { class: 'btn mini perigo', type: 'button',
+          onclick: function () { st.vazoes.splice(idx, 1); App.mudou(); } }, 'Remover'))));
+    });
+    tab.appendChild(corpo);
+    cart.appendChild(h('div', { class: 'rolagem' }, tab));
+    cart.appendChild(h('div', { style: 'margin-top:10px' },
+      h('button', { class: 'btn primario', type: 'button', onclick: function () {
+        st.vazoes.push({ id: U.id(), nome: 'Vazão ' + (st.vazoes.length + 1), q: null }); App.mudou();
+      } }, '+ Adicionar vazão')));
+    cart.appendChild(h('p', { class: 'nota' },
+      'Além das vazões informadas, o programa calcula o ', h('b', {}, 'máximo de transporte'),
+      ' de cada cenário — a vazão que consome exatamente a carga disponível.'));
+    main.appendChild(cart);
+  };
+
+  /* ================= CENÁRIOS ================= */
+
+  App.telaCenarios = function (main, st) {
+    var cart = h('div', { class: 'cartao' },
+      h('h2', {}, 'Estudo de cenários',
+        h('span', { class: 'dica' }, 'Para lançamentos em corpos d’água com nível variável (estiagem, cheia, cota de enchente): cada cenário fixa um NA de chegada — e, se preciso, um NA de saída — e toda a verificação é repetida para ele.')));
+
+    var chave = h('label', { class: 'interruptor' },
+      h('input', { type: 'checkbox', checked: st.cenarios.habilitado, onchange: function (ev) {
+        st.cenarios.habilitado = ev.target.checked;
+        if (st.cenarios.habilitado && !st.cenarios.itens.length) {
+          var c1 = E.cenarioPadrao(1); c1.nome = 'Condição normal'; c1.naChegada = st.projeto.naChegada;
+          st.cenarios.itens.push(c1);
+        }
+        App.mudou();
+      } }),
+      h('span', { class: 'pista' }),
+      h('span', { class: 'rot' }, st.cenarios.habilitado ? 'Estudo de cenários habilitado' : 'Habilitar estudo de cenários'));
+    cart.appendChild(chave);
+
+    if (!st.cenarios.habilitado) {
+      cart.appendChild(h('p', { class: 'nota', style: 'margin-top:10px' },
+        'Com o estudo desabilitado, o cálculo usa apenas os níveis da aba Projeto (condição única). ',
+        'Habilite quando o nível de lançamento variar — por exemplo, um emissário que lança em rio com NA de estiagem e NA de enchente.'));
+      main.appendChild(cart);
+      return;
+    }
+    main.appendChild(cart);
+
+    st.cenarios.itens.forEach(function (c, idx) {
+      var hd = (c.naSaida !== null && c.naSaida !== undefined ? c.naSaida : st.projeto.naSaida);
+      var hc = (c.naChegada !== null && c.naChegada !== undefined ? c.naChegada : st.projeto.naChegada);
+      var hdisp = (hd !== null && hd !== undefined && hc !== null && hc !== undefined) ? hd - hc : null;
+
+      main.appendChild(h('div', { class: 'trecho-cartao' },
+        h('div', { class: 'trecho-cab' },
+          h('span', { class: 'titulo' }, 'C' + (idx + 1) + '.'),
+          h('input', { type: 'text', class: 'l200', value: c.nome, style: 'font-weight:600', 'data-foco': 'cn' + c.id,
+            onchange: function (ev) { c.nome = ev.target.value; App.mudou(); } }),
+          hdisp !== null ? h('span', { class: 'selo ' + (hdisp > 0 ? 'neutro' : 'ruim') }, 'H disp. = ' + U.fmt(hdisp, 2) + ' mca') : null,
+          h('div', { class: 'acoes-trecho' },
+            h('button', { class: 'btn mini', type: 'button',
+              onclick: function () { var cp = U.clonar(c); cp.id = U.id(); cp.nome = c.nome + ' (cópia)'; st.cenarios.itens.splice(idx + 1, 0, cp); App.mudou(); } }, 'Duplicar'),
+            h('button', { class: 'btn mini perigo', type: 'button',
+              onclick: function () { if (confirm('Remover "' + c.nome + '"?')) { st.cenarios.itens.splice(idx, 1); App.mudou(); } } }, 'Remover'))),
+        h('div', { class: 'trecho-corpo' },
+          h('div', { class: 'linha-campos' },
+            campoNum('Cota do NA de chegada / lançamento', c.naChegada, function (v) { c.naChegada = v; }, { un: 'm', dec: 2, classe: 'l120', foco: 'cc' + c.id }),
+            campoNum('Cota do NA de saída (vazio = usar a do projeto: ' + (st.projeto.naSaida !== null && st.projeto.naSaida !== undefined ? U.fmt(st.projeto.naSaida, 2) : '—') + ')',
+              c.naSaida, function (v) { c.naSaida = v; }, { un: 'm', dec: 2, classe: 'l120', foco: 'cs' + c.id })),
+          h('div', { class: 'linha-campos' },
+            h('div', { class: 'campo cresce' }, h('label', {}, 'Descrição (ex.: NA de estiagem, cota de enchente TR 25 anos…)'),
+              h('input', { type: 'text', style: 'width:100%', value: c.descricao || '', 'data-foco': 'cd' + c.id,
+                onchange: function (ev) { c.descricao = ev.target.value; App.mudou(); } }))))));
+    });
+
+    main.appendChild(h('div', { class: 'cartao' },
+      h('button', { class: 'btn primario', type: 'button', onclick: function () {
+        st.cenarios.itens.push(E.cenarioPadrao(st.cenarios.itens.length + 1)); App.mudou();
+      } }, '+ Adicionar cenário'),
+      h('p', { class: 'nota', style: 'margin-top:8px' },
+        'Fluxo típico: crie um cenário para a condição normal e outro para a cota de enchente. ',
+        'Se alguma vazão "não passa" no cenário crítico, aumente o diâmetro na aba Trechos e verifique novamente — o resumo compara todos os cenários lado a lado.')));
+  };
+
+  /* ================= RESULTADOS ================= */
+
+  App.telaResultados = function (main, st, res) {
+    if (!res) return;
+    var vazoes = st.vazoes.filter(function (v) { return v.q > 0; });
+    if (!vazoes.length) {
+      main.appendChild(h('div', { class: 'cartao' },
+        h('div', { class: 'aviso info' }, h('b', {}, 'Sem vazões'), 'Informe ao menos uma vazão na aba Vazões.')));
+    }
+
+    /* características dos trechos */
+    var ct = h('div', { class: 'cartao' }, h('h2', {}, 'Características dos trechos'));
+    var tt = h('table', { class: 'dados' },
+      h('thead', {}, h('tr', {},
+        h('th', {}, 'Trecho'), h('th', {}, 'Tubo'), h('th', {}, 'DI (mm)'), h('th', {}, 'L (m)'),
+        h('th', {}, 'C'), h('th', {}, 'ε (mm)'), h('th', {}, 'ΣK'), h('th', {}, 'Peças'))));
+    var tb = h('tbody');
+    res.trechos.forEach(function (t) {
+      tb.appendChild(h('tr', {},
+        h('td', {}, t.nome),
+        h('td', { class: 'txt' }, t.rotTubo + (t.materialRot !== '—' ? ' — ' + t.materialRot : '')),
+        h('td', {}, t.di ? U.fmt(t.di * 1000, 1) : '—'),
+        h('td', {}, t.L ? U.fmt(t.L, 2) : '—'),
+        h('td', {}, t.C ? U.fmt(t.C, 0) : '—'),
+        h('td', {}, t.eps ? U.fmt(t.eps, 3) : '—'),
+        h('td', {}, U.fmt(t.K, 2)),
+        h('td', { class: 'txt' }, t.pecas.map(function (p) { return p.qtde + '× ' + p.rot; }).join(' · ') || '—')));
+    });
+    if (res.Ltotal) tb.appendChild(h('tr', { class: 'total' },
+      h('td', {}, 'Total'), h('td', {}), h('td', {}), h('td', {}, U.fmt(res.Ltotal, 2)),
+      h('td', {}), h('td', {}), h('td', {}), h('td', {})));
+    tt.appendChild(tb);
+    ct.appendChild(h('div', { class: 'rolagem' }, tt));
+    main.appendChild(ct);
+
+    /* resultados por cenário */
+    res.cenarios.forEach(function (rc) {
+      var cart = h('div', { class: 'cartao' },
+        h('h2', {}, (st.cenarios.habilitado ? rc.cen.nome : 'Verificação hidráulica'),
+          h('span', { class: 'dica' },
+            (rc.cen.descricao ? rc.cen.descricao + ' · ' : '') +
+            'NA saída ' + (rc.cen.naSaida !== null && rc.cen.naSaida !== undefined ? U.fmt(rc.cen.naSaida, 2) + ' m' : '—') +
+            ' · NA chegada ' + (rc.cen.naChegada !== null && rc.cen.naChegada !== undefined ? U.fmt(rc.cen.naChegada, 2) + ' m' : '—') +
+            ' · H disponível ' + (rc.hdisp !== null ? U.fmt(rc.hdisp, 3) + ' mca' : '—'))));
+
+      var mostraF = st.params.metodo !== 'hw';
+      var tab = h('table', { class: 'dados' },
+        h('thead', {}, h('tr', {},
+          h('th', {}, 'Vazão / trecho'), h('th', {}, 'Q (m³/s)'), h('th', {}, 'DI (m)'), h('th', {}, 'L (m)'),
+          mostraF ? h('th', {}, 'Re') : h('th', {}, 'C'),
+          mostraF ? h('th', {}, 'f') : null,
+          h('th', {}, 'v (m/s)'), h('th', {}, 'J (m/km)'), h('th', {}, 'hf (mca)'), h('th', {}, 'hl (mca)'),
+          h('th', {}, 'H total (mca)'), h('th', {}, 'H disp. (mca)'), h('th', {}, 'Folga (mca)'), h('th', {}, 'Situação'))));
+      var corpo = h('tbody');
+      var nCol = mostraF ? 14 : 13;
+
+      function linhasVazao(nome, Q, pt, folga, status, italico) {
+        var multi = res.trechos.length > 1;
+        pt.trechos.forEach(function (d, i) {
+          if (!d) return;
+          var t = res.trechos[i];
+          var primeira = i === (function () { for (var j = 0; j < pt.trechos.length; j++) if (pt.trechos[j]) return j; return 0; })();
+          corpo.appendChild(h('tr', {},
+            h('td', {}, multi ? (primeira ? nome + ' — ' : '') + t.nome : nome),
+            h('td', {}, U.fmt(Q, 4)),
+            h('td', {}, U.fmt(t.di, 4)),
+            h('td', {}, U.fmt(t.L, 2)),
+            mostraF ? h('td', {}, d.Re ? d.Re.toExponential(2).replace('.', ',') : '—') : h('td', {}, U.fmt(t.C, 0)),
+            mostraF ? h('td', {}, d.f !== null && d.f !== undefined ? U.fmt(d.f, 4) : '—') : null,
+            h('td', {}, U.fmt(d.v, 3)),
+            h('td', {}, U.fmt(d.J * 1000, 3)),
+            h('td', {}, U.fmt(d.hf, 3)),
+            h('td', {}, U.fmt(d.hl, 3)),
+            multi ? h('td', {}, U.fmt(d.htotal, 3)) : h('td', {}, U.fmt(pt.H, 3)),
+            multi ? h('td', {}, '') : h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 3) : '—'),
+            multi ? h('td', {}, '') : h('td', {}, folga !== null ? U.fmt(folga, 3) : '—'),
+            multi ? h('td', {}) : h('td', { class: 'c' }, selo(status, statusTexto(status)))));
+        });
+        if (multi) {
+          corpo.appendChild(h('tr', { class: 'total' },
+            h('td', {}, nome + ' — total'),
+            h('td', {}, U.fmt(Q, 4)), h('td', {}), h('td', {}, U.fmt(res.Ltotal, 2)),
+            h('td', {}), mostraF ? h('td', {}) : null, h('td', {}), h('td', {}),
+            h('td', {}, U.fmt(pt.hf, 3)), h('td', {}, U.fmt(pt.hl, 3)), h('td', {}, U.fmt(pt.H, 3)),
+            h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 3) : '—'),
+            h('td', {}, folga !== null ? U.fmt(folga, 3) : '—'),
+            h('td', { class: 'c' }, selo(status, statusTexto(status)))));
+        }
+      }
+
+      rc.vazoes.forEach(function (rv) {
+        linhasVazao(rv.vaz.nome, rv.Q, rv.perda, rv.folga, rv.status);
+      });
+      if (rc.qmax) {
+        linhasVazao('Máximo de transporte (' + U.fmt(rc.qmax * 1000, 1) + ' L/s)', rc.qmax, rc.qmaxDet,
+          rc.hdisp - rc.qmaxDet.H, 'indef');
+      }
+      tab.appendChild(corpo);
+      cart.appendChild(h('div', { class: 'rolagem' }, tab));
+
+      /* piezométrica por trecho, quando houver cota informada */
+      var temCota = res.trechos.some(function (t) { return t.cotaFim !== null && t.cotaFim !== undefined; });
+      if (temCota && rc.vazoes.length) {
+        cart.appendChild(h('h3', {}, 'Linha piezométrica no fim de cada trecho'));
+        var tp = h('table', { class: 'dados' },
+          h('thead', {}, h('tr', {},
+            h('th', {}, 'Vazão'),
+            res.trechos.map(function (t) { return h('th', {}, t.nome + ' — piez. (m) / cota (m)'); }))));
+        var cp = h('tbody');
+        rc.vazoes.forEach(function (rv) {
+          cp.appendChild(h('tr', {},
+            h('td', {}, rv.vaz.nome),
+            res.trechos.map(function (t, i) {
+              var pz = rv.piezFim[i];
+              var txt = (pz !== null && pz !== undefined ? U.fmt(pz, 2) : '—') +
+                        (t.cotaFim !== null && t.cotaFim !== undefined ? ' / ' + U.fmt(t.cotaFim, 2) : ' / —');
+              var ruim = pz !== null && pz !== undefined && t.cotaFim !== null && t.cotaFim !== undefined && pz < t.cotaFim;
+              return h('td', { style: ruim ? 'color:var(--vermelho);font-weight:700' : '' }, txt);
+            })));
+        });
+        tp.appendChild(cp);
+        cart.appendChild(h('div', { class: 'rolagem' }, tp));
+      }
+
+      main.appendChild(cart);
+    });
+
+    /* comparativo de cenários */
+    if (st.cenarios.habilitado && res.cenarios.length > 1 && vazoes.length) {
+      var cc = h('div', { class: 'cartao' },
+        h('h2', {}, 'Comparativo de cenários',
+          h('span', { class: 'dica' }, 'Folga (mca) de cada vazão em cada cenário — e a vazão máxima transportável.')));
+      var tc = h('table', { class: 'dados' },
+        h('thead', {}, h('tr', {},
+          h('th', {}, 'Cenário'), h('th', {}, 'H disp. (mca)'),
+          vazoes.map(function (v) { return h('th', {}, v.nome + ' (' + U.fmt(v.q, 1) + ' L/s)'); }),
+          h('th', {}, 'Q máx (L/s)'))));
+      var cb = h('tbody');
+      res.cenarios.forEach(function (rc) {
+        cb.appendChild(h('tr', {},
+          h('td', {}, rc.cen.nome),
+          h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 2) : '—'),
+          rc.vazoes.map(function (rv) {
+            return h('td', { style: rv.status === 'ruim' ? 'color:var(--vermelho);font-weight:700' : '' },
+              (rv.folga !== null ? U.fmt(rv.folga, 3) : '—') + (rv.status === 'ruim' ? ' ✗' : rv.status === 'ok' ? ' ✓' : ''));
+          }),
+          h('td', {}, rc.qmax ? U.fmt(rc.qmax * 1000, 1) : '—')));
+      });
+      tc.appendChild(cb);
+      cc.appendChild(h('div', { class: 'rolagem' }, tc));
+      main.appendChild(cc);
+    }
+
+    /* avisos */
+    if (res.avisos.length) {
+      var ca = h('div', { class: 'cartao' }, h('h2', {}, 'Pontos a verificar'));
+      var vistos = {};
+      res.avisos.forEach(function (a) {
+        var chave = a.onde + '|' + a.msg;
+        if (vistos[chave]) return; vistos[chave] = 1;
+        ca.appendChild(h('div', { class: 'aviso' + (a.tipo === 'erro' ? ' erro' : '') }, h('b', {}, a.onde), a.msg));
+      });
+      main.appendChild(ca);
+    }
+  };
+
+  /* ================= CATÁLOGOS ================= */
+
+  App.telaCatalogos = function (main, st) {
+    App.catAberto = App.catAberto || CAT.padrao[0].id;
+    var fams = CAT.porFamilia(CAT.padrao);
+    var sel = h('select', { class: 'l260', onchange: function (ev) { App.catAberto = ev.target.value; App.render(); } });
+    Object.keys(fams).forEach(function (fam) {
+      var og = h('optgroup', { label: fam });
+      fams[fam].forEach(function (c) { og.appendChild(h('option', { value: c.id, selected: App.catAberto === c.id }, c.nome)); });
+      sel.appendChild(og);
+    });
+
+    var cat = CAT.buscar(CAT.padrao, App.catAberto);
+    var cart = h('div', { class: 'cartao' },
+      h('h2', {}, 'Catálogo de tubos'),
+      h('div', { class: 'linha-campos' }, h('div', { class: 'campo' }, h('label', {}, 'Catálogo'), sel)));
+    if (cat) {
+      var tab = h('table', { class: 'dados' },
+        h('thead', {}, h('tr', {},
+          h('th', {}, cat.designacao), h('th', {}, 'DE (mm)'), h('th', {}, 'e (mm)'),
+          h('th', {}, 'DI (mm)'), h('th', {}, 'PN'))));
+      var tb = h('tbody');
+      cat.itens.forEach(function (it) {
+        tb.appendChild(h('tr', {},
+          h('td', {}, it.rot),
+          h('td', {}, it.de !== undefined && it.de !== null ? U.fmt(it.de, 1) : '—'),
+          h('td', {}, it.e !== undefined && it.e !== null ? U.fmt(it.e, 1) : '—'),
+          h('td', {}, U.fmt(CAT.diInterno(cat, it), 1)),
+          h('td', {}, it.pn ? String(it.pn).replace('.', ',') : '—')));
+      });
+      tab.appendChild(tb);
+      cart.appendChild(h('div', { class: 'rolagem' }, tab));
+      if (cat.nota) cart.appendChild(h('p', { class: 'nota' }, cat.nota));
+    }
+    main.appendChild(cart);
+
+    /* materiais */
+    var cm = h('div', { class: 'cartao' },
+      h('h2', {}, 'Rugosidade dos materiais',
+        h('span', { class: 'dica' }, 'C (Hazen-Williams) e ε (mm) adotados por idade — valores de referência da literatura, ajustados pelo fluido na aba Projeto.')));
+    var tm = h('table', { class: 'dados' },
+      h('thead', {}, h('tr', {},
+        h('th', {}, 'Material'),
+        R.faixasIdade.map(function (f) { return h('th', {}, f.rot.replace(/\s*\(.*\)/, '')); }))));
+    var tmb = h('tbody');
+    R.listaMateriais().forEach(function (m) {
+      tmb.appendChild(h('tr', {},
+        h('td', {}, m.rot),
+        R.faixasIdade.map(function (f) {
+          var c = R.consultar(m.id, f.id, 'agua_tratada');
+          return h('td', {}, 'C ' + U.fmt(c.C, 0) + ' · ε ' + U.fmt(c.eps, 3));
+        })));
+    });
+    tm.appendChild(tmb);
+    cm.appendChild(h('div', { class: 'rolagem' }, tm));
+    main.appendChild(cm);
+
+    /* peças */
+    var cp = h('div', { class: 'cartao' },
+      h('h2', {}, 'Peças e conexões — coeficientes K',
+        h('span', { class: 'dica' }, 'hl = K · v²/(2g) — Azevedo Netto, Manual de Hidráulica.')));
+    var tp = h('table', { class: 'dados' },
+      h('thead', {}, h('tr', {}, h('th', {}, 'Peça'), h('th', {}, 'Categoria'), h('th', {}, 'K'))));
+    var tpb = h('tbody');
+    P.pecas.forEach(function (p) {
+      tpb.appendChild(h('tr', {}, h('td', {}, p.rot), h('td', { class: 'txt' }, p.cat), h('td', {}, U.fmt(p.K, 2))));
+    });
+    tp.appendChild(tpb);
+    cp.appendChild(h('div', { class: 'rolagem' }, tp));
+    main.appendChild(cp);
+  };
+
+  /* ================= PARÂMETROS ================= */
+
+  App.telaParametros = function (main, st) {
+    var pr = st.params;
+    var selM = h('select', { onchange: function (ev) { pr.metodo = ev.target.value; App.mudou(); } },
+      h('option', { value: 'hw', selected: pr.metodo === 'hw' }, 'Hazen-Williams'),
+      h('option', { value: 'colebrook', selected: pr.metodo === 'colebrook' }, 'Universal (Darcy) — Colebrook-White iterativo'),
+      h('option', { value: 'swamee', selected: pr.metodo === 'swamee' }, 'Universal (Darcy) — Swamee-Jain explícita'),
+      h('option', { value: 'zigrang', selected: pr.metodo === 'zigrang' }, 'Universal (Darcy) — Zigrang-Sylvester'));
+
+    main.appendChild(h('div', { class: 'cartao' },
+      h('h2', {}, 'Método de cálculo da perda de carga contínua'),
+      h('div', { class: 'linha-campos' },
+        h('div', { class: 'campo' }, h('label', {}, 'Método'), selM),
+        campoNum('Temperatura da água', pr.temperatura, function (v) { pr.temperatura = (v === null ? 20 : v); },
+          { un: '°C', dec: 0, classe: 'l80', foco: 'pa-t' })),
+      pr.metodo === 'hw'
+        ? h('div', {},
+            h('div', { class: 'formula' }, 'J = k · Q^a / (C^a · D^b)'),
+            h('div', { class: 'linha-campos' },
+              campoNum('k', pr.hwK, function (v) { pr.hwK = v || 10.643; }, { dec: 3, classe: 'l100', foco: 'pa-k' }),
+              campoNum('a (expoente de Q e C)', pr.hwExpQ, function (v) { pr.hwExpQ = v || 1.852; }, { dec: 3, classe: 'l100', foco: 'pa-a' }),
+              campoNum('b (expoente de D)', pr.hwExpD, function (v) { pr.hwExpD = v || 4.871; }, { dec: 3, classe: 'l100', foco: 'pa-b' })),
+            h('p', { class: 'nota' }, 'Padrão (Azevedo Netto): k = 10,643, a = 1,852, b = 4,871. Q em m³/s, D em m, J em m/m. ',
+              'Hazen-Williams vale para água a temperatura ambiente e escoamento turbulento — para outros fluidos prefira a Fórmula Universal.'))
+        : h('div', {},
+            h('div', { class: 'formula' }, 'J = f · v² / (2 g D)'),
+            h('p', { class: 'nota' },
+              'O fator de atrito f vem de ', h('b', {}, App.rotuloMetodo(pr.metodo)), '. ',
+              'Colebrook-White: 1/√f = −2·log₁₀(ε/(3,7D) + 2,51/(Re·√f)). ',
+              'Swamee-Jain e Zigrang-Sylvester são aproximações explícitas (erro < 1 % na faixa usual 10⁻⁵ ≤ ε/D ≤ 10⁻² e 4×10³ ≤ Re ≤ 10⁸). ',
+              'A viscosidade cinemática é calculada pela temperatura informada (20 °C → ν = 1,004×10⁻⁶ m²/s).'))));
+
+    main.appendChild(h('div', { class: 'cartao' },
+      h('h2', {}, 'Critérios de verificação'),
+      h('div', { class: 'linha-campos' },
+        campoNum('Velocidade mínima', pr.vMin, function (v) { pr.vMin = v === null ? 0.6 : v; }, { un: 'm/s', dec: 2, classe: 'l80', foco: 'pa-vmin' }),
+        campoNum('Velocidade máxima', pr.vMax, function (v) { pr.vMax = v === null ? 3.0 : v; }, { un: 'm/s', dec: 2, classe: 'l80', foco: 'pa-vmax' }),
+        campoNum('Folga mínima exigida', pr.folgaMin, function (v) { pr.folgaMin = v === null ? 0 : v; }, { un: 'mca', dec: 2, classe: 'l80', foco: 'pa-folga' })),
+      h('p', { class: 'nota' },
+        'Referências: NBR 12215 (adutoras de água) e NBR 12208/9649 (esgoto — velocidade mínima de autolimpeza de 0,6 m/s). ',
+        'A folga mínima permite exigir uma reserva de carga além da perda calculada (segurança contra envelhecimento e incrustação).')));
+
+    main.appendChild(h('div', { class: 'cartao' },
+      h('h2', {}, 'Como o programa calcula'),
+      h('p', {}, '1. A carga disponível de cada cenário é H = NA saída − NA chegada.'),
+      h('p', {}, '2. Para cada vazão, a perda contínua é calculada trecho a trecho pelo método escolhido, e a localizada por hl = ΣK·v²/(2g) com as peças informadas.'),
+      h('p', {}, '3. Folga = H disponível − perda total. Folga negativa significa que a vazão não passa por gravidade — é preciso aumentar o diâmetro, reduzir peças ou rever o traçado.'),
+      h('p', {}, '4. O máximo de transporte é obtido por bissecção: a vazão em que a perda total iguala a carga disponível (folga nula), como na planilha de origem (Solver).'),
+      h('p', { class: 'nota' }, 'Todo o cálculo roda no navegador e os dados ficam gravados apenas neste dispositivo (localStorage). Use Exportar/Importar para levar o projeto a outro computador.')));
+  };
+
+  /* ================= FONTES ================= */
+
+  App.telaFontes = function (main, st) {
+    var cart = h('div', { class: 'cartao' },
+      h('h2', {}, 'Fontes e referências',
+        h('span', { class: 'dica' }, 'Normas e literatura que embasam coeficientes, catálogos e critérios do programa.')));
+    Object.keys(R.fontes).forEach(function (k) {
+      var f = R.fontes[k];
+      cart.appendChild(h('div', { class: 'fonte-item' },
+        h('b', {}, f.titulo), h('span', { class: 'tipo' }, f.tipo),
+        h('p', {}, f.detalhe)));
+    });
+    main.appendChild(cart);
+  };
+
+  GCF.App = App;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
+   Relatório de impressão (memorial resumido)
+   ================================================================ */
+(function (GCF) {
+  'use strict';
+  var REL = {};
+  var U = GCF.U, R = GCF.R, C = GCF.C, H = GCF.H;
+  var esc = U.escapar;
+
+  function fmt(x, d) { return U.fmt(x, d); }
+
+  REL.imprimir = function (st) {
+    H.HW.k = st.params.hwK; H.HW.expQ = st.params.hwExpQ; H.HW.expD = st.params.hwExpD;
+    var res;
+    try { res = C.calcular(st); }
+    catch (e) { alert('Não foi possível montar o relatório: ' + e.message); return; }
+
+    var p = st.projeto;
+    var s = [];
+    s.push('<h1>' + esc(p.nome || 'Dimensionamento de conduto forçado por gravidade') + '</h1>');
+    s.push('<div class="subtitulo">' +
+      esc((p.local ? p.local + ' · ' : '') + (p.autor ? p.autor + ' · ' : '') + (p.data || '')) +
+      '</div>');
+
+    s.push('<h2>1. Dados gerais</h2>');
+    if (p.descricao) s.push('<p>' + esc(p.descricao) + '</p>');
+    s.push('<table><tbody>');
+    s.push('<tr><td>Saída (montante)</td><td>' + esc(p.saidaNome || '—') + '</td><td>NA ' +
+      (p.naSaida !== null && p.naSaida !== undefined ? fmt(p.naSaida, 2) + ' m' : '—') + '</td></tr>');
+    s.push('<tr><td>Chegada (jusante)</td><td>' + esc(p.chegadaNome || '—') + '</td><td>NA ' +
+      (p.naChegada !== null && p.naChegada !== undefined ? fmt(p.naChegada, 2) + ' m' : '—') + '</td></tr>');
+    s.push('<tr><td>Extensão total</td><td colspan="2">' + fmt(res.Ltotal, 2) + ' m</td></tr>');
+    var fl = R.fluidos.filter(function (f) { return f.id === p.fluido; })[0];
+    s.push('<tr><td>Fluido</td><td colspan="2">' + esc(fl ? fl.rot : '—') + '</td></tr>');
+    s.push('<tr><td>Método de cálculo</td><td colspan="2">' + esc(GCF.App.rotuloMetodo(st.params.metodo)) +
+      (st.params.metodo === 'hw'
+        ? ' — J = ' + fmt(st.params.hwK, 3) + '·Q^' + fmt(st.params.hwExpQ, 3) + '/(C^' + fmt(st.params.hwExpQ, 3) + '·D^' + fmt(st.params.hwExpD, 3) + ')'
+        : ' — J = f·v²/(2gD), água a ' + fmt(st.params.temperatura, 0) + ' °C') + '</td></tr>');
+    s.push('</tbody></table>');
+
+    s.push('<h2>2. Trechos e peças</h2>');
+    s.push('<table><thead><tr><th>Trecho</th><th>Tubo / material</th><th>DI (mm)</th><th>L (m)</th><th>C</th><th>ε (mm)</th><th>ΣK</th><th>Peças</th></tr></thead><tbody>');
+    res.trechos.forEach(function (t) {
+      s.push('<tr><td>' + esc(t.nome) + '</td><td>' + esc(t.rotTubo + (t.materialRot !== '—' ? ' — ' + t.materialRot : '')) +
+        '</td><td>' + (t.di ? fmt(t.di * 1000, 1) : '—') + '</td><td>' + (t.L ? fmt(t.L, 2) : '—') +
+        '</td><td>' + (t.C ? fmt(t.C, 0) : '—') + '</td><td>' + (t.eps ? fmt(t.eps, 3) : '—') +
+        '</td><td>' + fmt(t.K, 2) + '</td><td>' +
+        esc(t.pecas.map(function (x) { return x.qtde + '× ' + x.rot + ' (K=' + fmt(x.K, 2) + ')'; }).join('; ') || '—') +
+        '</td></tr>');
+    });
+    s.push('</tbody></table>');
+
+    s.push('<h2>3. Verificação hidráulica' + (st.cenarios.habilitado ? ' por cenário' : '') + '</h2>');
+    var mostraF = st.params.metodo !== 'hw';
+    res.cenarios.forEach(function (rc, ic) {
+      if (st.cenarios.habilitado) {
+        s.push('<h3>' + esc('Cenário ' + (ic + 1) + ' — ' + rc.cen.nome) + '</h3>');
+        if (rc.cen.descricao) s.push('<p class="obs">' + esc(rc.cen.descricao) + '</p>');
+      }
+      s.push('<p class="obs">NA saída ' + (rc.cen.naSaida !== null && rc.cen.naSaida !== undefined ? fmt(rc.cen.naSaida, 2) : '—') +
+        ' m · NA chegada ' + (rc.cen.naChegada !== null && rc.cen.naChegada !== undefined ? fmt(rc.cen.naChegada, 2) : '—') +
+        ' m · <b>carga disponível ' + (rc.hdisp !== null ? fmt(rc.hdisp, 3) : '—') + ' mca</b></p>');
+
+      s.push('<table><thead><tr><th>Vazão / trecho</th><th>Q (L/s)</th>' +
+        (mostraF ? '<th>Re</th><th>f</th>' : '<th>C</th>') +
+        '<th>v (m/s)</th><th>J (m/km)</th><th>hf (mca)</th><th>hl (mca)</th><th>H total (mca)</th><th>Folga (mca)</th><th>Situação</th></tr></thead><tbody>');
+
+      function linhas(nome, Q, pt, folga, status) {
+        var multi = res.trechos.length > 1;
+        pt.trechos.forEach(function (d, i) {
+          if (!d) return;
+          var t = res.trechos[i];
+          s.push('<tr><td>' + esc(multi ? nome + ' — ' + t.nome : nome) + '</td><td>' + fmt(Q * 1000, 2) + '</td>' +
+            (mostraF ? '<td>' + (d.Re ? d.Re.toExponential(2).replace('.', ',') : '—') + '</td><td>' + (d.f !== null && d.f !== undefined ? fmt(d.f, 4) : '—') + '</td>'
+                     : '<td>' + (t.C ? fmt(t.C, 0) : '—') + '</td>') +
+            '<td>' + fmt(d.v, 3) + '</td><td>' + fmt(d.J * 1000, 3) + '</td><td>' + fmt(d.hf, 3) +
+            '</td><td>' + fmt(d.hl, 3) + '</td><td>' + fmt(multi ? d.htotal : pt.H, 3) + '</td>' +
+            (multi ? '<td></td><td></td>' :
+              '<td>' + (folga !== null ? fmt(folga, 3) : '—') + '</td><td class="c ' +
+              (status === 'ruim' ? 'ruim-txt' : status === 'ok' ? 'ok-txt' : '') + '">' + esc(txtStatus(status)) + '</td>') +
+            '</tr>');
+        });
+        if (multi) {
+          s.push('<tr class="total"><td>' + esc(nome) + ' — total</td><td>' + fmt(Q * 1000, 2) + '</td>' +
+            (mostraF ? '<td></td><td></td>' : '<td></td>') +
+            '<td></td><td></td><td>' + fmt(pt.hf, 3) + '</td><td>' + fmt(pt.hl, 3) + '</td><td>' + fmt(pt.H, 3) + '</td>' +
+            '<td>' + (folga !== null ? fmt(folga, 3) : '—') + '</td><td class="c ' +
+            (status === 'ruim' ? 'ruim-txt' : status === 'ok' ? 'ok-txt' : '') + '">' + esc(txtStatus(status)) + '</td></tr>');
+        }
+      }
+      function txtStatus(sst) {
+        return sst === 'ok' ? 'Passa' : sst === 'atencao' ? 'Passa (justa)' : sst === 'ruim' ? 'Não passa' : 'Limite';
+      }
+
+      rc.vazoes.forEach(function (rv) { linhas(rv.vaz.nome, rv.Q, rv.perda, rv.folga, rv.status); });
+      if (rc.qmax) linhas('Máximo de transporte', rc.qmax, rc.qmaxDet, rc.hdisp - rc.qmaxDet.H, 'indef');
+      s.push('</tbody></table>');
+    });
+
+    /* comparativo */
+    var vazoes = st.vazoes.filter(function (v) { return v.q > 0; });
+    if (st.cenarios.habilitado && res.cenarios.length > 1 && vazoes.length) {
+      s.push('<h2>4. Comparativo de cenários — folga (mca)</h2>');
+      s.push('<table><thead><tr><th>Cenário</th><th>H disp. (mca)</th>' +
+        vazoes.map(function (v) { return '<th>' + esc(v.nome) + '<br>(' + fmt(v.q, 1) + ' L/s)</th>'; }).join('') +
+        '<th>Q máx (L/s)</th></tr></thead><tbody>');
+      res.cenarios.forEach(function (rc) {
+        s.push('<tr><td>' + esc(rc.cen.nome) + '</td><td>' + (rc.hdisp !== null ? fmt(rc.hdisp, 2) : '—') + '</td>' +
+          rc.vazoes.map(function (rv) {
+            return '<td class="' + (rv.status === 'ruim' ? 'ruim-txt' : rv.status === 'ok' ? 'ok-txt' : '') + '">' +
+              (rv.folga !== null ? fmt(rv.folga, 3) : '—') + '</td>';
+          }).join('') +
+          '<td>' + (rc.qmax ? fmt(rc.qmax * 1000, 1) : '—') + '</td></tr>');
+      });
+      s.push('</tbody></table>');
+    }
+
+    /* avisos */
+    var avisos = [], vistos = {};
+    res.avisos.forEach(function (a) {
+      var k = a.onde + '|' + a.msg;
+      if (!vistos[k]) { vistos[k] = 1; avisos.push(a); }
+    });
+    if (avisos.length) {
+      s.push('<h2>' + (st.cenarios.habilitado && res.cenarios.length > 1 && vazoes.length ? '5' : '4') + '. Pontos a verificar</h2>');
+      avisos.forEach(function (a) {
+        s.push('<p class="obs">• <b>' + esc(a.onde) + ':</b> ' + esc(a.msg) + '</p>');
+      });
+    }
+
+    s.push('<p class="obs" style="margin-top:14px">Perda contínua: ' +
+      (st.params.metodo === 'hw' ? 'Hazen-Williams' : 'Fórmula Universal (Darcy-Weisbach), fator de atrito por ' + esc(GCF.App.rotuloMetodo(st.params.metodo).replace('Universal — ', ''))) +
+      '. Perda localizada: hl = ΣK·v²/(2g). Coeficientes conforme Azevedo Netto (Manual de Hidráulica) e normas ABNT citadas no programa. ' +
+      'Documento de pré-dimensionamento — confirmar diâmetros internos e classes de pressão nos catálogos dos fabricantes.</p>');
+
+    document.getElementById('impressao').innerHTML = s.join('');
+    window.print();
+  };
+
+  GCF.REL = REL;
+})(window.GCF = window.GCF || {});
+
+/* ================================================================
+   Início
+   ================================================================ */
+document.addEventListener('DOMContentLoaded', function () {
+  GCF.App.iniciar();
+});
+</script>
+</body>
+</html>
