@@ -4,7 +4,7 @@ Aplicativo web (arquivo único, sem dependências) para **cálculo do tempo de e
 
 ## Como usar
 
-Basta abrir o arquivo [`index.html`](index.html) em qualquer navegador — não precisa de internet nem de instalação. Funciona também no celular.
+Basta abrir o arquivo [`Tempo de Esvaziamento de Adutora.html`](Tempo%20de%20Esvaziamento%20de%20Adutora.html) em qualquer navegador — não precisa de internet nem de instalação. Funciona também no celular.
 
 Dois modos de operação:
 

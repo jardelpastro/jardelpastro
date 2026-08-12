@@ -91,9 +91,16 @@
     border: 1px solid var(--borda); border-radius: 8px;
     background: #fff; color: var(--texto);
   }
-  input[type=number]:focus, select:focus {
+  input[type=number]:focus, input[type=text]:focus, select:focus {
     outline: 2px solid var(--realce); border-color: var(--realce);
   }
+  input[type=text] {
+    width: 100%; padding: .55rem .7rem; font-size: 1rem;
+    border: 1px solid var(--borda); border-radius: 8px;
+    background: #fff; color: var(--texto);
+  }
+  /* seletor compacto de DN: mostra só "DN ▾"; o valor fica no campo ao lado */
+  select.sel-dn { flex: 0 0 auto; width: auto; padding: .55rem .5rem; color: var(--cinza); font-weight: 600; }
   .unidade { font-size: .85rem; color: var(--cinza); min-width: 2.4rem; }
 
   .segmento { display: flex; gap: .4rem; }
@@ -278,7 +285,7 @@
           <div class="campo campo-dn">
             <label id="lblD1">Diâmetro da adutora — DN <span class="dica">(interno)</span></label>
             <div class="linha-input">
-              <select id="selD1" onchange="aoMudarDN(1,'sel')"></select>
+              <select id="selD1" class="sel-dn" onchange="aoMudarDN(1,'sel')"></select>
               <input type="number" id="inpD1" min="1" step="1" value="300" oninput="aoMudarDN(1,'inp')">
               <span class="unidade">mm</span>
             </div>
@@ -302,9 +309,9 @@
         <div id="blocoLado2" class="oculto">
           <div class="subtitulo-lado">➡️ Lado direito</div>
           <div class="campo">
-            <label>Diâmetro — DN₂ <span class="dica">(pode diferir do esquerdo)</span></label>
+            <label>Diâmetro — DN₂ <span class="dica">(lado direito)</span></label>
             <div class="linha-input">
-              <select id="selD2" onchange="aoMudarDN(2,'sel')"></select>
+              <select id="selD2" class="sel-dn" onchange="aoMudarDN(2,'sel')"></select>
               <input type="number" id="inpD2" min="1" step="1" value="300" oninput="aoMudarDN(2,'inp')">
               <span class="unidade">mm</span>
             </div>
@@ -333,7 +340,7 @@
         <div class="campo" id="campoDescarga">
           <label>Diâmetro da descarga — d</label>
           <div class="linha-input">
-            <select id="selDd" onchange="sincronizarSelect('selDd','inpDd')"></select>
+            <select id="selDd" class="sel-dn" onchange="escolherDN('selDd','inpDd')"></select>
             <input type="number" id="inpDd" min="1" step="1" value="75" oninput="calcular()">
             <span class="unidade">mm</span>
           </div>
@@ -343,7 +350,7 @@
         <div class="campo oculto" id="campoTempoAlvo">
           <label>Tempo de esvaziamento desejado — t</label>
           <div class="linha-input">
-            <input type="number" id="inpTalvo" min="0.1" step="0.1" value="2" oninput="calcular()">
+            <input type="text" inputmode="decimal" id="inpTalvo" value="2" oninput="calcular()">
             <span class="unidade">horas</span>
           </div>
         </div>
@@ -357,7 +364,7 @@
               <option value="0.97">Bocal com bordas arredondadas — Cd = 0,97</option>
               <option value="custom">Personalizado…</option>
             </select>
-            <input type="number" id="inpCd" min="0.1" max="1" step="0.01" value="0.82" oninput="calcular()" style="max-width:6.5rem">
+            <input type="text" inputmode="decimal" id="inpCd" value="0,82" oninput="calcular()" style="max-width:6.5rem">
           </div>
         </div>
       </div>
@@ -430,26 +437,34 @@ const frac = (cima, baixo) => `<span class="frac"><span>${cima}</span><span>${ba
 const sqrt = x => `<span class="sqrt"><span>${x}</span></span>`;
 const RES = x => `<span class="num-final">${x}</span>`;
 
+/* Os seletores de DN mostram sempre só "DN"; a lista abre ao clicar e o
+   valor escolhido é lançado no campo numérico ao lado. */
 function preencherSelects() {
-  for (const [selId, inpId] of [["selD1", "inpD1"], ["selD2", "inpD2"], ["selDd", "inpDd"]]) {
+  for (const selId of ["selD1", "selD2", "selDd"]) {
     const sel = document.getElementById(selId);
+    const ph = document.createElement("option");
+    ph.value = ""; ph.textContent = "DN"; ph.disabled = false;
+    sel.appendChild(ph);
     DN_COMERCIAIS.forEach(dn => {
       const o = document.createElement("option");
       o.value = dn; o.textContent = "DN " + dn;
       sel.appendChild(o);
     });
-    const oc = document.createElement("option");
-    oc.value = "custom"; oc.textContent = "Personalizado…";
-    sel.appendChild(oc);
-    sel.value = document.getElementById(inpId).value;
-    if (sel.value === "") sel.value = "custom";
+    sel.value = "";
   }
+}
+
+function escolherDN(selId, inpId) {
+  const sel = document.getElementById(selId);
+  if (sel.value !== "") document.getElementById(inpId).value = sel.value;
+  sel.value = "";   // o seletor volta a exibir apenas "DN"
+  calcular();
 }
 
 function sincronizarSelect(selId, inpId) {
   const sel = document.getElementById(selId);
   const inp = document.getElementById(inpId);
-  if (sel.value !== "custom") inp.value = sel.value;
+  if (sel.value !== "custom") inp.value = sel.value.replace(".", ",");
   calcular();
 }
 
@@ -477,7 +492,8 @@ function faixaUsualDescarga(Dmm) {
 function aoMudarDN(lado, origem) {
   if (origem === "sel") {
     const sel = document.getElementById("selD" + lado);
-    if (sel.value !== "custom") document.getElementById("inpD" + lado).value = sel.value;
+    if (sel.value !== "") document.getElementById("inpD" + lado).value = sel.value;
+    sel.value = "";   // o seletor volta a exibir apenas "DN"
   }
   if (lado === 2 && origem !== "auto") dn2Editada = true;
   const Dref = dnReferencia();
@@ -528,7 +544,8 @@ function mudarConfig(nova) {
   calcular();
 }
 
-function num(id) { return parseFloat(document.getElementById(id).value); }
+/* aceita vírgula como separador decimal */
+function num(id) { return parseFloat(String(document.getElementById(id).value).replace(",", ".")); }
 
 function alerta(tipo, icone, texto) {
   return `<div class="alerta ${tipo}"><span>${icone}</span><span>${texto}</span></div>`;
@@ -545,14 +562,9 @@ function renderChips(Dref, dAtualMm, doisDNs) {
 }
 
 function calcular() {
-  // sincroniza selects com os inputs
-  for (const [selId, inpId] of [["selD1", "inpD1"], ["selD2", "inpD2"], ["selDd", "inpDd"]]) {
-    const sel = document.getElementById(selId);
-    const v = document.getElementById(inpId).value;
-    sel.value = DN_COMERCIAIS.includes(parseFloat(v)) ? v : "custom";
-  }
+  // sincroniza o seletor de Cd com o valor digitado (aceita vírgula)
   const selCd = document.getElementById("selCd");
-  const cdVal = document.getElementById("inpCd").value;
+  const cdVal = document.getElementById("inpCd").value.replace(",", ".");
   selCd.value = ["0.61", "0.82", "0.97"].includes(cdVal) ? cdVal : "custom";
 
   const dois = config === "dois";
