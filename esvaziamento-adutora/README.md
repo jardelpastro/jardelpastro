@@ -9,15 +9,22 @@ Basta abrir o arquivo [`index.html`](index.html) em qualquer navegador — não 
 Dois modos de operação:
 
 1. **⏱️ Calcular tempo de esvaziamento** — informe os dados da adutora e o diâmetro da descarga; o app retorna o tempo de esvaziamento, a vazão inicial e a velocidade do jato.
-2. **📐 Dimensionar a descarga** — informe o tempo de esvaziamento desejado; o app calcula o diâmetro mínimo teórico e sugere o DN comercial imediatamente superior.
+2. **📐 Dimensionar a descarga** — informe o tempo de esvaziamento desejado (passo de 0,1 h); o app calcula o diâmetro mínimo teórico e sugere o DN comercial imediatamente superior.
+
+E duas configurações de descarga:
+
+- **Extremidade (um lado)** — a descarga fica na ponta baixa do trecho;
+- **Ponto baixo (dois lados)** — a descarga fica num ponto baixo com adutora dos dois lados, cada lado com extensão e desnível próprios (ex.: 1.000 m e 15 m à esquerda, 500 m e 8 m à direita).
+
+Ao escolher o DN da adutora, o app **já preenche a descarga com o DN sugerido** (maior DN comercial da faixa usual D/6 a D/4) e exibe a faixa como botões clicáveis — o usuário permanece livre para adotar qualquer outro valor.
 
 ## Dados de entrada
 
 | Dado | Símbolo | Unidade |
 |---|---|---|
 | Diâmetro (interno) da adutora | D | mm |
-| Extensão do trecho (ponto alto → descarga) | L | m |
-| Desnível (cota do ponto alto − cota da descarga) | H | m |
+| Extensão de cada lado (ponto alto → descarga) | L (ou L₁, L₂) | m |
+| Desnível de cada lado (cota do ponto alto − cota da descarga) | H (ou H₁, H₂) | m |
 | Diâmetro da descarga *(modo 1)* | d | mm |
 | Tempo de esvaziamento desejado *(modo 2)* | t | h |
 | Coeficiente de vazão da descarga | Cd | – |
@@ -26,26 +33,39 @@ Valores usuais de Cd: 0,61 (orifício de parede delgada), 0,82 (tubo curto + vá
 
 ## Método de cálculo
 
-O trecho é tratado como um reservatório prismático que esvazia por um orifício, com a carga sobre a descarga decrescendo à medida que a linha esvazia (declividade uniforme entre o ponto alto e a descarga):
+Cada lado é tratado como um reservatório prismático que esvazia por um orifício, com a carga sobre a descarga decrescendo à medida que a linha esvazia (declividade uniforme):
 
-- Volume do trecho: `V = (π·D²/4)·L`
-- Vazão inicial pela descarga: `Q₀ = Cd·a·√(2gH)`, com `a = π·d²/4`
-- Tempo de esvaziamento: **`t = 2·V/Q₀ = 2·V / (Cd·a·√(2gH))`**
+- Volume do trecho: `V = (π·D²/4)·(L₁+L₂)`
+- Vazão inicial pela descarga: `Q₀ = Cd·a·√(2g·Hmax)`, com `a = π·d²/4`
 
-A integração da equação do orifício com carga variável, para volume distribuído linearmente com a cota, resulta no dobro do tempo que se obteria mantendo a vazão inicial constante.
+**Um lado:** `t = 2·V/Q₀ = 2·V / (Cd·a·√(2gH))` — a integração da equação do orifício com carga variável, para volume distribuído linearmente com a cota, resulta no dobro do tempo da vazão inicial constante.
+
+**Dois lados (desníveis diferentes):** definindo a "capacitância" de cada lado `cᵢ = A·Lᵢ/Hᵢ` (volume por metro de carga), o esvaziamento ocorre em duas fases:
+
+1. **Fase 1** — enquanto o nível do lado mais alto está acima de `H_baixo`, o lado mais baixo permanece cheio (pressurizado pela coluna vizinha) e só o lado alto rebaixa:
+   `t₁ = 2·c_alto·(√H_alto − √H_baixo) / (Cd·a·√(2g))`
+2. **Fase 2** — com os níveis igualados, os dois lados esvaziam juntos:
+   `t₂ = 2·(c₁+c₂)·√H_baixo / (Cd·a·√(2g))`
+
+Tempo total: **`t = t₁ + t₂`**. Com desníveis iguais, a expressão se reduz exatamente à fórmula de um lado.
+
+A velocidade inicial na seção da descarga é `v₀ = Cd·√(2g·Hmax)` — ela depende **apenas do desnível e do Cd**, não do diâmetro da descarga (Torricelli).
 
 ## Hipóteses
 
-- Adutora isolada a montante (registro fechado, sem vazão afluente);
-- Entrada de ar adequada no ponto alto (ventosas) — sem ela o tempo real é maior e há risco de colapso por subpressão;
-- Declividade uniforme no trecho.
+- Adutora isolada a montante (registros fechados, sem vazão afluente);
+- Entrada de ar adequada nos pontos altos (ventosas) — sem ela o tempo real é maior e há risco de colapso por subpressão;
+- Declividade uniforme em cada lado;
+- Perdas de carga distribuídas na adutora desprezadas (a favor da segurança na velocidade do jato; efeito pequeno no tempo para descargas usuais).
 
 ## Verificações automáticas
 
-O app emite alertas quando:
+- Relação d/D abaixo da faixa usual **D/6 a D/4**;
+- Tempo de esvaziamento acima de **6 horas** (sugestão de aumentar a descarga ou prever descargas intermediárias);
+- Velocidade do jato exibida **sempre** (alerta quando acima de 6 m/s — prever dissipação de energia e proteção anti-erosiva no lançamento).
 
-- a relação d/D fica abaixo da faixa usual **D/6 a D/4**;
-- o tempo de esvaziamento supera **6 horas** (sugestão de aumentar a descarga ou prever descargas intermediárias);
-- a velocidade do jato supera **6 m/s** (prever dissipação de energia e proteção anti-erosiva no lançamento).
+## Tema / cores
+
+Todas as cores ficam em variáveis CSS no início do arquivo (bloco `:root`, seção "PALETA DO TEMA"). Para aplicar as cores da logo, basta ajustar `--primaria`, `--primaria-escura`, `--realce` e derivadas — a interface e o esquema ilustrativo (SVG) acompanham automaticamente.
 
 > ⚠️ Ferramenta de **pré-dimensionamento**: os resultados devem ser verificados nas condições específicas de cada projeto.
