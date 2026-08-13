@@ -1490,21 +1490,39 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
     return piez;
   };
 
-  /* Vazão máxima de transporte: H(Q) = Hdisp, por bissecção */
-  C.vazaoMaxima = function (Hdisp, trechos, st) {
-    if (!(Hdisp > 0)) return 0;
+  /* Vazão máxima de transporte: a maior vazão em que a perda total cabe na
+     carga disponível E a linha piezométrica não corta o perfil do conduto —
+     um ponto alto no meio da linha pode limitar antes do fim. Bissecção
+     sobre o conjunto de restrições. */
+  C.vazaoMaxima = function (Hdisp, res, st, naSaida) {
+    if (!(Hdisp > 0)) return null;
+    var trechos = res.trechos;
     var ok = trechos.some(function (t) { return t.valido; });
     if (!ok) return null;
-    var lo = 0, hi = 0.001;
-    var i;
-    for (i = 0; i < 60; i++) {          /* expande até cruzar */
-      if (C.perdaTotal(hi, trechos, st).H >= Hdisp) break;
+    var pontos = (res.pontosPerfil || []).filter(function (pp) {
+      return pp.x !== null && pp.cota !== null;
+    });
+    function cabe(Q) {
+      var pt = C.perdaTotal(Q, trechos, st);
+      if (pt.H > Hdisp) return false;
+      if (naSaida !== null && naSaida !== undefined) {
+        for (var k = 0; k < pontos.length; k++) {
+          var pz = C.piezEm(pontos[k].x, naSaida, pt, res);
+          if (pz !== null && pz < pontos[k].cota - 1e-9) return false;
+        }
+      }
+      return true;
+    }
+    var lo = 0, hi = 0.001, i;
+    for (i = 0; i < 60; i++) {          /* expande até violar alguma restrição */
+      if (!cabe(hi)) break;
       hi *= 2;
       if (hi > 1000) return null;       /* sem perda apreciável — dado inconsistente */
     }
+    if (i === 60) return null;
     for (i = 0; i < 80; i++) {
       var m = (lo + hi) / 2;
-      if (C.perdaTotal(m, trechos, st).H > Hdisp) hi = m; else lo = m;
+      if (cabe(m)) lo = m; else hi = m;
     }
     return (lo + hi) / 2;
   };
@@ -1664,10 +1682,31 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
       });
 
       if (rc.hdisp !== null && rc.hdisp > 0) {
-        var qm = C.vazaoMaxima(rc.hdisp, res.trechos, st);
+        var qm = C.vazaoMaxima(rc.hdisp, res, st, cen.naSaida);
         if (qm !== null) {
           rc.qmax = qm;
           rc.qmaxDet = C.perdaTotal(qm, res.trechos, st);
+          /* verifica se quem limitou foi um ponto alto do perfil,
+             e não a carga no lançamento */
+          rc.qmaxPonto = null;
+          if (rc.hdisp - rc.qmaxDet.H > 0.005 &&
+              cen.naSaida !== null && cen.naSaida !== undefined) {
+            var piorP = null;
+            (res.pontosPerfil || []).forEach(function (pp) {
+              if (pp.x === null || pp.cota === null) return;
+              var pz = C.piezEm(pp.x, cen.naSaida, rc.qmaxDet, res);
+              if (pz === null) return;
+              var fp = pz - pp.cota;
+              if (piorP === null || fp < piorP.folga)
+                piorP = { folga: fp, rot: pp.rot || ('ponto em ' + GCF.U.fmt(pp.x, 0) + ' m') };
+            });
+            if (piorP && piorP.folga < 0.01) rc.qmaxPonto = piorP.rot;
+          }
+          if (rc.qmaxPonto)
+            res.avisos.push({ tipo: 'atencao', onde: cen.nome,
+              msg: 'O máximo de transporte (' + GCF.U.fmt(qm * 1000, 2) + ' L/s) é limitado pelo ponto alto "' + rc.qmaxPonto +
+                   '" — a linha piezométrica encosta no conduto antes do fim da linha, e a folga restante no lançamento (' +
+                   GCF.U.fmt(rc.hdisp - rc.qmaxDet.H, 2) + ' mca) não pode ser aproveitada.' });
         }
       }
       res.cenarios.push(rc);
@@ -2147,7 +2186,9 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
       paineis.appendChild(h('div', { class: 'painel' },
         h('div', { class: 'rotulo' }, 'Máximo de transporte'),
         h('div', { class: 'valor' }, U.fmt(base.qmax * 1000, 2), h('span', { class: 'un' }, 'L/s')),
-        h('div', { class: 'compl' }, 'vazão que esgota a carga disponível' + (st.cenarios.habilitado ? ' (1º cenário)' : ''))));
+        h('div', { class: 'compl' }, (base.qmaxPonto
+          ? 'limitado pelo ponto alto "' + base.qmaxPonto + '"'
+          : 'vazão que esgota a carga disponível') + (st.cenarios.habilitado ? ' (1º cenário)' : ''))));
     }
     cart.appendChild(paineis);
 
@@ -2156,29 +2197,42 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
       var tab = h('table', { class: 'dados' },
         h('thead', {}, h('tr', {},
           h('th', {}, st.cenarios.habilitado ? 'Cenário / Vazão' : 'Vazão'),
-          h('th', {}, 'Q (L/s)'), h('th', {}, 'v (m/s)'), h('th', {}, 'Perda total (mca)'),
+          h('th', {}, 'Q (L/s)'),
+          h('th', { title: 'Velocidade nos trechos — intervalo mín–máx quando os diâmetros diferem' }, 'v (m/s)'),
+          h('th', {}, 'Perda total (mca)'),
           h('th', {}, 'H disp. (mca)'), h('th', {}, 'Folga (mca)'), h('th', {}, 'Situação'))));
       var corpo = h('tbody');
+      /* velocidades de todos os trechos (e tubos): valor único ou faixa mín–máx */
+      function faixaV(pt) {
+        var vs = [];
+        pt.trechos.forEach(function (d) {
+          if (!d) return;
+          if (d.tubos) d.tubos.forEach(function (x) { if (x.v > 0) vs.push(x.v); });
+          else if (d.v > 0) vs.push(d.v);
+        });
+        if (!vs.length) return '—';
+        var mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
+        return (mx - mn) < 0.005 ? U.fmt(mn, 2) : U.fmt(mn, 2) + '–' + U.fmt(mx, 2);
+      }
       res.cenarios.forEach(function (rc) {
         if (st.cenarios.habilitado) corpo.appendChild(h('tr', { class: 'grupo' },
           h('td', { colspan: 7 }, rc.cen.nome +
             (rc.hdisp !== null ? ' — H disponível ' + U.fmt(rc.hdisp, 2) + ' mca' : ''))));
         rc.vazoes.forEach(function (rv) {
-          var v0 = null;
-          rv.perda.trechos.forEach(function (d) { if (d && v0 === null) v0 = d.v; });
           corpo.appendChild(h('tr', { class: rv.vaz.projeto ? 'destaque-projeto' : '' },
             h('td', {}, rv.vaz.nome, rv.vaz.projeto ? h('span', { class: 'selo ok', style: 'margin-left:8px' }, 'projeto') : null),
             h('td', {}, U.fmt(rv.Q * 1000, 2)),
-            h('td', {}, v0 !== null ? U.fmt(v0, 2) : '—'),
+            h('td', {}, faixaV(rv.perda)),
             h('td', {}, U.fmt(rv.perda.H, 2)),
             h('td', {}, rc.hdisp !== null ? U.fmt(rc.hdisp, 2) : '—'),
             h('td', {}, rv.folga !== null ? U.fmt(rv.folga, 2) : '—'),
             h('td', { class: 'c' }, selo(rv.status, statusTexto(rv.status)))));
         });
         if (rc.qmax) corpo.appendChild(h('tr', {},
-          h('td', {}, h('i', {}, 'Máximo de transporte')),
+          h('td', { title: rc.qmaxPonto ? 'Limitado pelo ponto alto: ' + rc.qmaxPonto : '' },
+            h('i', {}, 'Máximo de transporte' + (rc.qmaxPonto ? ' — limitado pelo ponto alto "' + rc.qmaxPonto + '"' : ''))),
           h('td', {}, U.fmt(rc.qmax * 1000, 2)),
-          h('td', {}, '—'),
+          h('td', {}, faixaV(rc.qmaxDet)),
           h('td', {}, U.fmt(rc.qmaxDet.H, 2)),
           h('td', {}, U.fmt(rc.hdisp, 2)),
           h('td', {}, U.fmt(rc.hdisp - rc.qmaxDet.H, 2)),
@@ -2807,38 +2861,32 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
     if (res) {
       var accO = 0;
       res.trechos.forEach(function (t) {
-        offs.push({ id: t.id, nome: t.nome, ini: accO, L: t.L > 0 ? t.L : 0 });
+        offs.push({ id: t.id, nome: t.nome, ini: accO, L: t.L > 0 ? t.L : 0, cotaFim: t.cotaFim });
         accO += t.L > 0 ? t.L : 0;
       });
     }
-    function xGlobal(p) {
-      if (!modoT) return (p.x === undefined ? null : p.x);
+    function xGlobalEm(pp, emTrecho) {
+      if (!emTrecho) return (pp.x === undefined ? null : pp.x);
       for (var i = 0; i < offs.length; i++)
-        if (offs[i].id === p.trechoId)
-          return offs[i].ini + (p.xLocal === null || p.xLocal === undefined ? 0 : p.xLocal);
+        if (offs[i].id === pp.trechoId)
+          return offs[i].ini + (pp.xLocal === null || pp.xLocal === undefined ? 0 : pp.xLocal);
       return null;
     }
-    function novoPonto(campos) {
+    function xGlobal(pp) { return xGlobalEm(pp, modoT); }
+    function novoPontoEm(emTrecho, campos) {
       return Object.assign({ id: U.id(), x: null, cota: null, rot: '',
-        trechoId: (modoT && offs.length) ? offs[0].id : null, xLocal: null }, campos || {});
+        trechoId: (emTrecho && offs.length) ? offs[0].id : null, xLocal: null }, campos || {});
     }
-    function ordenar() {
+    function ordenarEm(emTrecho) {
       st.perfil.pontos.sort(function (a, b) {
-        var xa = xGlobal(a), xb = xGlobal(b);
+        var xa = xGlobalEm(a, emTrecho), xb = xGlobalEm(b, emTrecho);
         return (xa === null ? 1e12 : xa) - (xb === null ? 1e12 : xb);
       });
     }
-
-    var cart = h('div', { class: 'cartao' },
-      h('h2', {}, 'Perfil da linha',
-        h('span', { class: 'dica' }, 'Pontos (distância × cota do conduto) ao longo de toda a linha — perfil único, mesmo com vários trechos em série.')));
-
-    /* referência das distâncias: extensão total ou por trecho */
-    var selRef = h('select', { 'data-foco': 'perf-ref', onchange: function (ev) {
-      var novo = ev.target.value;
-      if (novo === (modoT ? 'trecho' : 'total')) return;
+    /* converte os pontos existentes para a nova referência, preservando a posição */
+    function converterPontos(novo) {
       st.perfil.pontos.forEach(function (pp) {
-        var xg = xGlobal(pp);
+        var xg = xGlobalEm(pp, modoT);
         if (novo === 'trecho') {
           pp.trechoId = offs.length ? offs[0].id : null;
           pp.xLocal = null;
@@ -2854,6 +2902,44 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
           pp.x = xg;
         }
       });
+    }
+    /* pontos de início/fim de cada trecho, com a cota do fim quando informada */
+    function inserirLimites(emTrecho) {
+      var alvos = [{ xg: 0, rot: st.projeto.saidaNome || 'Saída',
+                     trechoId: offs.length ? offs[0].id : null, xLocal: 0, cota: null }];
+      offs.forEach(function (o, i) {
+        alvos.push({ xg: o.ini + o.L,
+                     rot: i === offs.length - 1 ? (st.projeto.chegadaNome || 'Chegada') : 'Fim de ' + o.nome,
+                     trechoId: o.id, xLocal: o.L,
+                     cota: (o.cotaFim === undefined || o.cotaFim === null) ? null : o.cotaFim });
+      });
+      alvos.forEach(function (a) {
+        var existe = st.perfil.pontos.some(function (pp) {
+          var xg = xGlobalEm(pp, emTrecho);
+          return xg !== null && Math.abs(xg - a.xg) < 0.005;
+        });
+        if (!existe) st.perfil.pontos.push(emTrecho
+          ? novoPontoEm(true, { trechoId: a.trechoId, xLocal: a.xLocal, cota: a.cota, rot: a.rot })
+          : novoPontoEm(false, { x: a.xg, cota: a.cota, rot: a.rot }));
+      });
+      ordenarEm(emTrecho);
+    }
+    function moverPonto(de, para) {
+      if (para < 0 || para >= st.perfil.pontos.length || de === para) return;
+      var x = st.perfil.pontos.splice(de, 1)[0];
+      st.perfil.pontos.splice(para, 0, x);
+      App.mudou();
+    }
+
+    var cart = h('div', { class: 'cartao' },
+      h('h2', {}, 'Perfil da linha',
+        h('span', { class: 'dica' }, 'Pontos (distância × cota do conduto) ao longo de toda a linha — perfil único, mesmo com vários trechos em série.')));
+
+    /* referência das distâncias: extensão total (padrão) ou por trecho */
+    var selRef = h('select', { 'data-foco': 'perf-ref', onchange: function (ev) {
+      var novo = ev.target.value;
+      if (novo === (modoT ? 'trecho' : 'total')) return;
+      converterPontos(novo);
       st.perfil.modoDist = novo;
       App.mudou();
     } },
@@ -2861,11 +2947,21 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
       h('option', { value: 'trecho', selected: modoT }, 'Por trecho (trecho + distância dentro dele)'));
     cart.appendChild(h('div', { class: 'linha-campos' },
       h('div', { class: 'campo' }, h('label', {}, 'Referência das distâncias'), selRef),
+      !modoT ? h('div', { class: 'campo' }, h('label', {}, ' '),
+        h('button', { class: 'btn', type: 'button',
+          title: 'Muda a referência para "por trecho" e já cria os pontos de início e fim de cada trecho, com as extensões e as cotas de fim já informadas',
+          onclick: function () {
+            converterPontos('trecho');
+            st.perfil.modoDist = 'trecho';
+            inserirLimites(true);
+            App.mudou();
+          } }, 'Lançar por trecho')) : null,
       h('div', { class: 'campo cresce' }, h('label', {}, ' '),
         h('span', { class: 'nota' }, 'Trocar a referência converte os pontos já lançados, preservando a posição deles na linha.'))));
 
     var tab = h('table', { class: 'dados' },
       h('thead', {}, h('tr', {},
+        h('th', { title: 'Arraste pela alça para reordenar' }, ''),
         modoT ? h('th', {}, 'Trecho') : null,
         h('th', {}, modoT ? 'Dist. no trecho (m)' : 'Distância desde a saída (m)'),
         modoT ? h('th', { title: 'Distância acumulada desde a saída' }, 'Acum. (m)') : null,
@@ -2881,7 +2977,26 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
         celTrecho = h('td', { class: 'txt' }, selT);
       }
       var xg = xGlobal(pp);
-      corpo.appendChild(h('tr', {},
+      var alca = h('td', {
+        class: 'c', draggable: 'true',
+        title: 'Arraste para reordenar',
+        style: 'cursor:grab;color:var(--texto-3);font-size:14px;width:26px',
+        ondragstart: function (ev) {
+          App._arrastando = idx;
+          try { ev.dataTransfer.setData('text/plain', String(idx)); } catch (e) { /* IE */ }
+          ev.dataTransfer.effectAllowed = 'move';
+        }
+      }, '⠿');
+      corpo.appendChild(h('tr', {
+        ondragover: function (ev) { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; },
+        ondrop: function (ev) {
+          ev.preventDefault();
+          if (App._arrastando === null || App._arrastando === undefined) return;
+          moverPonto(App._arrastando, idx);
+          App._arrastando = null;
+        }
+      },
+        alca,
         celTrecho,
         h('td', {}, U.campoNum({ valor: modoT ? pp.xLocal : pp.x, dec: 2, classe: 'l100', foco: 'ppx' + pp.id,
           gravar: function (v) { if (modoT) pp.xLocal = v; else pp.x = v; App.mudou(); } })),
@@ -2890,8 +3005,15 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
           gravar: function (v) { pp.cota = v; App.mudou(); } })),
         h('td', { class: 'txt' }, h('input', { type: 'text', style: 'width:100%;min-width:160px', value: pp.rot || '', 'data-foco': 'ppr' + pp.id,
           onchange: function (ev) { pp.rot = ev.target.value; App.mudou(); } })),
-        h('td', { class: 'c' }, h('button', { class: 'btn mini perigo', type: 'button',
-          onclick: function () { st.perfil.pontos.splice(idx, 1); App.mudou(); } }, 'Remover'))));
+        h('td', { class: 'c nq' },
+          h('button', { class: 'btn mini', type: 'button', title: 'Mover para cima', disabled: idx === 0,
+            onclick: function () { moverPonto(idx, idx - 1); } }, '↑'),
+          ' ',
+          h('button', { class: 'btn mini', type: 'button', title: 'Mover para baixo', disabled: idx === st.perfil.pontos.length - 1,
+            onclick: function () { moverPonto(idx, idx + 1); } }, '↓'),
+          ' ',
+          h('button', { class: 'btn mini perigo', type: 'button',
+            onclick: function () { st.perfil.pontos.splice(idx, 1); App.mudou(); } }, 'Remover'))));
     });
     tab.appendChild(corpo);
     cart.appendChild(h('div', { class: 'rolagem' }, tab));
@@ -2903,41 +3025,27 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
           /* primeiro clique: já cria o início e o fim da linha */
           if (modoT && offs.length) {
             var ult = offs[offs.length - 1];
-            st.perfil.pontos.push(novoPonto({ trechoId: offs[0].id, xLocal: 0, rot: st.projeto.saidaNome || 'Saída' }));
-            st.perfil.pontos.push(novoPonto({ trechoId: ult.id, xLocal: ult.L || null, rot: st.projeto.chegadaNome || 'Chegada' }));
+            st.perfil.pontos.push(novoPontoEm(true, { trechoId: offs[0].id, xLocal: 0, rot: st.projeto.saidaNome || 'Saída' }));
+            st.perfil.pontos.push(novoPontoEm(true, { trechoId: ult.id, xLocal: ult.L || null,
+              cota: (ult.cotaFim === undefined || ult.cotaFim === null) ? null : ult.cotaFim,
+              rot: st.projeto.chegadaNome || 'Chegada' }));
           } else {
-            st.perfil.pontos.push(novoPonto({ x: 0, rot: st.projeto.saidaNome || 'Saída' }));
-            st.perfil.pontos.push(novoPonto({ x: Ltot > 0 ? Ltot : null, rot: st.projeto.chegadaNome || 'Chegada' }));
+            st.perfil.pontos.push(novoPontoEm(false, { x: 0, rot: st.projeto.saidaNome || 'Saída' }));
+            st.perfil.pontos.push(novoPontoEm(false, { x: Ltot > 0 ? Ltot : null, rot: st.projeto.chegadaNome || 'Chegada' }));
           }
         } else {
-          st.perfil.pontos.splice(st.perfil.pontos.length - 1, 0, novoPonto());
+          st.perfil.pontos.splice(st.perfil.pontos.length - 1, 0, novoPontoEm(modoT));
         }
         App.mudou();
       } }, '+ Adicionar ponto'),
-      h('button', { class: 'btn', type: 'button', title: 'Cria pontos na saída, no fim de cada trecho e na chegada', onclick: function () {
-        var alvos = [{ xg: 0, rot: st.projeto.saidaNome || 'Saída',
-                       trechoId: offs.length ? offs[0].id : null, xLocal: 0 }];
-        offs.forEach(function (o, i) {
-          alvos.push({ xg: o.ini + o.L,
-                       rot: i === offs.length - 1 ? (st.projeto.chegadaNome || 'Chegada') : 'Fim de ' + o.nome,
-                       trechoId: o.id, xLocal: o.L });
-        });
-        alvos.forEach(function (a) {
-          var existe = st.perfil.pontos.some(function (pp) {
-            var xg = xGlobal(pp);
-            return xg !== null && Math.abs(xg - a.xg) < 0.005;
-          });
-          if (!existe) st.perfil.pontos.push(modoT
-            ? novoPonto({ trechoId: a.trechoId, xLocal: a.xLocal, rot: a.rot })
-            : novoPonto({ x: a.xg, rot: a.rot }));
-        });
-        ordenar();
+      h('button', { class: 'btn', type: 'button', title: 'Cria pontos na saída, no fim de cada trecho e na chegada — usa a "cota do conduto no fim do trecho" quando informada', onclick: function () {
+        inserirLimites(modoT);
         App.mudou();
       } }, 'Inserir limites dos trechos'),
       h('button', { class: 'btn', type: 'button', onclick: function () { App.mostrarColar = !App.mostrarColar; App.render(); } },
         App.mostrarColar ? 'Fechar "Colar do Excel"' : 'Colar do Excel'),
       st.perfil.pontos.length > 1 ? h('button', { class: 'btn', type: 'button', onclick: function () {
-        ordenar(); App.mudou();
+        ordenarEm(modoT); App.mudou();
       } }, 'Ordenar por distância') : null));
 
     /* colar do Excel */
@@ -2965,12 +3073,12 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
               if (isNaN(xv) || isNaN(cv)) return;
               var rot = (cel.slice(2).join(' ') || '').trim();
               st.perfil.pontos.push(modoT
-                ? novoPonto({ trechoId: selTImp ? selTImp.value : null, xLocal: xv, cota: cv, rot: rot })
-                : novoPonto({ x: xv, cota: cv, rot: rot }));
+                ? novoPontoEm(true, { trechoId: selTImp ? selTImp.value : null, xLocal: xv, cota: cv, rot: rot })
+                : novoPontoEm(false, { x: xv, cota: cv, rot: rot }));
               novos++;
             });
             if (!novos) { alert('Nenhuma linha válida encontrada — confira se colou duas colunas numéricas.'); return; }
-            ordenar();
+            ordenarEm(modoT);
             App.mostrarColar = false;
             App.mudou();
           } }, 'Importar pontos'),
@@ -2979,8 +3087,8 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
 
     cart.appendChild(h('p', { class: 'nota' },
       'Com trechos em série o perfil é único. Na referência "extensão total" a distância é acumulada desde a saída; ',
-      'na referência "por trecho" você informa o trecho e a distância dentro dele — útil quando o levantamento vem por trecho, sem precisar somar as extensões. ',
-      'O botão "Inserir limites dos trechos" cria os pontos exatamente onde o diâmetro muda.'));
+      'na referência "por trecho" você informa o trecho e a distância dentro dele — o botão "Lançar por trecho" faz a troca e já cria os pontos de início e fim de cada trecho. ',
+      'Reordene os pontos arrastando pela alça ⠿ ou pelos botões ↑ ↓.'));
     main.appendChild(cart);
 
     if (!res) return;
@@ -3158,8 +3266,9 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
         linhasVazao(rv.vaz.nome, rv.Q, rv.perda, rv.folga, rv.status);
       });
       if (rc.qmax) {
-        linhasVazao('Máximo de transporte (' + U.fmt(rc.qmax * 1000, 2) + ' L/s)', rc.qmax, rc.qmaxDet,
-          rc.hdisp - rc.qmaxDet.H, 'indef');
+        linhasVazao('Máximo de transporte (' + U.fmt(rc.qmax * 1000, 2) + ' L/s)' +
+          (rc.qmaxPonto ? ' — limitado pelo ponto alto "' + rc.qmaxPonto + '"' : ''),
+          rc.qmax, rc.qmaxDet, rc.hdisp - rc.qmaxDet.H, 'indef');
       }
       tab.appendChild(corpo);
       cart.appendChild(h('div', { class: 'rolagem' }, tab));
@@ -3505,7 +3614,8 @@ table.dados td.nq, table.dados th.nq { white-space: nowrap; }
       }
 
       rc.vazoes.forEach(function (rv) { linhas(rv.vaz.nome + (rv.vaz.projeto ? ' ★' : ''), rv.Q, rv.perda, rv.folga, rv.status); });
-      if (rc.qmax) linhas('Máximo de transporte', rc.qmax, rc.qmaxDet, rc.hdisp - rc.qmaxDet.H, 'indef');
+      if (rc.qmax) linhas('Máximo de transporte' + (rc.qmaxPonto ? ' (limitado pelo ponto alto: ' + rc.qmaxPonto + ')' : ''),
+        rc.qmax, rc.qmaxDet, rc.hdisp - rc.qmaxDet.H, 'indef');
       s.push('</tbody></table>');
     });
 
