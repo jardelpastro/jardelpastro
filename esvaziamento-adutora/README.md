@@ -68,6 +68,8 @@ A velocidade inicial na seção da descarga é `v₀ = Cd·√(2g·Hmax)` — el
 
 O tema segue a identidade visual da **Pastro Engenharia**: azul-marinho (`#1b2452`) como cor principal e verde-água (`#2aa39c`) como realce, com o cabeçalho em degradê marinho → teal. Todas as cores ficam em variáveis CSS no início do arquivo (bloco `:root`, seção "PALETA DO TEMA") — ajustando `--primaria`, `--primaria-escura`, `--realce` e derivadas, a interface e o esquema ilustrativo (SVG) acompanham automaticamente.
 
+Há também **tema escuro**: o botão 🌙/☀️ no cabeçalho alterna entre claro e escuro, a escolha fica memorizada no navegador e, na primeira visita, o app segue a preferência do sistema operacional.
+
 ## Memória de cálculo
 
 A memória de cálculo ocupa a largura total abaixo dos resultados e apresenta cada passo em três linhas: **fórmula em notação matemática** (frações e radicais renderizados em CSS puro, sem bibliotecas externas — o app segue 100% offline), **fórmula substituída pelos valores** e **resultado**, com a **fonte de cada fórmula** indicada ao lado do título do passo (Azevedo Netto — *Manual de Hidráulica*; Porto — *Hidráulica Básica*; Tsutiya — *Abastecimento de Água*).

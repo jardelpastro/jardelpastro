@@ -41,11 +41,19 @@
   }
   header {
     /* degradê marinho → teal, como no letreiro "ENGENHARIA" da logo */
-    background: linear-gradient(160deg, var(--primaria-escura) 0%, var(--primaria) 55%, var(--realce) 135%);
+    background: linear-gradient(160deg, #101838 0%, #1b2452 55%, #2aa39c 135%);
     color: #fff;
     padding: 1.6rem 1rem 1.4rem;
     text-align: center;
+    position: relative;
   }
+  .btn-tema {
+    position: absolute; top: .9rem; right: .9rem;
+    width: 2.5rem; height: 2.5rem; border-radius: 50%;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.35);
+    color: #fff; font-size: 1.15rem; cursor: pointer; line-height: 1;
+  }
+  .btn-tema:hover { background: rgba(255,255,255,.25); }
   header h1 { font-size: 1.45rem; font-weight: 600; }
   header p { font-size: .9rem; opacity: .85; margin-top: .3rem; }
   main { max-width: 980px; margin: 0 auto; padding: 1rem; }
@@ -187,15 +195,62 @@
   .sqrt::before { content: "√"; }
   .sqrt > span { border-top: 1.3px solid currentColor; padding: 0 .12em; }
 
+  /* hipóteses em largura total, itens em duas colunas */
+  .hipoteses-grid { display: grid; grid-template-columns: 1fr; gap: .5rem; }
+  @media (min-width: 800px) {
+    .hipoteses-grid { grid-template-columns: 1fr 1fr; }
+    .hipoteses-grid .passo { margin-bottom: 0; }
+    .hipoteses-grid .passo:last-child { grid-column: 1 / -1; }
+  }
+
   .esquema { width: 100%; height: auto; display: block; margin: .2rem auto .9rem; }
   .esquema text { font-family: "Segoe UI", Roboto, Arial, sans-serif; }
   .rodape { text-align: center; font-size: .78rem; color: #8a9199; margin-top: 1.2rem; padding: 0 1rem; }
   .oculto { display: none; }
+
+  /* ==========================================================
+     TEMA ESCURO — mesmas cores da marca sobre fundos escuros
+     ========================================================== */
+  html[data-tema="escuro"] {
+    color-scheme: dark;
+    --primaria: #46579f;
+    --primaria-escura: #c0caf2;
+    --realce: #38bdb4;
+    --realce-suave: #0f2e33;
+    --realce-borda: #1e4d4f;
+    --tubo-interno: #63c5be;
+    --verde: #7fd18a;
+    --laranja: #ffb26b;
+    --vermelho: #ff7b72;
+    --cinza: #9fa8c4;
+    --borda: #2a3154;
+    --fundo: #0c1126;
+    --card: #151b38;
+    --texto: #e6e9f2;
+    --terreno: #3a3527;
+    --terreno-borda: #6f6142;
+  }
+  html[data-tema="escuro"] input[type=number],
+  html[data-tema="escuro"] input[type=text],
+  html[data-tema="escuro"] select { background: #0e142c; color: var(--texto); }
+  html[data-tema="escuro"] .seg { background: #0e142c; }
+  html[data-tema="escuro"] .chip { color: var(--realce); }
+  html[data-tema="escuro"] .chip.ativo { color: #fff; }
+  html[data-tema="escuro"] .alerta.aviso { background: #33250e; border-color: #54401e; }
+  html[data-tema="escuro"] .alerta.erro  { background: #361513; border-color: #5c2724; }
+  html[data-tema="escuro"] .alerta.ok    { background: #0f2b16; border-color: #1f4a2a; }
+  html[data-tema="escuro"] .memoria .passo { background: #10162e; border-color: #232b52; }
+  html[data-tema="escuro"] table.res td { border-bottom-color: #232b52; }
+  html[data-tema="escuro"] .campo .dica,
+  html[data-tema="escuro"] .rodape,
+  html[data-tema="escuro"] .chips .rotulo-chip,
+  html[data-tema="escuro"] .fonte { color: #7f89ab; }
 </style>
 </head>
 <body>
 
 <header>
+  <button class="btn-tema" id="btnTema" onclick="alternarTema()" title="Alternar tema claro/escuro">🌙</button>
   <h1>💧 Tempo de Esvaziamento de Adutora</h1>
   <p>Cálculo do tempo de esvaziamento do trecho pela descarga de fundo</p>
 </header>
@@ -389,17 +444,19 @@
         <div id="alertas"></div>
       </div>
 
-      <div class="card">
-        <h2>ℹ️ Hipóteses e observações</h2>
-        <div class="memoria">
-          <div class="passo">A adutora é considerada <b>isolada a montante</b> (registro fechado — sem vazão afluente durante o esvaziamento).</div>
-          <div class="passo">É admitida <b>entrada de ar adequada</b> nos pontos altos (ventosas). Sem admissão de ar suficiente, o tempo real será maior e há risco de <b>colapso por subpressão</b>.</div>
-          <div class="passo">Cada lado é tratado com <b>declividade uniforme</b> até a descarga. Com dois lados de desníveis diferentes, o esvaziamento ocorre em <b>duas fases</b>: primeiro só o lado mais alto rebaixa (o outro permanece cheio, pressurizado pela coluna vizinha); quando os níveis se igualam, os dois lados esvaziam juntos.</div>
-          <div class="passo">Prática usual: descarga com diâmetro entre <b>D/6 e D/4</b> da adutora e tempo de esvaziamento típico de <b>2 a 6 horas</b> (ajuste conforme a operação prevista e o corpo receptor).</div>
-          <div class="passo">Prever <b>proteção anti-erosiva</b> (caixa de descarga, enrocamento) no lançamento quando a velocidade do jato for elevada.</div>
-          <div class="passo"><b>Referências:</b> Azevedo Netto — <i>Manual de Hidráulica</i> (orifícios, bocais e esvaziamento de reservatórios); Porto, R.M. — <i>Hidráulica Básica</i>, EESC-USP (escoamento por orifícios sob carga variável); Tsutiya, M.T. — <i>Abastecimento de Água</i> (descargas em adutoras).</div>
-        </div>
-      </div>
+    </div>
+  </div>
+
+  <!-- ===================== HIPÓTESES (largura total) ===================== -->
+  <div class="card">
+    <h2>ℹ️ Hipóteses e observações</h2>
+    <div class="memoria hipoteses-grid">
+      <div class="passo">A adutora é considerada <b>isolada a montante</b> (registro fechado — sem vazão afluente durante o esvaziamento).</div>
+      <div class="passo">É admitida <b>entrada de ar adequada</b> nos pontos altos (ventosas). Sem admissão de ar suficiente, o tempo real será maior e há risco de <b>colapso por subpressão</b>.</div>
+      <div class="passo">Cada lado é tratado com <b>declividade uniforme</b> até a descarga. Com dois lados de desníveis diferentes, o esvaziamento ocorre em <b>duas fases</b>: primeiro só o lado mais alto rebaixa (o outro permanece cheio, pressurizado pela coluna vizinha); quando os níveis se igualam, os dois lados esvaziam juntos.</div>
+      <div class="passo">Prática usual: descarga com diâmetro entre <b>D/6 e D/4</b> da adutora e tempo de esvaziamento típico de <b>2 a 6 horas</b> (ajuste conforme a operação prevista e o corpo receptor).</div>
+      <div class="passo">Prever <b>proteção anti-erosiva</b> (caixa de descarga, enrocamento) no lançamento quando a velocidade do jato for elevada.</div>
+      <div class="passo"><b>Referências:</b> Azevedo Netto — <i>Manual de Hidráulica</i> (orifícios, bocais e esvaziamento de reservatórios); Porto, R.M. — <i>Hidráulica Básica</i>, EESC-USP (escoamento por orifícios sob carga variável); Tsutiya, M.T. — <i>Abastecimento de Água</i> (descargas em adutoras).</div>
     </div>
   </div>
 
@@ -809,6 +866,25 @@ function calcular() {
   document.getElementById("svg2D2").textContent = "DN₂ " + fmt(D2mm, 0);
   document.getElementById("svg2Dd").textContent = "Descarga · d = " + fmt(d * 1000, 0) + " mm";
 }
+
+/* ---------- tema claro/escuro ---------- */
+function aplicarTema(t) {
+  document.documentElement.dataset.tema = t;
+  const b = document.getElementById("btnTema");
+  if (b) b.textContent = t === "escuro" ? "☀️" : "🌙";
+  try { localStorage.setItem("tema-esvaziamento", t); } catch (e) {}
+}
+function alternarTema() {
+  aplicarTema(document.documentElement.dataset.tema === "escuro" ? "claro" : "escuro");
+}
+(function () {
+  let t = null;
+  try { t = localStorage.getItem("tema-esvaziamento"); } catch (e) {}
+  if (t !== "claro" && t !== "escuro") {
+    t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "escuro" : "claro";
+  }
+  aplicarTema(t);
+})();
 
 preencherSelects();
 aoMudarDN(1, "auto");
