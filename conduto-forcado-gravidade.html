@@ -174,6 +174,8 @@ table.dados tr.clicavel { cursor: pointer; }
 table.dados tr.clicavel:hover { filter: brightness(.97); }
 table.dados tr.selecionada { outline: 2px solid var(--azul); outline-offset: -2px; }
 table.dados tr.selecionada td { font-weight: 600; }
+table.dados tr.destaque-projeto td { background: var(--verde-bg); }
+table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--verde); }
 .rolagem { overflow-x: auto; }
 
 .selo { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 9px; white-space: nowrap; }
@@ -1080,8 +1082,8 @@ table.dados tr.selecionada td { font-weight: 600; }
       },
       trechos: [E.trechoPadrao(1)],
       vazoes: [
-        { id: U.id(), nome: 'Vazão média', q: null },
-        { id: U.id(), nome: 'Vazão máxima (QMH)', q: null }
+        { id: U.id(), nome: 'Vazão média', q: null, projeto: true },
+        { id: U.id(), nome: 'Vazão máxima (QMH)', q: null, projeto: false }
       ],
       cenarios: { habilitado: false, itens: [] },
       perfil: { pontos: [] },    /* [{id, x, cota, rot}] — perfil único da linha */
@@ -1098,7 +1100,10 @@ table.dados tr.selecionada td { font-weight: 600; }
   E.trechoPadrao = function (n) {
     return {
       id: U.id(), nome: 'Trecho ' + n, L: null,
+      qFator: 100,               /* % da vazão da linha que passa neste trecho */
       nParalelo: 1,              /* tubos idênticos em paralelo */
+      paraleloModo: 'identicos', /* identicos | diferentes */
+      tubosParalelos: [],        /* [{id, modo, catId, itemDn, diManual, materialManual}] */
       modo: 'catalogo',          /* catalogo | manual */
       catId: null, itemDn: null, /* tubo do catálogo */
       diManual: null,            /* DI direto (mm) */
@@ -1110,6 +1115,10 @@ table.dados tr.selecionada td { font-weight: 600; }
       kExtra: null,              /* ΣK adicional livre */
       cotaFim: null              /* cota do terreno/GI no fim do trecho (opcional) */
     };
+  };
+
+  E.tuboParaleloPadrao = function () {
+    return { id: U.id(), modo: 'catalogo', catId: null, itemDn: null, diManual: null, materialManual: 'pead' };
   };
 
   E.cenarioPadrao = function (n) {
@@ -1146,6 +1155,17 @@ table.dados tr.selecionada td { font-weight: 600; }
     if (!Array.isArray(st.trechos) || !st.trechos.length) st.trechos = [E.trechoPadrao(1)];
     st.trechos = st.trechos.map(function (t, i) { return Object.assign(E.trechoPadrao(i + 1), t); });
     if (!Array.isArray(st.vazoes)) st.vazoes = [];
+    st.vazoes = st.vazoes.map(function (v) {
+      return Object.assign({ id: U.id(), nome: 'Vazão', q: null, projeto: false }, v);
+    });
+    if (st.vazoes.length && !st.vazoes.some(function (v) { return v.projeto; })) {
+      var maior = null;
+      st.vazoes.forEach(function (v) { if (v.q > 0 && (!maior || v.q > maior.q)) maior = v; });
+      (maior || st.vazoes[0]).projeto = true;
+    }
+    st.trechos.forEach(function (t) {
+      if (!Array.isArray(t.tubosParalelos)) t.tubosParalelos = [];
+    });
     st.versao = 1;
     return st;
   };
@@ -1179,9 +1199,9 @@ table.dados tr.selecionada td { font-weight: 600; }
     ];
     st.trechos = [t];
     st.vazoes = [
-      { id: U.id(), nome: 'Vazão média atual', q: 15 },
-      { id: U.id(), nome: 'QMH atual', q: 22.5 },
-      { id: U.id(), nome: 'Vazão média futura', q: 30 }
+      { id: U.id(), nome: 'Vazão média atual', q: 15, projeto: false },
+      { id: U.id(), nome: 'QMH atual', q: 22.5, projeto: false },
+      { id: U.id(), nome: 'Vazão média futura', q: 30, projeto: true }
     ];
     st.cenarios = {
       habilitado: true,
@@ -1212,64 +1232,177 @@ table.dados tr.selecionada td { font-weight: 600; }
   var C = {};
   var H = GCF.H, R = GCF.R, CAT = GCF.CAT, P = GCF.P;
 
-  /* Resolve um trecho: DI (m), C, eps (m), ΣK, rótulos e avisos */
+  /* Resolve um trecho: DI (m), C, eps (m), ΣK, fator de vazão, tubos em
+     paralelo (idênticos ou diferentes), rótulos e avisos */
   C.resolverTrecho = function (t, st) {
     var out = { id: t.id, nome: t.nome || 'Trecho', L: t.L, di: null, rotTubo: '—',
                 n: Math.max(1, Math.round(t.nParalelo || 1)),
+                fator: (t.qFator === null || t.qFator === undefined ? 100 : Math.max(0, t.qFator)) / 100,
+                tubos: null,
                 materialId: null, materialRot: '—', C: null, eps: null, K: 0,
                 pecas: [], pn: null, cotaFim: t.cotaFim, avisos: [] };
 
     if (!(t.L > 0)) out.avisos.push('Extensão não informada.');
+    if (!(out.fator > 0)) out.avisos.push('Vazão do trecho zerada — informe o percentual da vazão da linha.');
 
-    if (t.modo === 'manual') {
-      if (t.diManual > 0) { out.di = t.diManual / 1000; out.rotTubo = 'DI ' + GCF.U.fmt(t.diManual, 1) + ' mm (manual)'; }
-      else out.avisos.push('Diâmetro interno não informado.');
-      out.materialId = t.materialManual || 'pead';
-    } else {
-      var cat = CAT.buscar(CAT.padrao, t.catId);
-      if (!cat) { out.avisos.push('Tubo do catálogo não escolhido.'); }
-      else {
-        var item = null;
-        for (var i = 0; i < cat.itens.length; i++) if (cat.itens[i].dn === t.itemDn) item = cat.itens[i];
-        if (!item) out.avisos.push('Diâmetro não escolhido no catálogo.');
-        else {
-          out.di = CAT.diInterno(cat, item) / 1000;
-          out.rotTubo = cat.nome + ' · ' + item.rot + ' (DI ' + GCF.U.fmt(CAT.diInterno(cat, item), 1) + ' mm)';
-          out.pn = item.pn || null;
-        }
-        out.materialId = cat.material;
-      }
+    var pm = (t.paraleloModo === 'diferentes' && Array.isArray(t.tubosParalelos) && t.tubosParalelos.length >= 2);
+
+    function coeficientes(materialId) {
+      var mat = materialId ? R.consultar(materialId, t.idade, st.projeto.fluido) : null;
+      if (t.cFonte === 'manual') return { C: t.cManual, eps: t.epsManual, mat: mat };
+      if (mat) return { C: mat.C, eps: mat.eps, mat: mat };
+      return { C: null, eps: null, mat: null };
     }
 
-    var mat = out.materialId ? R.consultar(out.materialId, t.idade, st.projeto.fluido) : null;
-    out.materialRot = mat ? mat.rot : '—';
-    out.consulta = mat;
-    if (t.cFonte === 'manual') {
-      out.C = t.cManual;
-      out.eps = t.epsManual;
-      if (!(out.C > 0)) out.avisos.push('Coeficiente C manual não informado.');
-      if (!(out.eps > 0) && st.params.metodo !== 'hw') out.avisos.push('Rugosidade ε manual não informada.');
-    } else if (mat) {
-      out.C = mat.C;
-      out.eps = mat.eps;
+    if (pm) {
+      /* -------- tubos diferentes em paralelo -------- */
+      out.tubos = [];
+      t.tubosParalelos.forEach(function (tp, i) {
+        var tb = { id: tp.id, di: null, rotCurto: 'Tubo ' + (i + 1), materialId: null, C: null, eps: null };
+        if (tp.modo === 'manual') {
+          if (tp.diManual > 0) { tb.di = tp.diManual / 1000; tb.rotCurto = 'DI ' + GCF.U.fmt(tp.diManual, 1) + ' mm'; }
+          else out.avisos.push('Tubo ' + (i + 1) + ' em paralelo sem diâmetro.');
+          tb.materialId = tp.materialManual || 'pead';
+        } else {
+          var catP = CAT.buscar(CAT.padrao, tp.catId);
+          if (!catP) out.avisos.push('Tubo ' + (i + 1) + ' em paralelo sem catálogo.');
+          else {
+            var itemP = null;
+            for (var j = 0; j < catP.itens.length; j++) if (catP.itens[j].dn === tp.itemDn) itemP = catP.itens[j];
+            if (!itemP) out.avisos.push('Tubo ' + (i + 1) + ' em paralelo sem diâmetro escolhido.');
+            else {
+              tb.di = CAT.diInterno(catP, itemP) / 1000;
+              tb.rotCurto = itemP.rot + ' · DI ' + GCF.U.fmt(CAT.diInterno(catP, itemP), 1) + ' mm';
+            }
+            tb.materialId = catP.material;
+          }
+        }
+        var co = coeficientes(tb.materialId);
+        tb.C = co.C; tb.eps = co.eps;
+        out.tubos.push(tb);
+      });
+      out.n = out.tubos.length;
+      out.rotTubo = out.n + ' tubos em paralelo: ' + out.tubos.map(function (tb) { return tb.rotCurto; }).join(' + ');
+      var co0 = coeficientes(out.tubos[0].materialId);
+      out.materialId = out.tubos[0].materialId;
+      out.materialRot = co0.mat ? co0.mat.rot : '—';
+      out.consulta = co0.mat;
+      out.C = out.tubos[0].C; out.eps = out.tubos[0].eps;
+      if (t.cFonte === 'manual') {
+        if (!(out.C > 0)) out.avisos.push('Coeficiente C manual não informado.');
+        if (!(out.eps > 0) && st.params.metodo !== 'hw') out.avisos.push('Rugosidade ε manual não informada.');
+      }
     } else {
-      out.avisos.push('Material não identificado — informe C/ε manualmente.');
+      /* -------- tubo único ou idênticos em paralelo -------- */
+      if (t.modo === 'manual') {
+        if (t.diManual > 0) { out.di = t.diManual / 1000; out.rotTubo = 'DI ' + GCF.U.fmt(t.diManual, 1) + ' mm (manual)'; }
+        else out.avisos.push('Diâmetro interno não informado.');
+        out.materialId = t.materialManual || 'pead';
+      } else {
+        var cat = CAT.buscar(CAT.padrao, t.catId);
+        if (!cat) { out.avisos.push('Tubo do catálogo não escolhido.'); }
+        else {
+          var item = null;
+          for (var i = 0; i < cat.itens.length; i++) if (cat.itens[i].dn === t.itemDn) item = cat.itens[i];
+          if (!item) out.avisos.push('Diâmetro não escolhido no catálogo.');
+          else {
+            out.di = CAT.diInterno(cat, item) / 1000;
+            out.rotTubo = cat.nome + ' · ' + item.rot + ' (DI ' + GCF.U.fmt(CAT.diInterno(cat, item), 1) + ' mm)';
+            out.pn = item.pn || null;
+          }
+          out.materialId = cat.material;
+        }
+      }
+
+      var co = coeficientes(out.materialId);
+      out.materialRot = co.mat ? co.mat.rot : '—';
+      out.consulta = co.mat;
+      out.C = co.C; out.eps = co.eps;
+      if (t.cFonte === 'manual') {
+        if (!(out.C > 0)) out.avisos.push('Coeficiente C manual não informado.');
+        if (!(out.eps > 0) && st.params.metodo !== 'hw') out.avisos.push('Rugosidade ε manual não informada.');
+      } else if (!co.mat) {
+        out.avisos.push('Material não identificado — informe C/ε manualmente.');
+      }
     }
 
     /* peças */
     var K = 0;
     (t.pecas || []).forEach(function (pi) {
-      var p = P.buscarPeca(pi.id);
-      if (!p || !(pi.qtde > 0)) return;
-      K += p.K * pi.qtde;
-      out.pecas.push({ id: p.id, rot: p.rot, K: p.K, qtde: pi.qtde, ki: p.K * pi.qtde });
+      var pk = P.buscarPeca(pi.id);
+      if (!pk || !(pi.qtde > 0)) return;
+      K += pk.K * pi.qtde;
+      out.pecas.push({ id: pk.id, rot: pk.rot, K: pk.K, qtde: pi.qtde, ki: pk.K * pi.qtde });
     });
     if (t.kExtra > 0) { K += t.kExtra; out.pecas.push({ id: '_extra', rot: 'ΣK adicional (informado)', K: t.kExtra, qtde: 1, ki: t.kExtra }); }
     out.K = K;
 
-    out.valido = (out.di > 0) && (t.L > 0) && (out.C > 0 || st.params.metodo !== 'hw') &&
-                 (st.params.metodo === 'hw' ? out.C > 0 : out.eps > 0 || out.eps === 0);
+    function coefOk(Cv, epsV) {
+      return st.params.metodo === 'hw' ? Cv > 0 : (epsV > 0 || epsV === 0);
+    }
+    if (pm) {
+      out.valido = (t.L > 0) && (out.fator > 0) &&
+                   out.tubos.every(function (tb) { return tb.di > 0 && coefOk(tb.C, tb.eps); });
+    } else {
+      out.valido = (out.di > 0) && (t.L > 0) && (out.fator > 0) && coefOk(out.C, out.eps);
+    }
     return out;
+  };
+
+  /* Trecho com tubos diferentes em paralelo: distribui a vazão de modo que
+     a perda de carga (hf + hl) seja a MESMA em todos os tubos — mesma carga
+     entre as extremidades do trecho. Resolvido numericamente. */
+  C.trechoParalelo = function (Qt, tr, st, ni) {
+    function perdaTubo(q, tb) {
+      var pd = H.perdaDistribuida(q, tb.di, tr.L, {
+        metodo: st.params.metodo, C: tb.C, eps: (tb.eps || 0) / 1000, ni: ni
+      });
+      var hl = H.perdaLocalizada(q, tb.di, tr.K);
+      return { pd: pd, hl: hl, h: pd.hf + hl };
+    }
+    function zerado(tb) { return { tb: tb, Q: 0, v: 0, Re: 0, J: 0, f: null, hf: 0, hl: 0, htotal: 0 }; }
+    if (!(Qt > 0)) {
+      return { Qp: 0, v: 0, Re: 0, J: 0, f: null, regime: null,
+               hf: 0, hl: 0, htotal: 0, tubos: tr.tubos.map(zerado) };
+    }
+    /* vazão de um tubo para uma carga h (ponto fixo: h varia com q^1,85 a q²) */
+    function qDeH(hAlvo, tb) {
+      if (!(hAlvo > 0)) return 0;
+      var q = Qt / tr.tubos.length, i, r;
+      for (i = 0; i < 40; i++) {
+        r = perdaTubo(q, tb).h;
+        if (!(r > 0)) { q = q > 0 ? q * 2 : 1e-6; continue; }
+        var fx = Math.pow(hAlvo / r, 0.54);
+        q *= Math.min(4, Math.max(0.25, fx));
+        if (Math.abs(r - hAlvo) < 1e-10 + 1e-7 * hAlvo) break;
+      }
+      return q;
+    }
+    /* carga comum: h em que a soma das vazões dos tubos iguala Qt */
+    var hMax = Infinity;
+    tr.tubos.forEach(function (tb) { hMax = Math.min(hMax, perdaTubo(Qt, tb).h); });
+    if (!(hMax > 0) || !isFinite(hMax)) {
+      return { Qp: Qt, v: 0, Re: 0, J: 0, f: null, regime: null,
+               hf: 0, hl: 0, htotal: 0, tubos: tr.tubos.map(zerado) };
+    }
+    var lo = 0, hi = hMax, i;
+    for (i = 0; i < 40; i++) {
+      var m = (lo + hi) / 2, soma = 0;
+      tr.tubos.forEach(function (tb) { soma += qDeH(m, tb); });
+      if (soma > Qt) hi = m; else lo = m;
+    }
+    var hC = (lo + hi) / 2;
+    var tubos = tr.tubos.map(function (tb) {
+      var q = qDeH(hC, tb);
+      var r = perdaTubo(q, tb);
+      return { tb: tb, Q: q, v: r.pd.v, Re: r.pd.Re, J: r.pd.J, f: r.pd.f, hf: r.pd.hf, hl: r.hl, htotal: hC };
+    });
+    /* repartição hf/hl "do trecho" ponderada pela vazão (para tabelas/gráfico) */
+    var hfM = 0, qS = 0;
+    tubos.forEach(function (x) { hfM += x.hf * x.Q; qS += x.Q; });
+    hfM = qS > 0 ? hfM / qS : 0;
+    return { Qp: Qt, v: tubos[0].v, Re: tubos[0].Re, J: tubos[0].J, f: tubos[0].f, regime: null,
+             hf: hfM, hl: Math.max(0, hC - hfM), htotal: hC, tubos: tubos };
   };
 
   /* Perda total do sistema para uma vazão Q (m³/s), trechos resolvidos */
@@ -1278,13 +1411,19 @@ table.dados tr.selecionada td { font-weight: 600; }
     var det = [], Htot = 0, hfTot = 0, hlTot = 0;
     trechos.forEach(function (tr) {
       if (!tr.valido) { det.push(null); return; }
-      var Qp = Q / (tr.n || 1);   /* vazão por tubo — tubos idênticos em paralelo */
-      var pd = H.perdaDistribuida(Qp, tr.di, tr.L, {
-        metodo: st.params.metodo, C: tr.C, eps: (tr.eps || 0) / 1000, ni: ni
-      });
-      var hl = H.perdaLocalizada(Qp, tr.di, tr.K);
-      var d = { Qp: Qp, v: pd.v, Re: pd.Re, J: pd.J, f: pd.f, regime: pd.regime, hf: pd.hf, hl: hl, htotal: pd.hf + hl };
-      hfTot += pd.hf; hlTot += hl; Htot += d.htotal;
+      var Qt = Q * (tr.fator === undefined || tr.fator === null ? 1 : tr.fator);
+      var d;
+      if (tr.tubos) {
+        d = C.trechoParalelo(Qt, tr, st, ni);
+      } else {
+        var Qp = Qt / (tr.n || 1);  /* vazão por tubo — tubos idênticos em paralelo */
+        var pd = H.perdaDistribuida(Qp, tr.di, tr.L, {
+          metodo: st.params.metodo, C: tr.C, eps: (tr.eps || 0) / 1000, ni: ni
+        });
+        var hl = H.perdaLocalizada(Qp, tr.di, tr.K);
+        d = { Qp: Qp, v: pd.v, Re: pd.Re, J: pd.J, f: pd.f, regime: pd.regime, hf: pd.hf, hl: hl, htotal: pd.hf + hl };
+      }
+      hfTot += d.hf; hlTot += d.hl; Htot += d.htotal;
       det.push(d);
     });
     return { H: Htot, hf: hfTot, hl: hlTot, trechos: det };
@@ -1362,7 +1501,11 @@ table.dados tr.selecionada td { font-weight: 600; }
     });
 
     var cens = C.cenariosEfetivos(st);
-    var vazoes = st.vazoes.filter(function (v) { return v.q > 0; });
+    var vazoes = st.vazoes.filter(function (v) { return v.q > 0; })
+      .slice().sort(function (a, b) { return a.q - b.q; });
+    res.vazProjeto = null;
+    vazoes.forEach(function (v) { if (v.projeto) res.vazProjeto = v; });
+    if (!res.vazProjeto && vazoes.length) res.vazProjeto = vazoes[vazoes.length - 1];
 
     cens.forEach(function (cen) {
       var rc = { cen: cen, hdisp: null, vazoes: [], qmax: null };
@@ -1401,23 +1544,29 @@ table.dados tr.selecionada td { font-weight: 600; }
         });
         rc.vazoes.push(rv);
 
-        /* avisos de velocidade */
+        /* avisos de velocidade (por tubo, quando houver paralelo diferente) */
         pt.trechos.forEach(function (d, i) {
-          if (!d || !(d.v > 0)) return;
+          if (!d) return;
           var tn = res.trechos[i].nome;
-          if (d.v < st.params.vMin) res.avisos.push({ tipo: 'atencao', onde: cen.nome + ' · ' + vz.nome + ' · ' + tn,
-            msg: 'Velocidade de ' + GCF.U.fmt(d.v, 2) + ' m/s abaixo da mínima de autolimpeza (' + GCF.U.fmt(st.params.vMin, 2) + ' m/s).' });
-          if (d.v > st.params.vMax) res.avisos.push({ tipo: 'atencao', onde: cen.nome + ' · ' + vz.nome + ' · ' + tn,
-            msg: 'Velocidade de ' + GCF.U.fmt(d.v, 2) + ' m/s acima da máxima admitida (' + GCF.U.fmt(st.params.vMax, 2) + ' m/s).' });
-          if (st.params.metodo !== 'hw') {
-            var epsRel = (res.trechos[i].eps || 0) / 1000 / res.trechos[i].di;
-            if (d.Re > 4000 && (epsRel < 1e-5 || epsRel > 1e-2))
-              res.avisos.push({ tipo: 'atencao', onde: tn,
-                msg: 'Rugosidade relativa ε/D = ' + epsRel.toExponential(2) + ' fora da faixa usual de validade (10⁻⁵ a 10⁻²).' });
-            if (d.Re > 0 && d.Re < 4000)
-              res.avisos.push({ tipo: 'atencao', onde: cen.nome + ' · ' + vz.nome + ' · ' + tn,
-                msg: 'Re = ' + GCF.U.fmt(d.Re, 0) + ' — escoamento fora do regime turbulento pleno; verificar o resultado.' });
-          }
+          var itensV = d.tubos
+            ? d.tubos.map(function (x, k) { return { v: x.v, Re: x.Re, di: x.tb.di, eps: x.tb.eps, rot: tn + ' · tubo ' + (k + 1) }; })
+            : [{ v: d.v, Re: d.Re, di: res.trechos[i].di, eps: res.trechos[i].eps, rot: tn }];
+          itensV.forEach(function (it) {
+            if (!(it.v > 0)) return;
+            if (it.v < st.params.vMin) res.avisos.push({ tipo: 'atencao', onde: cen.nome + ' · ' + vz.nome + ' · ' + it.rot,
+              msg: 'Velocidade de ' + GCF.U.fmt(it.v, 2) + ' m/s abaixo da mínima de autolimpeza (' + GCF.U.fmt(st.params.vMin, 2) + ' m/s).' });
+            if (it.v > st.params.vMax) res.avisos.push({ tipo: 'atencao', onde: cen.nome + ' · ' + vz.nome + ' · ' + it.rot,
+              msg: 'Velocidade de ' + GCF.U.fmt(it.v, 2) + ' m/s acima da máxima admitida (' + GCF.U.fmt(st.params.vMax, 2) + ' m/s).' });
+            if (st.params.metodo !== 'hw' && it.di > 0) {
+              var epsRel = (it.eps || 0) / 1000 / it.di;
+              if (it.Re > 4000 && (epsRel < 1e-5 || epsRel > 1e-2))
+                res.avisos.push({ tipo: 'atencao', onde: it.rot,
+                  msg: 'Rugosidade relativa ε/D = ' + epsRel.toExponential(2) + ' fora da faixa usual de validade (10⁻⁵ a 10⁻²).' });
+              if (it.Re > 0 && it.Re < 4000)
+                res.avisos.push({ tipo: 'atencao', onde: cen.nome + ' · ' + vz.nome + ' · ' + it.rot,
+                  msg: 'Re = ' + GCF.U.fmt(it.Re, 0) + ' — escoamento fora do regime turbulento pleno; verificar o resultado.' });
+            }
+          });
         });
 
         if (rv.status === 'ruim')
@@ -1643,8 +1792,8 @@ table.dados tr.selecionada td { font-weight: 600; }
   App.abas = [
     { id: 'resumo', rot: 'Resumo' },
     { id: 'projeto', rot: 'Projeto' },
-    { id: 'trechos', rot: 'Trechos e peças' },
     { id: 'vazoes', rot: 'Vazões' },
+    { id: 'trechos', rot: 'Trechos e peças' },
     { id: 'cenarios', rot: 'Cenários' },
     { id: 'perfil', rot: 'Perfil da linha' },
     { sep: true },
@@ -1840,8 +1989,7 @@ table.dados tr.selecionada td { font-weight: 600; }
       h('div', { class: 'rotulo' }, 'Extensão total'),
       h('div', { class: 'valor' }, res.Ltotal ? U.fmt(res.Ltotal, 2) : '—', h('span', { class: 'un' }, 'm')),
       h('div', { class: 'compl' }, st.trechos.length + ' trecho(s)')));
-    var vazProj = null;
-    st.vazoes.forEach(function (v) { if (v.q > 0 && (!vazProj || v.q > vazProj.q)) vazProj = v; });
+    var vazProj = res.vazProjeto;
     if (vazProj) {
       paineis.appendChild(h('div', { class: 'painel' },
         h('div', { class: 'rotulo' }, 'Vazão de projeto'),
@@ -1879,8 +2027,8 @@ table.dados tr.selecionada td { font-weight: 600; }
         rc.vazoes.forEach(function (rv) {
           var v0 = null;
           rv.perda.trechos.forEach(function (d) { if (d && v0 === null) v0 = d.v; });
-          corpo.appendChild(h('tr', {},
-            h('td', {}, rv.vaz.nome),
+          corpo.appendChild(h('tr', { class: rv.vaz.projeto ? 'destaque-projeto' : '' },
+            h('td', {}, rv.vaz.nome, rv.vaz.projeto ? h('span', { class: 'selo ok', style: 'margin-left:8px' }, 'projeto') : null),
             h('td', {}, U.fmt(rv.Q * 1000, 2)),
             h('td', {}, v0 !== null ? U.fmt(v0, 2) : '—'),
             h('td', {}, U.fmt(rv.perda.H, 2)),
@@ -2017,7 +2165,9 @@ table.dados tr.selecionada td { font-weight: 600; }
       h('input', { type: 'text', class: 'l200', value: t.nome, 'data-foco': 'tn' + t.id, style: 'font-weight:600',
         onchange: function (ev) { t.nome = ev.target.value; App.mudou(); } }),
       rt && rt.di ? h('span', { class: 'selo neutro' }, 'DI ' + U.fmt(rt.di * 1000, 1) + ' mm') : null,
-      rt && rt.n > 1 ? h('span', { class: 'selo neutro' }, rt.n + ' tubos em paralelo') : null,
+      rt && rt.tubos ? h('span', { class: 'selo neutro' }, rt.n + ' tubos ≠ em paralelo') : null,
+      rt && !rt.tubos && rt.n > 1 ? h('span', { class: 'selo neutro' }, rt.n + ' tubos em paralelo') : null,
+      rt && rt.fator !== 1 ? h('span', { class: 'selo neutro' }, U.fmt(rt.fator * 100, 0) + '% da vazão') : null,
       rt && rt.K ? h('span', { class: 'selo neutro' }, 'ΣK = ' + U.fmt(rt.K, 2)) : null,
       acoes);
 
@@ -2027,12 +2177,41 @@ table.dados tr.selecionada td { font-weight: 600; }
     var linhaTubo = h('div', { class: 'linha-campos' });
     linhaTubo.appendChild(campoNum('Extensão', t.L, function (v) { t.L = v; }, { un: 'm', dec: 2, classe: 'l100', foco: 'tl' + t.id }));
 
+    /* arranjo dos tubos: único, idênticos ou diferentes em paralelo */
+    var arranjo = t.paraleloModo === 'diferentes' ? 'diferentes' : (t.nParalelo > 1 ? 'identicos' : 'unico');
+    var selArr = h('select', { onchange: function (ev) {
+      var v = ev.target.value;
+      if (v === 'unico') { t.paraleloModo = 'identicos'; t.nParalelo = 1; }
+      else if (v === 'identicos') { t.paraleloModo = 'identicos'; if (!(t.nParalelo > 1)) t.nParalelo = 2; }
+      else {
+        t.paraleloModo = 'diferentes';
+        if (!Array.isArray(t.tubosParalelos) || t.tubosParalelos.length < 2) {
+          t.tubosParalelos = [E.tuboParaleloPadrao(), E.tuboParaleloPadrao()];
+          t.tubosParalelos.forEach(function (tp) {
+            tp.modo = t.modo; tp.catId = t.catId; tp.itemDn = t.itemDn;
+            tp.diManual = t.diManual; tp.materialManual = t.materialManual;
+          });
+        }
+      }
+      App.mudou();
+    } },
+      h('option', { value: 'unico', selected: arranjo === 'unico' }, 'Tubo único'),
+      h('option', { value: 'identicos', selected: arranjo === 'identicos' }, 'Tubos idênticos em paralelo'),
+      h('option', { value: 'diferentes', selected: arranjo === 'diferentes' }, 'Tubos diferentes em paralelo'));
+    linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Arranjo'), selArr));
+    if (arranjo === 'identicos') {
+      linhaTubo.appendChild(campoNum('Qtde de tubos', t.nParalelo,
+        function (v) { t.nParalelo = (v && v >= 1) ? Math.round(v) : 1; },
+        { un: 'un', dec: 0, classe: 'l60', foco: 'tpar' + t.id }));
+    }
+
     var selModo = h('select', { onchange: function (ev) { t.modo = ev.target.value; App.mudou(); } },
       h('option', { value: 'catalogo', selected: t.modo === 'catalogo' }, 'Tubo do catálogo'),
       h('option', { value: 'manual', selected: t.modo === 'manual' }, 'Diâmetro interno manual'));
-    linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Escolha do tubo'), selModo));
+    if (arranjo !== 'diferentes')
+      linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Escolha do tubo'), selModo));
 
-    if (t.modo === 'catalogo') {
+    if (arranjo !== 'diferentes' && t.modo === 'catalogo') {
       var fams = CAT.porFamilia(CAT.padrao);
       var selCat = h('select', { class: 'l260', onchange: function (ev) {
         t.catId = ev.target.value || null; t.itemDn = null; App.mudou(); } });
@@ -2056,7 +2235,7 @@ table.dados tr.selecionada td { font-weight: 600; }
         });
         linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, cat.designacao), selDn));
       }
-    } else {
+    } else if (arranjo !== 'diferentes') {
       linhaTubo.appendChild(campoNum('Diâmetro interno (DI)', t.diManual, function (v) { t.diManual = v; }, { un: 'mm', dec: 1, classe: 'l100', foco: 'td' + t.id }));
       var selMat = h('select', { class: 'l260', onchange: function (ev) { t.materialManual = ev.target.value; App.mudou(); } });
       R.listaMateriais().forEach(function (m) {
@@ -2070,10 +2249,79 @@ table.dados tr.selecionada td { font-weight: 600; }
       selIdade.appendChild(h('option', { value: f.id, selected: t.idade === f.id }, f.rot));
     });
     linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Idade da tubulação'), selIdade));
-    linhaTubo.appendChild(campoNum('Tubos em paralelo', t.nParalelo,
-      function (v) { t.nParalelo = (v && v >= 1) ? Math.round(v) : 1; },
-      { un: 'un', dec: 0, classe: 'l60', foco: 'tpar' + t.id }));
     corpo.appendChild(linhaTubo);
+
+    /* --- tubos diferentes em paralelo --- */
+    if (arranjo === 'diferentes') {
+      corpo.appendChild(h('h3', {}, 'Tubos em paralelo (diâmetros diferentes)'));
+      (t.tubosParalelos || []).forEach(function (tp, k) {
+        var linhaTp = h('div', { class: 'linha-campos' });
+        linhaTp.appendChild(h('div', { class: 'campo' }, h('label', {}, h('b', {}, 'Tubo ' + (k + 1))),
+          h('select', { onchange: function (ev) { tp.modo = ev.target.value; App.mudou(); } },
+            h('option', { value: 'catalogo', selected: tp.modo !== 'manual' }, 'Catálogo'),
+            h('option', { value: 'manual', selected: tp.modo === 'manual' }, 'DI manual'))));
+        if (tp.modo === 'manual') {
+          linhaTp.appendChild(campoNum('DI', tp.diManual, function (v) { tp.diManual = v; }, { un: 'mm', dec: 1, classe: 'l100', foco: 'tpd' + tp.id }));
+          var selMatTp = h('select', { class: 'l260', onchange: function (ev) { tp.materialManual = ev.target.value; App.mudou(); } });
+          R.listaMateriais().forEach(function (m) {
+            selMatTp.appendChild(h('option', { value: m.id, selected: tp.materialManual === m.id }, m.rot));
+          });
+          linhaTp.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Material'), selMatTp));
+        } else {
+          var famsTp = CAT.porFamilia(CAT.padrao);
+          var selCatTp = h('select', { class: 'l260', onchange: function (ev) {
+            tp.catId = ev.target.value || null; tp.itemDn = null; App.mudou(); } });
+          selCatTp.appendChild(h('option', { value: '' }, '— escolher catálogo —'));
+          Object.keys(famsTp).forEach(function (fam) {
+            var og = h('optgroup', { label: fam });
+            famsTp[fam].forEach(function (c) {
+              og.appendChild(h('option', { value: c.id, selected: tp.catId === c.id }, c.nome));
+            });
+            selCatTp.appendChild(og);
+          });
+          linhaTp.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Catálogo'), selCatTp));
+          var catTp = CAT.buscar(CAT.padrao, tp.catId);
+          if (catTp) {
+            var selDnTp = h('select', { onchange: function (ev) { tp.itemDn = U.num(ev.target.value); App.mudou(); } });
+            selDnTp.appendChild(h('option', { value: '' }, '—'));
+            catTp.itens.forEach(function (it) {
+              selDnTp.appendChild(h('option', { value: it.dn, selected: tp.itemDn === it.dn },
+                it.rot + ' · DI ' + U.fmt(CAT.diInterno(catTp, it), 1) + ' mm' + (it.pn ? ' · PN ' + String(it.pn).replace('.', ',') : '')));
+            });
+            linhaTp.appendChild(h('div', { class: 'campo' }, h('label', {}, catTp.designacao), selDnTp));
+          }
+        }
+        if ((t.tubosParalelos || []).length > 2) {
+          linhaTp.appendChild(h('div', { class: 'campo' }, h('label', {}, ' '),
+            h('button', { class: 'btn mini perigo', type: 'button',
+              onclick: function () { t.tubosParalelos.splice(k, 1); App.mudou(); } }, 'Remover tubo')));
+        }
+        corpo.appendChild(linhaTp);
+      });
+      corpo.appendChild(h('div', { style: 'margin:4px 0 8px' },
+        h('button', { class: 'btn mini', type: 'button', onclick: function () {
+          t.tubosParalelos.push(E.tuboParaleloPadrao()); App.mudou();
+        } }, '+ Adicionar tubo em paralelo')));
+      corpo.appendChild(h('p', { class: 'nota' },
+        'A vazão do trecho se distribui entre os tubos de modo que a perda de carga seja a ', h('b', {}, 'mesma em todos'),
+        ' (mesma carga entre as extremidades) — o programa resolve a divisão iterativamente e mostra a vazão de cada tubo nos Resultados. As peças (ΣK) valem para cada tubo.'));
+    }
+
+    /* --- vazão do trecho (ramificações / derivações) --- */
+    var vpTr = res ? res.vazProjeto : null;
+    var linhaQt = h('div', { class: 'linha-campos' });
+    linhaQt.appendChild(campoNum('Vazão do trecho (% da vazão da linha)', t.qFator,
+      function (v) { t.qFator = (v === null ? 100 : Math.max(0, v)); },
+      { un: '%', dec: 0, classe: 'l80', foco: 'tqf' + t.id }));
+    if (vpTr && vpTr.q > 0) {
+      linhaQt.appendChild(campoNum('… ou em L/s, na vazão de projeto (' + vpTr.nome + ' = ' + U.fmt(vpTr.q, 2) + ' L/s)',
+        vpTr.q * (t.qFator === null || t.qFator === undefined ? 100 : t.qFator) / 100,
+        function (v) { if (v !== null && vpTr.q > 0) t.qFator = 100 * v / vpTr.q; },
+        { un: 'L/s', dec: 2, classe: 'l100', foco: 'tqa' + t.id }));
+    }
+    linhaQt.appendChild(h('div', { class: 'campo cresce' }, h('label', {}, ' '),
+      h('span', { class: 'nota' }, 'Use quando houver derivação no meio da linha (ex.: ramal para um reservatório) — o percentual se aplica a todas as vazões verificadas.')));
+    corpo.appendChild(linhaQt);
 
     /* --- rugosidade --- */
     var linhaC = h('div', { class: 'linha-campos' });
@@ -2160,13 +2408,18 @@ table.dados tr.selecionada td { font-weight: 600; }
      sugestão (★ = menor diâmetro adequado), nas cores de classificação.
      Clique na linha adota o diâmetro. */
   App.comparacaoDiametros = function (st, t, idx, res, rt) {
+    if (rt && rt.tubos) {
+      return h('div', {},
+        h('h3', {}, 'Comparação de diâmetros'),
+        h('p', { class: 'nota' }, 'Indisponível com tubos diferentes em paralelo — verifique a folga e a vazão de cada tubo na aba Resultados.'));
+    }
     var cat = CAT.buscar(CAT.padrao, t.catId);
     if (!cat || !res || !rt || !(t.L > 0)) return null;
     var vazoes = st.vazoes.filter(function (v) { return v.q > 0; });
     if (!vazoes.length) return null;
     if (st.params.metodo === 'hw' ? !(rt.C > 0) : !(rt.eps > 0 || rt.eps === 0)) return null;
 
-    var qProj = vazoes.reduce(function (a, b) { return b.q > a.q ? b : a; });
+    var qProj = res.vazProjeto || vazoes.reduce(function (a, b) { return b.q > a.q ? b : a; });
     var qMin = vazoes.reduce(function (a, b) { return b.q < a.q ? b : a; });
 
     /* pior cenário = menor carga disponível */
@@ -2185,7 +2438,7 @@ table.dados tr.selecionada td { font-weight: 600; }
       var ptProj = C.perdaTotal(qProj.q / 1000, trechosMod, st);
       var dProj = ptProj.trechos[idx];
       if (!dProj) return;
-      var vMinQ = H.velocidade(qMin.q / 1000 / n, di);
+      var vMinQ = H.velocidade(qMin.q / 1000 * (rt.fator || 1) / n, di);
       var folga = pior ? pior.hdisp - ptProj.H : null;
 
       var classe = 'bom', motivos = [];
@@ -2205,16 +2458,8 @@ table.dados tr.selecionada td { font-weight: 600; }
     linhas.forEach(function (l, i) { if (iSug < 0 && l.classe === 'bom') iSug = i; });
     if (iSug < 0) linhas.forEach(function (l, i) { if (iSug < 0 && l.classe === 'atencao') iSug = i; });
 
-    /* janela de 5: sugerido, 2 menores e 2 maiores */
-    var ini = Math.max(0, Math.min(iSug >= 0 ? iSug - 2 : 0, linhas.length - 5));
-    var fim = Math.min(linhas.length, ini + 5);
-    var visiveis = linhas.slice(ini, fim);
-    var iSel = -1;
-    linhas.forEach(function (l, i) { if (l.it.dn === t.itemDn) iSel = i; });
-    if (iSel >= 0 && (iSel < ini || iSel >= fim)) {
-      if (iSel < ini) visiveis = [linhas[iSel]].concat(visiveis);
-      else visiveis = visiveis.concat([linhas[iSel]]);
-    }
+    /* todos os diâmetros do catálogo, como no programa da adutora */
+    var visiveis = linhas;
 
     var mostraPn = visiveis.some(function (l) { return l.it.pn; });
     var tab = h('table', { class: 'dados' },
@@ -2255,12 +2500,17 @@ table.dados tr.selecionada td { font-weight: 600; }
       h('h3', {}, 'Comparação de diâmetros'),
       h('p', { class: 'nota', style: 'margin:0 0 6px' },
         'Vazão de projeto: ', h('b', {}, qProj.nome + ' = ' + U.fmt(qProj.q, 2) + ' L/s'),
+        (rt.fator !== 1 ? ' · trecho conduz ' + U.fmt(rt.fator * 100, 0) + '% (' + U.fmt(qProj.q * rt.fator, 2) + ' L/s)' : ''),
         (n > 1 ? ' · ' + n + ' tubos em paralelo (valores por tubo)' : ''),
         pior ? ' · H disponível' + (st.cenarios.habilitado && pior.cen ? ' (pior cenário: ' + pior.cen.nome + ')' : '') + ': ' + U.fmt(pior.hdisp, 2) + ' mca' : '',
         ' · Critério: v de ' + U.fmt(st.params.vMin, 2) + ' a ' + U.fmt(st.params.vMax, 2) + ' m/s'),
       h('div', { class: 'rolagem' }, tab),
+      iSug >= 0 && linhas[iSug].classe !== 'bom'
+        ? h('p', { class: 'nota', style: 'color:var(--ambar)' },
+            h('b', {}, '★ ' + linhas[iSug].it.rot + ' em atenção: '), linhas[iSug].motivos.join('; ') + '.')
+        : null,
       h('p', { class: 'nota' },
-        'Clique em uma linha para adotar o diâmetro. ★ é a sugestão do programa: o menor diâmetro que atende integralmente aos critérios (a vazão de projeto passa no pior cenário e as velocidades ficam dentro dos limites).'));
+        'Clique em uma linha para adotar o diâmetro. ★ é a sugestão do programa: o menor diâmetro que atende integralmente aos critérios (a vazão de projeto passa no pior cenário e as velocidades ficam dentro dos limites). Passe o mouse sobre uma linha para ver os motivos da classificação.'));
   };
 
   /* ================= VAZÕES ================= */
@@ -2272,15 +2522,19 @@ table.dados tr.selecionada td { font-weight: 600; }
 
     var tab = h('table', { class: 'dados' },
       h('thead', {}, h('tr', {},
+        h('th', { title: 'A vazão de projeto é a referência do Resumo e da comparação de diâmetros' }, 'Projeto'),
         h('th', {}, 'Identificação'), h('th', {}, 'Vazão (L/s)'), h('th', {}, 'Vazão (m³/h)'), h('th', {}, ''))));
     var corpo = h('tbody');
     st.vazoes.forEach(function (v, idx) {
-      corpo.appendChild(h('tr', {},
+      corpo.appendChild(h('tr', { class: v.projeto ? 'destaque-projeto' : '' },
+        h('td', { class: 'c' }, h('input', { type: 'radio', name: 'vaz-projeto', checked: !!v.projeto,
+          title: 'Marcar como vazão de projeto',
+          onchange: function () { st.vazoes.forEach(function (x) { x.projeto = false; }); v.projeto = true; App.mudou(); } })),
         h('td', {}, h('input', { type: 'text', class: 'cresce', style: 'width:100%;min-width:180px', value: v.nome, 'data-foco': 'vn' + v.id,
           onchange: function (ev) { v.nome = ev.target.value; App.mudou(); } })),
         h('td', {}, U.campoNum({ valor: v.q, dec: 2, classe: 'l100',
           gravar: function (x) { v.q = x; App.mudou(); } })),
-        h('td', {}, v.q > 0 ? U.fmt(v.q * 3.6, 1) : '—'),
+        h('td', {}, v.q > 0 ? U.fmt(v.q * 3.6, 2) : '—'),
         h('td', { class: 'c' }, h('button', { class: 'btn mini perigo', type: 'button',
           onclick: function () { st.vazoes.splice(idx, 1); App.mudou(); } }, 'Remover'))));
     });
@@ -2291,6 +2545,7 @@ table.dados tr.selecionada td { font-weight: 600; }
         st.vazoes.push({ id: U.id(), nome: 'Vazão ' + (st.vazoes.length + 1), q: null }); App.mudou();
       } }, '+ Adicionar vazão')));
     cart.appendChild(h('p', { class: 'nota' },
+      'Marque a ', h('b', {}, 'vazão de projeto'), ' — ela é a referência do Resumo e da comparação de diâmetros; as demais são verificadas de forma informativa. ',
       'Além das vazões informadas, o programa calcula o ', h('b', {}, 'máximo de transporte'),
       ' de cada cenário — a vazão que consome exatamente a carga disponível.'));
     main.appendChild(cart);
@@ -2502,8 +2757,9 @@ table.dados tr.selecionada td { font-weight: 600; }
       tb.appendChild(h('tr', {},
         h('td', {}, t.nome),
         h('td', { class: 'txt' }, t.rotTubo + (t.materialRot !== '—' ? ' — ' + t.materialRot : '')),
-        h('td', { class: 'c' }, (t.n || 1) + '×' + (t.n > 1 ? ' paralelo' : '')),
-        h('td', {}, t.di ? U.fmt(t.di * 1000, 1) : '—'),
+        h('td', { class: 'c' }, (t.n || 1) + '×' + (t.tubos ? ' diferentes' : t.n > 1 ? ' paralelo' : '') +
+          (t.fator !== 1 ? ' · ' + U.fmt(t.fator * 100, 0) + '% Q' : '')),
+        h('td', {}, t.di ? U.fmt(t.di * 1000, 1) : (t.tubos ? 'vários' : '—')),
         h('td', {}, t.L ? U.fmt(t.L, 2) : '—'),
         h('td', {}, t.C ? U.fmt(t.C, 0) : '—'),
         h('td', {}, t.eps ? U.fmt(t.eps, 3) : '—'),
@@ -2539,13 +2795,33 @@ table.dados tr.selecionada td { font-weight: 600; }
       var nCol = mostraF ? 14 : 13;
 
       function linhasVazao(nome, Q, pt, folga, status) {
-        var multi = res.trechos.length > 1;
+        var multi = res.trechos.length > 1 || res.trechos.some(function (x) { return x.tubos; });
         pt.trechos.forEach(function (d, i) {
           if (!d) return;
           var t = res.trechos[i];
+          if (d.tubos) {
+            /* tubos diferentes em paralelo: uma linha por tubo, mesma perda total */
+            d.tubos.forEach(function (x, k) {
+              corpo.appendChild(h('tr', {},
+                h('td', {}, (res.trechos.length > 1 ? t.nome + ' · ' : '') + 'Tubo ' + (k + 1) + ' (' + x.tb.rotCurto + ')'),
+                h('td', {}, U.fmt(x.Q * 1000, 2)),
+                h('td', {}, U.fmt(x.tb.di * 1000, 2)),
+                h('td', {}, U.fmt(t.L, 2)),
+                mostraF ? h('td', {}, x.Re ? x.Re.toExponential(2).replace('.', ',') : '—') : h('td', {}, U.fmt(x.tb.C, 0)),
+                mostraF ? h('td', {}, x.f !== null && x.f !== undefined ? U.fmt(x.f, 4) : '—') : null,
+                h('td', {}, U.fmt(x.v, 2)),
+                h('td', {}, U.fmt(x.J * 1000, 2)),
+                h('td', {}, U.fmt(x.hf, 2)),
+                h('td', {}, U.fmt(x.hl, 2)),
+                h('td', {}, U.fmt(x.htotal, 2)),
+                h('td', {}, ''), h('td', {}, ''), h('td', {})));
+            });
+            return;
+          }
+          var Qt = d.Qp * (t.n || 1);
           corpo.appendChild(h('tr', {},
             h('td', {}, multi ? t.nome : nome),
-            h('td', {}, U.fmt(Q * 1000, 2)),
+            h('td', {}, U.fmt(Qt * 1000, 2)),
             h('td', {}, U.fmt(t.di * 1000, 2)),
             h('td', {}, U.fmt(t.L, 2)),
             mostraF ? h('td', {}, d.Re ? d.Re.toExponential(2).replace('.', ',') : '—') : h('td', {}, U.fmt(t.C, 0)),
@@ -2580,9 +2856,12 @@ table.dados tr.selecionada td { font-weight: 600; }
       }
       tab.appendChild(corpo);
       cart.appendChild(h('div', { class: 'rolagem' }, tab));
-      if (res.trechos.some(function (t) { return t.n > 1; }))
+      if (res.trechos.some(function (t) { return t.n > 1 && !t.tubos; }))
         cart.appendChild(h('p', { class: 'nota' },
-          'Trechos com tubos em paralelo: Q é a vazão total do sistema; v, J, hf e hl referem-se a cada tubo (tubos idênticos, vazão dividida igualmente).'));
+          'Trechos com tubos idênticos em paralelo: Q é a vazão total do trecho; v, J, hf e hl referem-se a cada tubo (vazão dividida igualmente).'));
+      if (res.trechos.some(function (t) { return t.tubos; }))
+        cart.appendChild(h('p', { class: 'nota' },
+          'Trechos com tubos diferentes em paralelo: a vazão se distribui de modo que a perda de carga seja a mesma em todos os tubos — cada linha "Tubo n" mostra a vazão e a velocidade daquele tubo; a linha "— total" soma o trecho.'));
 
       /* piezométrica por trecho, quando houver cota informada */
       var temCota = res.trechos.some(function (t) { return t.cotaFim !== null && t.cotaFim !== undefined; });
@@ -2843,16 +3122,19 @@ table.dados tr.selecionada td { font-weight: 600; }
     s.push('<table><thead><tr><th>Trecho</th><th>Tubo / material</th><th>Tubos</th><th>DI (mm)</th><th>L (m)</th><th>C</th><th>ε (mm)</th><th>ΣK</th><th>Peças</th></tr></thead><tbody>');
     res.trechos.forEach(function (t) {
       s.push('<tr><td>' + esc(t.nome) + '</td><td>' + esc(t.rotTubo + (t.materialRot !== '—' ? ' — ' + t.materialRot : '')) +
-        '</td><td class="c">' + (t.n || 1) + '×</td>' +
-        '<td>' + (t.di ? fmt(t.di * 1000, 1) : '—') + '</td><td>' + (t.L ? fmt(t.L, 2) : '—') +
+        '</td><td class="c">' + (t.n || 1) + '×' + (t.fator !== 1 ? ' · ' + fmt(t.fator * 100, 0) + '% Q' : '') + '</td>' +
+        '<td>' + (t.di ? fmt(t.di * 1000, 1) : (t.tubos ? 'vários' : '—')) + '</td><td>' + (t.L ? fmt(t.L, 2) : '—') +
         '</td><td>' + (t.C ? fmt(t.C, 0) : '—') + '</td><td>' + (t.eps ? fmt(t.eps, 3) : '—') +
         '</td><td>' + fmt(t.K, 2) + '</td><td>' +
         esc(t.pecas.map(function (x) { return x.qtde + '× ' + x.rot + ' (K=' + fmt(x.K, 2) + ')'; }).join('; ') || '—') +
         '</td></tr>');
     });
     s.push('</tbody></table>');
-    if (res.trechos.some(function (t) { return t.n > 1; }))
-      s.push('<p class="obs">Trechos com tubos em paralelo: tubos idênticos com divisão igual da vazão; velocidades e perdas referem-se a cada tubo.</p>');
+    if (res.trechos.some(function (t) { return t.n > 1 && !t.tubos; }))
+      s.push('<p class="obs">Trechos com tubos idênticos em paralelo: divisão igual da vazão; velocidades e perdas referem-se a cada tubo.</p>');
+    if (res.trechos.some(function (t) { return t.tubos; }))
+      s.push('<p class="obs">Trechos com tubos diferentes em paralelo: a vazão se distribui de modo que a perda de carga seja a mesma em todos os tubos; a vazão de cada tubo consta na verificação hidráulica.</p>');
+    if (res.vazProjeto) s.push('<p class="obs">★ = vazão de projeto (' + esc(res.vazProjeto.nome) + ').</p>');
 
     s.push('<h2>3. Verificação hidráulica' + (st.cenarios.habilitado ? ' por cenário' : '') + '</h2>');
     var mostraF = st.params.metodo !== 'hw';
@@ -2870,11 +3152,23 @@ table.dados tr.selecionada td { font-weight: 600; }
         '<th>v (m/s)</th><th>J (m/km)</th><th>hf (mca)</th><th>hl (mca)</th><th>H total (mca)</th><th>Folga (mca)</th><th>Situação</th></tr></thead><tbody>');
 
       function linhas(nome, Q, pt, folga, status) {
-        var multi = res.trechos.length > 1;
+        var multi = res.trechos.length > 1 || res.trechos.some(function (x) { return x.tubos; });
         pt.trechos.forEach(function (d, i) {
           if (!d) return;
           var t = res.trechos[i];
-          s.push('<tr><td>' + esc(multi ? t.nome : nome) + '</td><td>' + fmt(Q * 1000, 2) + '</td>' +
+          if (d.tubos) {
+            d.tubos.forEach(function (x, k) {
+              s.push('<tr><td>' + esc((res.trechos.length > 1 ? t.nome + ' · ' : '') + 'Tubo ' + (k + 1) + ' (' + x.tb.rotCurto + ')') +
+                '</td><td>' + fmt(x.Q * 1000, 2) + '</td>' +
+                (mostraF ? '<td>' + (x.Re ? x.Re.toExponential(2).replace('.', ',') : '—') + '</td><td>' + (x.f !== null && x.f !== undefined ? fmt(x.f, 4) : '—') + '</td>'
+                         : '<td>' + (x.tb.C ? fmt(x.tb.C, 0) : '—') + '</td>') +
+                '<td>' + fmt(x.v, 2) + '</td><td>' + fmt(x.J * 1000, 2) + '</td><td>' + fmt(x.hf, 2) +
+                '</td><td>' + fmt(x.hl, 2) + '</td><td>' + fmt(x.htotal, 2) + '</td><td></td><td></td></tr>');
+            });
+            return;
+          }
+          var Qt = d.Qp * (t.n || 1);
+          s.push('<tr><td>' + esc(multi ? t.nome : nome) + '</td><td>' + fmt(Qt * 1000, 2) + '</td>' +
             (mostraF ? '<td>' + (d.Re ? d.Re.toExponential(2).replace('.', ',') : '—') + '</td><td>' + (d.f !== null && d.f !== undefined ? fmt(d.f, 4) : '—') + '</td>'
                      : '<td>' + (t.C ? fmt(t.C, 0) : '—') + '</td>') +
             '<td>' + fmt(d.v, 2) + '</td><td>' + fmt(d.J * 1000, 2) + '</td><td>' + fmt(d.hf, 2) +
@@ -2896,7 +3190,7 @@ table.dados tr.selecionada td { font-weight: 600; }
         return sst === 'ok' ? 'Passa' : sst === 'atencao' ? 'Passa (justa)' : sst === 'ruim' ? 'Não passa' : 'Limite';
       }
 
-      rc.vazoes.forEach(function (rv) { linhas(rv.vaz.nome, rv.Q, rv.perda, rv.folga, rv.status); });
+      rc.vazoes.forEach(function (rv) { linhas(rv.vaz.nome + (rv.vaz.projeto ? ' ★' : ''), rv.Q, rv.perda, rv.folga, rv.status); });
       if (rc.qmax) linhas('Máximo de transporte', rc.qmax, rc.qmaxDet, rc.hdisp - rc.qmaxDet.H, 'indef');
       s.push('</tbody></table>');
     });
