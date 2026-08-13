@@ -231,6 +231,21 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
 .duas-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 860px) { .duas-colunas { grid-template-columns: 1fr; } }
 
+table.dados td.nq, table.dados th.nq { white-space: nowrap; }
+
+.veu {
+  position: fixed; inset: 0; background: rgba(8, 14, 24, .48);
+  z-index: 100; display: flex; align-items: flex-start; justify-content: center;
+  padding: 60px 16px;
+}
+.dialogo {
+  background: var(--surface); border: 1px solid var(--border-forte);
+  border-radius: 8px; box-shadow: 0 14px 44px rgba(0,0,0,.35);
+  max-width: 680px; width: 100%; padding: 16px 18px;
+  max-height: 80vh; overflow: auto;
+}
+.dialogo h2 { font-size: 15px; color: var(--azul); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
 .fonte-item { border-bottom: 1px solid var(--border); padding: 8px 0; }
 .fonte-item:last-child { border-bottom: 0; }
 .fonte-item b { font-size: 13px; }
@@ -274,6 +289,8 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
   </div>
   <div class="acoes">
     <button class="btn" type="button" data-acao="novo">Novo</button>
+    <button class="btn" type="button" data-acao="abrir" title="Abrir um projeto salvo neste navegador">Abrir</button>
+    <button class="btn" type="button" data-acao="salvar" title="Salvar o projeto neste navegador">Salvar</button>
     <button class="btn" type="button" data-acao="exemplo">Exemplo</button>
     <button class="btn" type="button" data-acao="exportar" title="Baixar o projeto em arquivo .json">Exportar</button>
     <button class="btn" type="button" data-acao="importar" title="Abrir um projeto .json exportado">Importar</button>
@@ -366,6 +383,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
         op.gravar(isNaN(v) ? null : v);
       }
     });
+    if (op.foco) input.setAttribute('data-foco', op.foco);
     return input;
   };
 
@@ -986,6 +1004,11 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
     if (item.di !== undefined && item.di !== null) return item.di;
     return item.de - 2 * item.e - 2 * (cat.revMm || 0);
   };
+  /* nome curto para tabelas: remove parênteses e o travessão longo */
+  CAT.nomeCurto = function (nome) {
+    return String(nome || '').replace(/\s*\([^)]*\)/g, '').replace(/\s+—\s+/g, ' — ').replace(/\s{2,}/g, ' ').trim();
+  };
+
   CAT.porFamilia = function (todos) {
     var g = {};
     todos.forEach(function (c) { (g[c.familia] = g[c.familia] || []).push(c); });
@@ -1136,6 +1159,24 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
   E.gravar = function (st) {
     try { localStorage.setItem(CHAVE, JSON.stringify(st)); } catch (e) { /* sem espaço */ }
   };
+  /* ---------------- projetos salvos (vários, por nome) ---------------- */
+  var CHAVE_LISTA = 'gcf_projetos_v1';
+  E.listaProjetos = function () {
+    try { return JSON.parse(localStorage.getItem(CHAVE_LISTA)) || {}; } catch (e) { return {}; }
+  };
+  E.salvarProjeto = function (st, nome) {
+    var l = E.listaProjetos();
+    l[nome] = { nome: nome, local: (st.projeto && st.projeto.local) || '',
+                quando: new Date().toISOString(), st: st };
+    try { localStorage.setItem(CHAVE_LISTA, JSON.stringify(l)); return true; }
+    catch (e) { alert('Não foi possível salvar — o armazenamento do navegador pode estar cheio.'); return false; }
+  };
+  E.excluirProjeto = function (nome) {
+    var l = E.listaProjetos();
+    delete l[nome];
+    try { localStorage.setItem(CHAVE_LISTA, JSON.stringify(l)); } catch (e) { /* ignora */ }
+  };
+
   E.carregarConfig = function () {
     try { return JSON.parse(localStorage.getItem(CHAVE_CFG)) || {}; } catch (e) { return {}; }
   };
@@ -1236,6 +1277,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
      paralelo (idênticos ou diferentes), rótulos e avisos */
   C.resolverTrecho = function (t, st) {
     var out = { id: t.id, nome: t.nome || 'Trecho', L: t.L, di: null, rotTubo: '—',
+                tuboCurto: '—', dnRot: '—',
                 n: Math.max(1, Math.round(t.nParalelo || 1)),
                 fator: (t.qFator === null || t.qFator === undefined ? 100 : Math.max(0, t.qFator)) / 100,
                 tubos: null,
@@ -1283,6 +1325,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
       });
       out.n = out.tubos.length;
       out.rotTubo = out.n + ' tubos em paralelo: ' + out.tubos.map(function (tb) { return tb.rotCurto; }).join(' + ');
+      out.tuboCurto = out.rotTubo;
       var co0 = coeficientes(out.tubos[0].materialId);
       out.materialId = out.tubos[0].materialId;
       out.materialRot = co0.mat ? co0.mat.rot : '—';
@@ -1309,7 +1352,9 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
             out.di = CAT.diInterno(cat, item) / 1000;
             out.rotTubo = cat.nome + ' · ' + item.rot + ' (DI ' + GCF.U.fmt(CAT.diInterno(cat, item), 1) + ' mm)';
             out.pn = item.pn || null;
+            out.dnRot = item.rot;
           }
+          out.tuboCurto = CAT.nomeCurto(cat.nome);
           out.materialId = cat.material;
         }
       }
@@ -1324,6 +1369,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
       } else if (!co.mat) {
         out.avisos.push('Material não identificado — informe C/ε manualmente.');
       }
+      if (t.modo === 'manual') out.tuboCurto = CAT.nomeCurto(out.materialRot) + ' (DI manual)';
     }
 
     /* peças */
@@ -1494,10 +1540,29 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
     res.trechos.forEach(function (t) { if (t.L > 0) Ltotal += t.L; });
     res.Ltotal = Ltotal;
 
-    ((st.perfil && st.perfil.pontos) || []).forEach(function (pp) {
-      if (pp.x !== null && pp.x !== undefined && Ltotal > 0 && pp.x > Ltotal + 0.01)
+    /* pontos do perfil com a distância global derivada (referência
+       "extensão total" ou "por trecho") */
+    res.pontosPerfil = ((st.perfil && st.perfil.pontos) || []).map(function (pp) {
+      var x = pp.x;
+      if ((st.perfil.modoDist || 'total') === 'trecho') {
+        x = null;
+        var acc = 0;
+        for (var i = 0; i < res.trechos.length; i++) {
+          var tL = res.trechos[i].L > 0 ? res.trechos[i].L : 0;
+          if (res.trechos[i].id === pp.trechoId) {
+            x = acc + (pp.xLocal === null || pp.xLocal === undefined ? 0 : pp.xLocal);
+            break;
+          }
+          acc += tL;
+        }
+      }
+      return { id: pp.id, x: (x === undefined ? null : x),
+               cota: (pp.cota === undefined ? null : pp.cota), rot: pp.rot || '' };
+    });
+    res.pontosPerfil.forEach(function (r) {
+      if (r.x !== null && Ltotal > 0 && r.x > Ltotal + 0.01)
         res.avisos.push({ tipo: 'atencao', onde: 'Perfil da linha',
-          msg: 'Ponto em ' + GCF.U.fmt(pp.x, 1) + ' m está além da extensão total da linha (' + GCF.U.fmt(Ltotal, 1) + ' m).' });
+          msg: 'Ponto em ' + GCF.U.fmt(r.x, 1) + ' m está além da extensão total da linha (' + GCF.U.fmt(Ltotal, 1) + ' m).' });
     });
 
     var cens = C.cenariosEfetivos(st);
@@ -1536,10 +1601,10 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
         });
         rv.piezFim = acum;
         /* perfil da linha: piezométrica e pressão em cada ponto */
-        rv.perfil = ((st.perfil && st.perfil.pontos) || []).map(function (pp) {
-          if (pp.x === null || pp.x === undefined || pp.cota === null || pp.cota === undefined) return null;
+        rv.perfil = (res.pontosPerfil || []).map(function (pp) {
+          if (pp.x === null || pp.cota === null) return null;
           var pz = C.piezEm(pp.x, cen.naSaida, pt, res);
-          return { id: pp.id, x: pp.x, cota: pp.cota, rot: pp.rot || '', piez: pz,
+          return { id: pp.id, x: pp.x, cota: pp.cota, rot: pp.rot, piez: pz,
                    pressao: (pz === null ? null : pz - pp.cota) };
         });
         rc.vazoes.push(rv);
@@ -1585,7 +1650,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
       });
 
       /* pior pressão em cada ponto do perfil, entre todas as vazões */
-      ((st.perfil && st.perfil.pontos) || []).forEach(function (pp, ip) {
+      (res.pontosPerfil || []).forEach(function (pp, ip) {
         var pior = null;
         rc.vazoes.forEach(function (rv) {
           var r = rv.perfil && rv.perfil[ip];
@@ -1654,7 +1719,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
     var corEixo = claro ? '#999' : 'var(--border-forte)';
     var corConduto = claro ? '#1b2733' : 'var(--texto)';
 
-    var pontos = (st.perfil.pontos || []).filter(function (p) {
+    var pontos = (res.pontosPerfil || []).filter(function (p) {
       return p.x !== null && p.x !== undefined && p.cota !== null && p.cota !== undefined;
     }).slice().sort(function (a, b) { return a.x - b.x; });
     if (pontos.length < 2 || !(res.Ltotal > 0)) return null;
@@ -1816,9 +1881,16 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
     App.render();
   };
 
+  /* A re-renderização é adiada para depois que o navegador conclui a troca
+     de foco (clique ou TAB) — assim o campo de destino não é destruído no
+     meio do caminho e o foco é devolvido ao elemento certo pelo data-foco. */
   App.mudou = function () {
     E.gravar(App.st);
-    App.render();
+    if (App._timerRender) return;
+    App._timerRender = window.setTimeout(function () {
+      App._timerRender = null;
+      App.render();
+    }, 0);
   };
 
   App.irPara = function (aba) {
@@ -1844,6 +1916,8 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
               App.st = E.exemplo(); App.mudou(); App.irPara('resumo');
             }
             break;
+          case 'salvar': App.salvarProjeto(); break;
+          case 'abrir': App.dialogoProjetos(); break;
           case 'exportar': App.exportar(); break;
           case 'importar': document.getElementById('arquivo-json').click(); break;
           case 'imprimir': GCF.REL.imprimir(App.st); break;
@@ -1867,6 +1941,69 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
     });
   };
 
+  App.salvarProjeto = function () {
+    var sugerido = App.st.projeto.nome || 'Projeto';
+    var nome = window.prompt('Salvar o projeto neste navegador com o nome:', sugerido);
+    if (nome === null) return;
+    nome = nome.trim();
+    if (!nome) { alert('Informe um nome para salvar.'); return; }
+    if (!App.st.projeto.nome) App.st.projeto.nome = nome;
+    if (E.salvarProjeto(U.clonar(App.st), nome)) {
+      E.gravar(App.st);
+      App.render();
+      alert('Projeto salvo como "' + nome + '".');
+    }
+  };
+
+  App.dialogoProjetos = function () {
+    var veu = h('div', { class: 'veu', onclick: function (ev) { if (ev.target === veu) veu.remove(); } });
+    function montar() {
+      U.limpar(veu);
+      var l = E.listaProjetos();
+      var nomes = Object.keys(l).sort(function (a, b) {
+        return (l[b].quando || '').localeCompare(l[a].quando || '');
+      });
+      var dlg = h('div', { class: 'dialogo' }, h('h2', {}, 'Projetos salvos neste navegador'));
+      if (!nomes.length) {
+        dlg.appendChild(h('p', { class: 'nota' }, 'Nenhum projeto salvo ainda — use o botão "Salvar" no topo. Os projetos ficam gravados apenas neste navegador; para levar a outro computador use Exportar/Importar.'));
+      } else {
+        var tab = h('table', { class: 'dados' },
+          h('thead', {}, h('tr', {},
+            h('th', {}, 'Projeto'), h('th', {}, 'Local'), h('th', {}, 'Salvo em'), h('th', {}, ''))));
+        var corpo = h('tbody');
+        nomes.forEach(function (nm) {
+          var it = l[nm];
+          var quando = it.quando ? new Date(it.quando).toLocaleString('pt-BR') : '—';
+          corpo.appendChild(h('tr', {},
+            h('td', { class: 'txt' }, h('b', {}, nm)),
+            h('td', { class: 'txt' }, it.local || '—'),
+            h('td', { class: 'c' }, quando),
+            h('td', { class: 'c nq' },
+              h('button', { class: 'btn mini primario', type: 'button', onclick: function () {
+                App.st = E.migrar(U.clonar(it.st));
+                E.gravar(App.st);
+                veu.remove();
+                App.irPara('resumo');
+              } }, 'Abrir'), ' ',
+              h('button', { class: 'btn mini perigo', type: 'button', onclick: function () {
+                if (confirm('Excluir o projeto salvo "' + nm + '"? Esta ação não tem volta.')) {
+                  E.excluirProjeto(nm);
+                  montar();
+                }
+              } }, 'Excluir'))));
+        });
+        tab.appendChild(corpo);
+        dlg.appendChild(h('div', { class: 'rolagem' }, tab));
+        dlg.appendChild(h('p', { class: 'nota' }, 'Abrir substitui o projeto em edição — salve antes, se precisar.'));
+      }
+      dlg.appendChild(h('div', { style: 'margin-top:10px;text-align:right' },
+        h('button', { class: 'btn', type: 'button', onclick: function () { veu.remove(); } }, 'Fechar')));
+      veu.appendChild(dlg);
+    }
+    montar();
+    document.body.appendChild(veu);
+  };
+
   App.exportar = function () {
     var nome = (App.st.projeto.nome || 'conduto-gravidade').toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -1885,6 +2022,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
   /* ---------------- renderização ---------------- */
 
   App.render = function () {
+    var rolagem = window.pageYOffset || document.documentElement.scrollTop || 0;
     var st = App.st;
     H.HW.k = st.params.hwK; H.HW.expQ = st.params.hwExpQ; H.HW.expD = st.params.hwExpD;
     var res = null, erroCalc = null;
@@ -1928,6 +2066,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
       case 'fontes': App.telaFontes(main, st); break;
     }
     App.devolverFoco(foco);
+    window.scrollTo(0, rolagem);
   };
 
   App.guardarFoco = function () {
@@ -2054,6 +2193,10 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
     }
     main.appendChild(cart);
 
+    /* gráfico do perfil × piezométrica */
+    var g = App.graficoPerfilCard(st, res);
+    if (g) main.appendChild(g.card);
+
     /* avisos */
     if (res.avisos.length) {
       var ca = h('div', { class: 'cartao' }, h('h2', {}, 'Pontos a verificar'));
@@ -2179,7 +2322,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
 
     /* arranjo dos tubos: único, idênticos ou diferentes em paralelo */
     var arranjo = t.paraleloModo === 'diferentes' ? 'diferentes' : (t.nParalelo > 1 ? 'identicos' : 'unico');
-    var selArr = h('select', { onchange: function (ev) {
+    var selArr = h('select', { 'data-foco': 'tarr' + t.id, onchange: function (ev) {
       var v = ev.target.value;
       if (v === 'unico') { t.paraleloModo = 'identicos'; t.nParalelo = 1; }
       else if (v === 'identicos') { t.paraleloModo = 'identicos'; if (!(t.nParalelo > 1)) t.nParalelo = 2; }
@@ -2205,7 +2348,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
         { un: 'un', dec: 0, classe: 'l60', foco: 'tpar' + t.id }));
     }
 
-    var selModo = h('select', { onchange: function (ev) { t.modo = ev.target.value; App.mudou(); } },
+    var selModo = h('select', { 'data-foco': 'tmodo' + t.id, onchange: function (ev) { t.modo = ev.target.value; App.mudou(); } },
       h('option', { value: 'catalogo', selected: t.modo === 'catalogo' }, 'Tubo do catálogo'),
       h('option', { value: 'manual', selected: t.modo === 'manual' }, 'Diâmetro interno manual'));
     if (arranjo !== 'diferentes')
@@ -2213,7 +2356,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
 
     if (arranjo !== 'diferentes' && t.modo === 'catalogo') {
       var fams = CAT.porFamilia(CAT.padrao);
-      var selCat = h('select', { class: 'l260', onchange: function (ev) {
+      var selCat = h('select', { class: 'l260', 'data-foco': 'tcat' + t.id, onchange: function (ev) {
         t.catId = ev.target.value || null; t.itemDn = null; App.mudou(); } });
       selCat.appendChild(h('option', { value: '' }, '— escolher catálogo —'));
       Object.keys(fams).forEach(function (fam) {
@@ -2227,7 +2370,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
 
       var cat = CAT.buscar(CAT.padrao, t.catId);
       if (cat) {
-        var selDn = h('select', { onchange: function (ev) { t.itemDn = U.num(ev.target.value); App.mudou(); } });
+        var selDn = h('select', { 'data-foco': 'tdn' + t.id, onchange: function (ev) { t.itemDn = U.num(ev.target.value); App.mudou(); } });
         selDn.appendChild(h('option', { value: '' }, '—'));
         cat.itens.forEach(function (it) {
           selDn.appendChild(h('option', { value: it.dn, selected: t.itemDn === it.dn },
@@ -2244,7 +2387,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
       linhaTubo.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Material'), selMat));
     }
 
-    var selIdade = h('select', { onchange: function (ev) { t.idade = ev.target.value; App.mudou(); } });
+    var selIdade = h('select', { 'data-foco': 'tida' + t.id, onchange: function (ev) { t.idade = ev.target.value; App.mudou(); } });
     R.faixasIdade.forEach(function (f) {
       selIdade.appendChild(h('option', { value: f.id, selected: t.idade === f.id }, f.rot));
     });
@@ -2325,7 +2468,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
 
     /* --- rugosidade --- */
     var linhaC = h('div', { class: 'linha-campos' });
-    var selC = h('select', { onchange: function (ev) { t.cFonte = ev.target.value; App.mudou(); } },
+    var selC = h('select', { 'data-foco': 'tcf' + t.id, onchange: function (ev) { t.cFonte = ev.target.value; App.mudou(); } },
       h('option', { value: 'auto', selected: t.cFonte === 'auto' }, 'Automático (material + idade + fluido)'),
       h('option', { value: 'manual', selected: t.cFonte === 'manual' }, 'Manual'));
     linhaC.appendChild(h('div', { class: 'campo' }, h('label', {}, 'Coeficientes de rugosidade'), selC));
@@ -2352,7 +2495,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
       if (!p) return;
       chips.appendChild(h('span', { class: 'chip' },
         p.rot, h('span', { class: 'k' }, 'K=' + U.fmt(p.K, 2)),
-        '×', h('input', { type: 'text', inputmode: 'numeric', value: pi.qtde,
+        '×', h('input', { type: 'text', inputmode: 'numeric', value: pi.qtde, 'data-foco': 'pq' + t.id + pi.id,
           onchange: function (ev) { var n = U.num(ev.target.value); pi.qtde = (n > 0) ? Math.round(n) : 1; App.mudou(); } }),
         h('button', { type: 'button', title: 'Remover peça',
           onclick: function () { t.pecas.splice(pidx, 1); App.mudou(); } }, '×')));
@@ -2532,7 +2675,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
           onchange: function () { st.vazoes.forEach(function (x) { x.projeto = false; }); v.projeto = true; App.mudou(); } })),
         h('td', {}, h('input', { type: 'text', class: 'cresce', style: 'width:100%;min-width:180px', value: v.nome, 'data-foco': 'vn' + v.id,
           onchange: function (ev) { v.nome = ev.target.value; App.mudou(); } })),
-        h('td', {}, U.campoNum({ valor: v.q, dec: 2, classe: 'l100',
+        h('td', {}, U.campoNum({ valor: v.q, dec: 2, classe: 'l100', foco: 'vq' + v.id,
           gravar: function (x) { v.q = x; App.mudou(); } })),
         h('td', {}, v.q > 0 ? U.fmt(v.q * 3.6, 2) : '—'),
         h('td', { class: 'c' }, h('button', { class: 'btn mini perigo', type: 'button',
@@ -2618,65 +2761,13 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
 
   /* ================= PERFIL DA LINHA ================= */
 
-  App.telaPerfil = function (main, st, res) {
-    var cart = h('div', { class: 'cartao' },
-      h('h2', {}, 'Perfil da linha',
-        h('span', { class: 'dica' }, 'Pontos (distância desde a saída × cota do conduto) ao longo de TODA a linha, em distância acumulada — um perfil único, mesmo com vários trechos em série.')));
-
-    var tab = h('table', { class: 'dados' },
-      h('thead', {}, h('tr', {},
-        h('th', {}, 'Distância desde a saída (m)'), h('th', {}, 'Cota do conduto (m)'), h('th', {}, 'Descrição'), h('th', {}, ''))));
-    var corpo = h('tbody');
-    st.perfil.pontos.forEach(function (p, idx) {
-      corpo.appendChild(h('tr', {},
-        h('td', {}, U.campoNum({ valor: p.x, dec: 2, classe: 'l100', gravar: function (v) { p.x = v; App.mudou(); } })),
-        h('td', {}, U.campoNum({ valor: p.cota, dec: 2, classe: 'l100', gravar: function (v) { p.cota = v; App.mudou(); } })),
-        h('td', { class: 'txt' }, h('input', { type: 'text', style: 'width:100%;min-width:160px', value: p.rot || '', 'data-foco': 'pp' + p.id,
-          onchange: function (ev) { p.rot = ev.target.value; App.mudou(); } })),
-        h('td', { class: 'c' }, h('button', { class: 'btn mini perigo', type: 'button',
-          onclick: function () { st.perfil.pontos.splice(idx, 1); App.mudou(); } }, 'Remover'))));
+  /* Cartão do gráfico perfil × piezométrica (usado no Perfil e no Resumo) */
+  App.graficoPerfilCard = function (st, res) {
+    var pontosValidos = (res.pontosPerfil || []).filter(function (p) {
+      return p.x !== null && p.cota !== null;
     });
-    tab.appendChild(corpo);
-    cart.appendChild(h('div', { class: 'rolagem' }, tab));
-    cart.appendChild(h('div', { style: 'margin-top:10px;display:flex;gap:6px;flex-wrap:wrap' },
-      h('button', { class: 'btn primario', type: 'button', onclick: function () {
-        st.perfil.pontos.push({ id: U.id(), x: null, cota: null, rot: '' }); App.mudou();
-      } }, '+ Adicionar ponto'),
-      h('button', { class: 'btn', type: 'button', title: 'Cria pontos na saída, no fim de cada trecho e na chegada', onclick: function () {
-        var acc = 0, novos = [{ x: 0, rot: 'Saída' }];
-        st.trechos.forEach(function (t) {
-          if (t.L > 0) { acc += t.L; novos.push({ x: acc, rot: 'Fim de ' + (t.nome || 'trecho'), cota: t.cotaFim }); }
-        });
-        novos.forEach(function (nv) {
-          var existe = st.perfil.pontos.some(function (p) { return p.x !== null && p.x !== undefined && Math.abs(p.x - nv.x) < 0.005; });
-          if (!existe) st.perfil.pontos.push({ id: U.id(), x: nv.x,
-            cota: (nv.cota === undefined || nv.cota === null ? null : nv.cota), rot: nv.rot });
-        });
-        st.perfil.pontos.sort(function (a, b) { return (a.x === null ? 1e12 : a.x) - (b.x === null ? 1e12 : b.x); });
-        App.mudou();
-      } }, 'Inserir limites dos trechos'),
-      st.perfil.pontos.length > 1 ? h('button', { class: 'btn', type: 'button', onclick: function () {
-        st.perfil.pontos.sort(function (a, b) { return (a.x === null ? 1e12 : a.x) - (b.x === null ? 1e12 : b.x); });
-        App.mudou();
-      } }, 'Ordenar por distância') : null));
-    cart.appendChild(h('p', { class: 'nota' },
-      'Não é preciso lançar um perfil por trecho: como os trechos estão em série, o perfil é único e a distância é acumulada. ',
-      'Para trabalhar "por trecho", o botão ', h('b', {}, 'Inserir limites dos trechos'), ' cria os pontos exatamente onde um trecho termina e o outro começa (onde o diâmetro muda) — complete as cotas e acrescente os pontos intermediários que interessarem (pontos altos, travessias, mudanças de declividade).'));
-    main.appendChild(cart);
+    if (pontosValidos.length < 2) return null;
 
-    if (!res) return;
-
-    var pontosValidos = st.perfil.pontos.filter(function (p) {
-      return p.x !== null && p.x !== undefined && p.cota !== null && p.cota !== undefined;
-    });
-    if (pontosValidos.length < 2) {
-      main.appendChild(h('div', { class: 'cartao' },
-        h('div', { class: 'aviso info' }, h('b', {}, 'Gráfico'),
-          'Informe ao menos dois pontos completos (distância e cota) para desenhar o perfil e a linha piezométrica.')));
-      return;
-    }
-
-    /* cenário exibido */
     var rcSel = res.cenarios[0];
     if (st.cenarios.habilitado && res.cenarios.length > 1 && App.perfilCen) {
       res.cenarios.forEach(function (rc) { if (rc.cen.id === App.perfilCen) rcSel = rc; });
@@ -2686,7 +2777,7 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
       h('h2', {}, 'Perfil × linha piezométrica',
         h('span', { class: 'dica' }, 'Para o traçado, a perda localizada é distribuída ao longo do trecho. Linhas verticais tracejadas: limites entre trechos. Pontos em vermelho: piezométrica abaixo do conduto (pressão negativa).')));
     if (st.cenarios.habilitado && res.cenarios.length > 1) {
-      var selC = h('select', { onchange: function (ev) { App.perfilCen = ev.target.value; App.render(); } });
+      var selC = h('select', { 'data-foco': 'graf-cen', onchange: function (ev) { App.perfilCen = ev.target.value; App.mudou(); } });
       res.cenarios.forEach(function (rc) {
         selC.appendChild(h('option', { value: rc.cen.id, selected: rcSel.cen.id === rc.cen.id }, rc.cen.nome));
       });
@@ -2705,7 +2796,204 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
       cg.appendChild(h('div', { class: 'aviso' }, h('b', {}, 'Gráfico indisponível'),
         'Verifique se todos os trechos estão completos e se as cotas dos níveis de água foram informadas.'));
     }
-    main.appendChild(cg);
+    return { card: cg, rcSel: rcSel };
+  };
+
+  App.telaPerfil = function (main, st, res) {
+    var modoT = (st.perfil.modoDist || 'total') === 'trecho';
+
+    /* posições acumuladas dos trechos */
+    var offs = [];
+    if (res) {
+      var accO = 0;
+      res.trechos.forEach(function (t) {
+        offs.push({ id: t.id, nome: t.nome, ini: accO, L: t.L > 0 ? t.L : 0 });
+        accO += t.L > 0 ? t.L : 0;
+      });
+    }
+    function xGlobal(p) {
+      if (!modoT) return (p.x === undefined ? null : p.x);
+      for (var i = 0; i < offs.length; i++)
+        if (offs[i].id === p.trechoId)
+          return offs[i].ini + (p.xLocal === null || p.xLocal === undefined ? 0 : p.xLocal);
+      return null;
+    }
+    function novoPonto(campos) {
+      return Object.assign({ id: U.id(), x: null, cota: null, rot: '',
+        trechoId: (modoT && offs.length) ? offs[0].id : null, xLocal: null }, campos || {});
+    }
+    function ordenar() {
+      st.perfil.pontos.sort(function (a, b) {
+        var xa = xGlobal(a), xb = xGlobal(b);
+        return (xa === null ? 1e12 : xa) - (xb === null ? 1e12 : xb);
+      });
+    }
+
+    var cart = h('div', { class: 'cartao' },
+      h('h2', {}, 'Perfil da linha',
+        h('span', { class: 'dica' }, 'Pontos (distância × cota do conduto) ao longo de toda a linha — perfil único, mesmo com vários trechos em série.')));
+
+    /* referência das distâncias: extensão total ou por trecho */
+    var selRef = h('select', { 'data-foco': 'perf-ref', onchange: function (ev) {
+      var novo = ev.target.value;
+      if (novo === (modoT ? 'trecho' : 'total')) return;
+      st.perfil.pontos.forEach(function (pp) {
+        var xg = xGlobal(pp);
+        if (novo === 'trecho') {
+          pp.trechoId = offs.length ? offs[0].id : null;
+          pp.xLocal = null;
+          if (xg !== null && offs.length) {
+            for (var i = 0; i < offs.length; i++) {
+              var o = offs[i];
+              if (xg <= o.ini + o.L + 1e-9 || i === offs.length - 1) {
+                pp.trechoId = o.id; pp.xLocal = xg - o.ini; break;
+              }
+            }
+          }
+        } else {
+          pp.x = xg;
+        }
+      });
+      st.perfil.modoDist = novo;
+      App.mudou();
+    } },
+      h('option', { value: 'total', selected: !modoT }, 'Extensão total (distância acumulada desde a saída)'),
+      h('option', { value: 'trecho', selected: modoT }, 'Por trecho (trecho + distância dentro dele)'));
+    cart.appendChild(h('div', { class: 'linha-campos' },
+      h('div', { class: 'campo' }, h('label', {}, 'Referência das distâncias'), selRef),
+      h('div', { class: 'campo cresce' }, h('label', {}, ' '),
+        h('span', { class: 'nota' }, 'Trocar a referência converte os pontos já lançados, preservando a posição deles na linha.'))));
+
+    var tab = h('table', { class: 'dados' },
+      h('thead', {}, h('tr', {},
+        modoT ? h('th', {}, 'Trecho') : null,
+        h('th', {}, modoT ? 'Dist. no trecho (m)' : 'Distância desde a saída (m)'),
+        modoT ? h('th', { title: 'Distância acumulada desde a saída' }, 'Acum. (m)') : null,
+        h('th', {}, 'Cota do conduto (m)'), h('th', {}, 'Descrição'), h('th', {}, ''))));
+    var corpo = h('tbody');
+    st.perfil.pontos.forEach(function (pp, idx) {
+      var celTrecho = null;
+      if (modoT) {
+        var selT = h('select', { 'data-foco': 'ppt' + pp.id,
+          onchange: function (ev) { pp.trechoId = ev.target.value || null; App.mudou(); } });
+        selT.appendChild(h('option', { value: '' }, '—'));
+        offs.forEach(function (o) { selT.appendChild(h('option', { value: o.id, selected: pp.trechoId === o.id }, o.nome)); });
+        celTrecho = h('td', { class: 'txt' }, selT);
+      }
+      var xg = xGlobal(pp);
+      corpo.appendChild(h('tr', {},
+        celTrecho,
+        h('td', {}, U.campoNum({ valor: modoT ? pp.xLocal : pp.x, dec: 2, classe: 'l100', foco: 'ppx' + pp.id,
+          gravar: function (v) { if (modoT) pp.xLocal = v; else pp.x = v; App.mudou(); } })),
+        modoT ? h('td', {}, xg !== null ? U.fmt(xg, 2) : '—') : null,
+        h('td', {}, U.campoNum({ valor: pp.cota, dec: 2, classe: 'l100', foco: 'ppc' + pp.id,
+          gravar: function (v) { pp.cota = v; App.mudou(); } })),
+        h('td', { class: 'txt' }, h('input', { type: 'text', style: 'width:100%;min-width:160px', value: pp.rot || '', 'data-foco': 'ppr' + pp.id,
+          onchange: function (ev) { pp.rot = ev.target.value; App.mudou(); } })),
+        h('td', { class: 'c' }, h('button', { class: 'btn mini perigo', type: 'button',
+          onclick: function () { st.perfil.pontos.splice(idx, 1); App.mudou(); } }, 'Remover'))));
+    });
+    tab.appendChild(corpo);
+    cart.appendChild(h('div', { class: 'rolagem' }, tab));
+
+    var Ltot = res ? res.Ltotal : 0;
+    cart.appendChild(h('div', { style: 'margin-top:10px;display:flex;gap:6px;flex-wrap:wrap' },
+      h('button', { class: 'btn primario', type: 'button', onclick: function () {
+        if (!st.perfil.pontos.length) {
+          /* primeiro clique: já cria o início e o fim da linha */
+          if (modoT && offs.length) {
+            var ult = offs[offs.length - 1];
+            st.perfil.pontos.push(novoPonto({ trechoId: offs[0].id, xLocal: 0, rot: st.projeto.saidaNome || 'Saída' }));
+            st.perfil.pontos.push(novoPonto({ trechoId: ult.id, xLocal: ult.L || null, rot: st.projeto.chegadaNome || 'Chegada' }));
+          } else {
+            st.perfil.pontos.push(novoPonto({ x: 0, rot: st.projeto.saidaNome || 'Saída' }));
+            st.perfil.pontos.push(novoPonto({ x: Ltot > 0 ? Ltot : null, rot: st.projeto.chegadaNome || 'Chegada' }));
+          }
+        } else {
+          st.perfil.pontos.splice(st.perfil.pontos.length - 1, 0, novoPonto());
+        }
+        App.mudou();
+      } }, '+ Adicionar ponto'),
+      h('button', { class: 'btn', type: 'button', title: 'Cria pontos na saída, no fim de cada trecho e na chegada', onclick: function () {
+        var alvos = [{ xg: 0, rot: st.projeto.saidaNome || 'Saída',
+                       trechoId: offs.length ? offs[0].id : null, xLocal: 0 }];
+        offs.forEach(function (o, i) {
+          alvos.push({ xg: o.ini + o.L,
+                       rot: i === offs.length - 1 ? (st.projeto.chegadaNome || 'Chegada') : 'Fim de ' + o.nome,
+                       trechoId: o.id, xLocal: o.L });
+        });
+        alvos.forEach(function (a) {
+          var existe = st.perfil.pontos.some(function (pp) {
+            var xg = xGlobal(pp);
+            return xg !== null && Math.abs(xg - a.xg) < 0.005;
+          });
+          if (!existe) st.perfil.pontos.push(modoT
+            ? novoPonto({ trechoId: a.trechoId, xLocal: a.xLocal, rot: a.rot })
+            : novoPonto({ x: a.xg, rot: a.rot }));
+        });
+        ordenar();
+        App.mudou();
+      } }, 'Inserir limites dos trechos'),
+      h('button', { class: 'btn', type: 'button', onclick: function () { App.mostrarColar = !App.mostrarColar; App.render(); } },
+        App.mostrarColar ? 'Fechar "Colar do Excel"' : 'Colar do Excel'),
+      st.perfil.pontos.length > 1 ? h('button', { class: 'btn', type: 'button', onclick: function () {
+        ordenar(); App.mudou();
+      } }, 'Ordenar por distância') : null));
+
+    /* colar do Excel */
+    if (App.mostrarColar) {
+      var ta = h('textarea', { rows: 7, style: 'width:100%;font-family:var(--mono);font-size:12px', 'data-foco': 'perf-colar',
+        placeholder: (modoT ? 'dist. no trecho' : 'distância') + '\tcota\tdescrição (opcional)\nEx.:\n0\t741,50\tSaída\n110\t740,20' });
+      var selTImp = null;
+      if (modoT && offs.length) {
+        selTImp = h('select', {});
+        offs.forEach(function (o) { selTImp.appendChild(h('option', { value: o.id }, o.nome)); });
+      }
+      cart.appendChild(h('div', { style: 'margin-top:10px' },
+        h('h3', {}, 'Colar do Excel'),
+        h('p', { class: 'nota' }, 'Copie no Excel duas colunas (distância e cota) — e, se quiser, uma terceira com a descrição — e cole abaixo. Aceita vírgula decimal.'),
+        selTImp ? h('div', { class: 'linha-campos' }, h('div', { class: 'campo' }, h('label', {}, 'Trecho de destino dos pontos colados'), selTImp)) : null,
+        ta,
+        h('div', { style: 'margin-top:6px;display:flex;gap:6px' },
+          h('button', { class: 'btn primario', type: 'button', onclick: function () {
+            var novos = 0;
+            ta.value.split(/\r?\n/).forEach(function (ln) {
+              if (!ln.trim()) return;
+              var cel = ln.split(/\t|;/);
+              if (cel.length < 2) cel = ln.trim().split(/\s+/);
+              var xv = U.num(cel[0]), cv = U.num(cel[1]);
+              if (isNaN(xv) || isNaN(cv)) return;
+              var rot = (cel.slice(2).join(' ') || '').trim();
+              st.perfil.pontos.push(modoT
+                ? novoPonto({ trechoId: selTImp ? selTImp.value : null, xLocal: xv, cota: cv, rot: rot })
+                : novoPonto({ x: xv, cota: cv, rot: rot }));
+              novos++;
+            });
+            if (!novos) { alert('Nenhuma linha válida encontrada — confira se colou duas colunas numéricas.'); return; }
+            ordenar();
+            App.mostrarColar = false;
+            App.mudou();
+          } }, 'Importar pontos'),
+          h('button', { class: 'btn', type: 'button', onclick: function () { App.mostrarColar = false; App.render(); } }, 'Cancelar'))));
+    }
+
+    cart.appendChild(h('p', { class: 'nota' },
+      'Com trechos em série o perfil é único. Na referência "extensão total" a distância é acumulada desde a saída; ',
+      'na referência "por trecho" você informa o trecho e a distância dentro dele — útil quando o levantamento vem por trecho, sem precisar somar as extensões. ',
+      'O botão "Inserir limites dos trechos" cria os pontos exatamente onde o diâmetro muda.'));
+    main.appendChild(cart);
+
+    if (!res) return;
+
+    var g = App.graficoPerfilCard(st, res);
+    if (!g) {
+      main.appendChild(h('div', { class: 'cartao' },
+        h('div', { class: 'aviso info' }, h('b', {}, 'Gráfico'),
+          'Informe ao menos dois pontos completos (distância e cota) para desenhar o perfil e a linha piezométrica.')));
+      return;
+    }
+    main.appendChild(g.card);
+    var rcSel = g.rcSel;
 
     /* pressões nos pontos */
     if (rcSel.vazoes.length) {
@@ -2717,8 +3005,8 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
           h('th', {}, 'Ponto'), h('th', {}, 'Dist. (m)'), h('th', {}, 'Cota (m)'),
           rcSel.vazoes.map(function (rv) { return h('th', {}, rv.vaz.nome + ' (' + U.fmt(rv.Q * 1000, 2) + ' L/s)'); }))));
       var tpb = h('tbody');
-      st.perfil.pontos.forEach(function (pp, ip) {
-        if (pp.x === null || pp.cota === null || pp.x === undefined || pp.cota === undefined) return;
+      (res.pontosPerfil || []).forEach(function (pp, ip) {
+        if (pp.x === null || pp.cota === null) return;
         tpb.appendChild(h('tr', {},
           h('td', {}, pp.rot || 'Ponto ' + (ip + 1)),
           h('td', {}, U.fmt(pp.x, 1)),
@@ -2747,28 +3035,47 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
     }
 
     /* características dos trechos */
+    var ehHW = st.params.metodo === 'hw';
+    var qRef = res.vazProjeto;
     var ct = h('div', { class: 'cartao' }, h('h2', {}, 'Características dos trechos'));
+    var selMet = h('select', { 'data-foco': 'met-res',
+      onchange: function (ev) { st.params.metodo = ev.target.value; App.mudou(); } },
+      h('option', { value: 'hw', selected: st.params.metodo === 'hw' }, 'Hazen-Williams'),
+      h('option', { value: 'colebrook', selected: st.params.metodo === 'colebrook' }, 'Universal (Darcy) — Colebrook-White'),
+      h('option', { value: 'swamee', selected: st.params.metodo === 'swamee' }, 'Universal (Darcy) — Swamee-Jain'),
+      h('option', { value: 'zigrang', selected: st.params.metodo === 'zigrang' }, 'Universal (Darcy) — Zigrang-Sylvester'));
+    ct.appendChild(h('div', { class: 'linha-campos' },
+      h('div', { class: 'campo' }, h('label', {}, 'Método da perda de carga contínua'), selMet),
+      h('div', { class: 'campo cresce' }, h('label', {}, ' '),
+        h('span', { class: 'nota' }, ehHW
+          ? 'Coeficiente adotado no cálculo: C de Hazen-Williams (coluna C).'
+          : 'Coeficiente adotado no cálculo: rugosidade absoluta ε (coluna ε). Temperatura e ajustes finos na aba Parâmetros de cálculo.'))));
     var tt = h('table', { class: 'dados' },
       h('thead', {}, h('tr', {},
-        h('th', {}, 'Trecho'), h('th', {}, 'Tubo'), h('th', {}, 'Tubos'), h('th', {}, 'DI (mm)'), h('th', {}, 'L (m)'),
-        h('th', {}, 'C'), h('th', {}, 'ε (mm)'), h('th', {}, 'ΣK'), h('th', {}, 'Peças'))));
+        h('th', {}, 'Trecho'), h('th', {}, 'Tubo'), h('th', {}, 'DN/DE'), h('th', {}, 'Tubos'),
+        qRef ? h('th', { title: 'Vazão do trecho na vazão de projeto (' + qRef.nome + ' = ' + U.fmt(qRef.q, 2) + ' L/s)' }, 'Q proj. (L/s)') : null,
+        h('th', {}, 'DI (mm)'), h('th', {}, 'L (m)'),
+        ehHW ? h('th', {}, 'C') : h('th', {}, 'ε (mm)'),
+        h('th', {}, 'ΣK'), h('th', {}, 'Peças'))));
     var tb = h('tbody');
     res.trechos.forEach(function (t) {
       tb.appendChild(h('tr', {},
-        h('td', {}, t.nome),
-        h('td', { class: 'txt' }, t.rotTubo + (t.materialRot !== '—' ? ' — ' + t.materialRot : '')),
-        h('td', { class: 'c' }, (t.n || 1) + '×' + (t.tubos ? ' diferentes' : t.n > 1 ? ' paralelo' : '') +
-          (t.fator !== 1 ? ' · ' + U.fmt(t.fator * 100, 0) + '% Q' : '')),
+        h('td', { class: 'nq' }, t.nome),
+        h('td', { class: 'txt' }, t.tubos ? t.rotTubo : t.tuboCurto),
+        h('td', { class: 'c nq' }, t.tubos ? '—' : t.dnRot),
+        h('td', { class: 'c nq' }, (t.n || 1) + '×' + (t.tubos ? ' diferentes' : t.n > 1 ? ' paralelo' : '')),
+        qRef ? h('td', { class: 'nq' }, U.fmt(qRef.q * t.fator, 2) + (t.fator !== 1 ? ' (' + U.fmt(t.fator * 100, 0) + '%)' : '')) : null,
         h('td', {}, t.di ? U.fmt(t.di * 1000, 1) : (t.tubos ? 'vários' : '—')),
         h('td', {}, t.L ? U.fmt(t.L, 2) : '—'),
-        h('td', {}, t.C ? U.fmt(t.C, 0) : '—'),
-        h('td', {}, t.eps ? U.fmt(t.eps, 3) : '—'),
+        ehHW ? h('td', {}, t.C ? U.fmt(t.C, 0) : '—') : h('td', {}, t.eps || t.eps === 0 ? U.fmt(t.eps, 3) : '—'),
         h('td', {}, U.fmt(t.K, 2)),
         h('td', { class: 'txt' }, t.pecas.map(function (p) { return p.qtde + '× ' + p.rot; }).join(' · ') || '—')));
     });
     if (res.Ltotal) tb.appendChild(h('tr', { class: 'total' },
-      h('td', {}, 'Total'), h('td', {}), h('td', {}), h('td', {}), h('td', {}, U.fmt(res.Ltotal, 2)),
-      h('td', {}), h('td', {}), h('td', {}), h('td', {})));
+      h('td', {}, 'Total'), h('td', {}), h('td', {}), h('td', {}),
+      qRef ? h('td', {}) : null,
+      h('td', {}), h('td', {}, U.fmt(res.Ltotal, 2)),
+      h('td', {}), h('td', {}), h('td', {})));
     tt.appendChild(tb);
     ct.appendChild(h('div', { class: 'rolagem' }, tt));
     main.appendChild(ct);
@@ -3119,13 +3426,20 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
     s.push('</tbody></table>');
 
     s.push('<h2>2. Trechos e peças</h2>');
-    s.push('<table><thead><tr><th>Trecho</th><th>Tubo / material</th><th>Tubos</th><th>DI (mm)</th><th>L (m)</th><th>C</th><th>ε (mm)</th><th>ΣK</th><th>Peças</th></tr></thead><tbody>');
+    var ehHW = st.params.metodo === 'hw';
+    var qRef = res.vazProjeto;
+    s.push('<table><thead><tr><th>Trecho</th><th>Tubo</th><th>DN/DE</th><th>Tubos</th>' +
+      (qRef ? '<th>Q proj. (L/s)</th>' : '') +
+      '<th>DI (mm)</th><th>L (m)</th>' + (ehHW ? '<th>C</th>' : '<th>ε (mm)</th>') +
+      '<th>ΣK</th><th>Peças</th></tr></thead><tbody>');
     res.trechos.forEach(function (t) {
-      s.push('<tr><td>' + esc(t.nome) + '</td><td>' + esc(t.rotTubo + (t.materialRot !== '—' ? ' — ' + t.materialRot : '')) +
-        '</td><td class="c">' + (t.n || 1) + '×' + (t.fator !== 1 ? ' · ' + fmt(t.fator * 100, 0) + '% Q' : '') + '</td>' +
+      s.push('<tr><td>' + esc(t.nome) + '</td><td>' + esc((t.tubos ? t.rotTubo : t.tuboCurto) + (t.materialRot !== '—' && !t.tubos ? ' — ' + t.materialRot : '')) +
+        '</td><td class="c">' + esc(t.tubos ? '—' : t.dnRot) + '</td>' +
+        '<td class="c">' + (t.n || 1) + '×' + (t.tubos ? ' dif.' : t.n > 1 ? ' paralelo' : '') + '</td>' +
+        (qRef ? '<td>' + fmt(qRef.q * t.fator, 2) + (t.fator !== 1 ? ' (' + fmt(t.fator * 100, 0) + '%)' : '') + '</td>' : '') +
         '<td>' + (t.di ? fmt(t.di * 1000, 1) : (t.tubos ? 'vários' : '—')) + '</td><td>' + (t.L ? fmt(t.L, 2) : '—') +
-        '</td><td>' + (t.C ? fmt(t.C, 0) : '—') + '</td><td>' + (t.eps ? fmt(t.eps, 3) : '—') +
-        '</td><td>' + fmt(t.K, 2) + '</td><td>' +
+        '</td>' + (ehHW ? '<td>' + (t.C ? fmt(t.C, 0) : '—') + '</td>' : '<td>' + (t.eps || t.eps === 0 ? fmt(t.eps, 3) : '—') + '</td>') +
+        '<td>' + fmt(t.K, 2) + '</td><td>' +
         esc(t.pecas.map(function (x) { return x.qtde + '× ' + x.rot + ' (K=' + fmt(x.K, 2) + ')'; }).join('; ') || '—') +
         '</td></tr>');
     });
@@ -3198,8 +3512,8 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
     var sec = 3;
 
     /* perfil da linha */
-    var pontosPerf = ((st.perfil && st.perfil.pontos) || []).filter(function (pp) {
-      return pp.x !== null && pp.x !== undefined && pp.cota !== null && pp.cota !== undefined;
+    var pontosPerf = (res.pontosPerfil || []).filter(function (pp) {
+      return pp.x !== null && pp.cota !== null;
     });
     if (pontosPerf.length >= 2) {
       sec += 1;
@@ -3212,8 +3526,8 @@ table.dados tr.destaque-projeto td:first-child { box-shadow: inset 3px 0 var(--v
           s.push('<table><thead><tr><th>Ponto</th><th>Dist. (m)</th><th>Cota (m)</th>' +
             rc.vazoes.map(function (rv) { return '<th>' + esc(rv.vaz.nome) + '<br>(' + fmt(rv.Q * 1000, 2) + ' L/s)</th>'; }).join('') +
             '</tr></thead><tbody>');
-          st.perfil.pontos.forEach(function (pp, ip) {
-            if (pp.x === null || pp.cota === null || pp.x === undefined || pp.cota === undefined) return;
+          (res.pontosPerfil || []).forEach(function (pp, ip) {
+            if (pp.x === null || pp.cota === null) return;
             s.push('<tr><td>' + esc(pp.rot || 'Ponto ' + (ip + 1)) + '</td><td>' + fmt(pp.x, 1) + '</td><td>' + fmt(pp.cota, 2) + '</td>' +
               rc.vazoes.map(function (rv) {
                 var r = rv.perfil && rv.perfil[ip];
