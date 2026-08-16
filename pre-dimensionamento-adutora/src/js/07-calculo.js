@@ -914,6 +914,140 @@
     };
   };
 
+  /* ---------------- blocos de ancoragem ---------------- */
+
+  /* Resolve um bloco: de onde vem o tubo (trecho da adutora ou escolha
+     manual), qual a pressão de cálculo e o resultado do dimensionamento.
+     res pode ser null (versão avulsa): aí só vale pressão informada. */
+  C.blocoInfo = function (st, ctx, res, b) {
+    var avisos = [];
+
+    /* ---- tubo ---- */
+    var catId = b.catalogoId, itemRot = b.itemRot, trechoRot = null;
+    if (b.tuboOrigem && b.tuboOrigem.indexOf('adutora.') === 0) {
+      var i = Number(b.tuboOrigem.split('.')[1]);
+      var conj = (st.adutoras || [])[i];
+      if (conj) {
+        catId = conj.catalogoId;
+        itemRot = conj.itemRot;
+        trechoRot = conj.rot;
+        if (!itemRot) avisos.push('O trecho "' + conj.rot + '" ainda não tem diâmetro escolhido.');
+      } else {
+        avisos.push('O trecho da adutora indicado não existe mais; escolha o tubo manualmente.');
+      }
+    }
+    var cat = PDA.CAT.buscar(ctx.cats.todos, catId);
+    var item = null, k;
+    if (cat) for (k = 0; k < cat.itens.length; k++) if (cat.itens[k].rot === itemRot) item = cat.itens[k];
+
+    var deMm = 0;
+    if (b.deOverride !== null && b.deOverride !== undefined && b.deOverride !== '' && Number(b.deOverride) > 0) {
+      deMm = Number(b.deOverride);
+    } else if (item) {
+      deMm = item.de || item.dn;
+      if (!item.de) avisos.push('O catálogo não traz o DE deste item; o DN foi usado como diâmetro externo.');
+    }
+    var dn = item ? item.dn : (deMm || null);
+
+    var de2Mm = 0;
+    if (b.pecaId === 'reducao') {
+      var dn2 = Number(b.dn2) || 0;
+      if (cat) for (k = 0; k < cat.itens.length; k++) if (cat.itens[k].dn === dn2) de2Mm = cat.itens[k].de || cat.itens[k].dn;
+      if (!de2Mm) de2Mm = dn2;
+      if (!(de2Mm > 0)) avisos.push('Informe o DN de saída da redução.');
+    }
+
+    /* ---- pressão de cálculo ---- */
+    var fonte = b.pressaoFonte || 'informada';
+    var pServ = res && res.projeto ? res.projeto.Hm : 0;
+    var pTrans = 0, origemTrans = '';
+    if (res) {
+      if (res.envoltoria && res.envoltoria.criticoMax) {
+        pTrans = res.envoltoria.criticoMax.pMax;
+        origemTrans = 'maior pressão da envoltória do transitório (perfil da linha)';
+      } else if (res.golpe && res.golpe.length) {
+        pTrans = res.golpe.reduce(function (a, g) { return Math.max(a, g.pressaoMaxMca || 0); }, 0);
+        origemTrans = 'Hm + Δh da pré-avaliação do transitório';
+      }
+    }
+
+    var pMca = 0, pOrigem = '';
+    if (fonte === 'transitorio') {
+      if (pTrans > 0) { pMca = pTrans; pOrigem = origemTrans; }
+      else {
+        fonte = 'informada';
+        pMca = Number(b.pressaoInformada) || 0;
+        pOrigem = 'valor informado (transitório indisponível)';
+        avisos.push('Não há transitório calculado — ative a pré-avaliação ou informe a pressão.');
+      }
+    } else if (fonte === 'ensaio') {
+      var fator = Number(b.fatorEnsaio) || 1.5;
+      if (pServ > 0) {
+        pMca = pServ * fator;
+        pOrigem = fator.toLocaleString('pt-BR') + ' × a altura manométrica de projeto (' +
+                  pServ.toFixed(1).replace('.', ',') + ' mca)';
+      } else {
+        pMca = (Number(b.pressaoInformada) || 0) * fator;
+        pOrigem = fator.toLocaleString('pt-BR') + ' × a pressão de serviço informada';
+      }
+    } else {
+      pMca = Number(b.pressaoInformada) || 0;
+      pOrigem = 'valor informado';
+    }
+
+    /* ---- dimensionamento ---- */
+    var calc = PDA.BA.calcular({
+      pecaId: b.pecaId, deMm: deMm, de2Mm: de2Mm, pMca: pMca,
+      orientacao: b.orientacao, dn: dn, rec: b.recobrimento,
+      soloId: b.soloId, sigmaOverride: b.sigmaOverride,
+      fs: Number(st.blocos && st.blocos.fs) || 1.5,
+      gamaConcreto: Number(st.blocos && st.blocos.gamaConcreto) || 2400,
+      tipoEscolhido: b.tipoEscolhido
+    });
+
+    if (calc.solo && !(calc.sigma > 0)) {
+      avisos.push('Solo sem capacidade de apoio — este ponto exige solução específica (estaca, tirante).');
+    }
+    if (calc.orientacao !== 'horizontal') {
+      avisos.push('Curva vertical: os blocos padronizados valem para empuxo horizontal — aqui o bloco sai pelo cálculo.');
+    }
+    if (calc.orientacao === 'horizontal' && calc.padrao && !calc.padrao.achou && calc.E > 0) {
+      avisos.push('Nenhum bloco padronizado resiste a este empuxo — adotar o bloco calculado pelo apoio.');
+    }
+    if (calc.padrao && calc.padrao.achou && !calc.padrao.recPedido) {
+      avisos.push('O bloco padronizado só atende com recobrimento de ' +
+                  calc.padrao.rec.toFixed(2).replace('.', ',') + ' m — confirme a profundidade da vala.');
+    }
+    if (calc.escolhido && !calc.escolhido.atende) {
+      avisos.push('O tipo escolhido manualmente NÃO resiste ao empuxo calculado.');
+    }
+    if (calc.E > 30000) {
+      avisos.push('Empuxo elevado (' + (calc.E / 1000).toFixed(0) + ' tf): avalie junta travada ' +
+                  '(autotravamento dos tubos) ou tirantes em vez de bloco — o bloco resultante pode ser antieconômico.');
+    }
+
+    /* situação geral do bloco */
+    var classe = 'bom';
+    if (!(deMm > 0) || !(pMca > 0)) classe = 'na';
+    else if (calc.escolhido && !calc.escolhido.atende) classe = 'ruim';
+    else if (!(calc.sigma > 0) && calc.orientacao !== 'vert_cima') classe = 'ruim';
+    else if (calc.orientacao === 'horizontal' && calc.padrao && !calc.padrao.achou) classe = 'atencao';
+    else if (calc.padrao && calc.padrao.achou && !calc.padrao.recPedido) classe = 'atencao';
+
+    return {
+      b: b, cat: cat, item: item, trechoRot: trechoRot,
+      dn: dn, deMm: deMm, de2Mm: de2Mm,
+      pMca: pMca, pOrigem: pOrigem, fonte: fonte,
+      pServ: pServ, pTrans: pTrans,
+      calc: calc, avisos: avisos, classe: classe
+    };
+  };
+
+  C.blocosResolvidos = function (st, ctx, res) {
+    if (!st.blocos || !st.blocos.ativo) return [];
+    return (st.blocos.itens || []).map(function (b) { return C.blocoInfo(st, ctx, res, b); });
+  };
+
   /* ---------------- consolidação ---------------- */
 
   C.resumo = function (st, catalogos) {

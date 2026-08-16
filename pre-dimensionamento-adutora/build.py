@@ -16,6 +16,7 @@ RAIZ = Path(__file__).parent
 SRC = RAIZ / "src"
 DIST = RAIZ / "dist"
 SAIDA = DIST / "Pre-dimensionamento-Adutora.html"
+SAIDA_BLOCO = DIST / "Bloco-de-Ancoragem.html"
 
 
 def ler(p: Path) -> str:
@@ -55,6 +56,15 @@ def main() -> int:
     kb = len(html.encode("utf-8")) / 1024
     print(f"gerado {SAIDA.relative_to(RAIZ)}  ({kb:.0f} kB, "
           f"{len(js_files)} módulos JS)")
+
+    # Versão avulsa: só o pré-dimensionamento de blocos de ancoragem.
+    # Mesmo código, com a bandeira PDA_BLOCO ligada antes dos módulos.
+    bloco = html.replace("<script>", "<script>window.PDA_BLOCO = true;\n", 1)
+    bloco = bloco.replace("<title>Pré-dimensionamento de Adutora e Linha de Recalque</title>",
+                          "<title>Bloco de Ancoragem — pré-dimensionamento</title>")
+    SAIDA_BLOCO.write_text(bloco, encoding="utf-8")
+    kb2 = len(bloco.encode("utf-8")) / 1024
+    print(f"gerado {SAIDA_BLOCO.relative_to(RAIZ)}  ({kb2:.0f} kB)")
 
     faltando = [m for m in ("PDA.H", "PDA.CAT", "PDA.C", "PDA.App") if m not in html]
     if faltando:

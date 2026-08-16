@@ -13,7 +13,8 @@ unificando as duas formulações num único programa.
 O programa é **um único arquivo HTML**:
 
 ```
-dist/Pre-dimensionamento-Adutora.html
+dist/Pre-dimensionamento-Adutora.html    programa completo
+dist/Bloco-de-Ancoragem.html             versão avulsa: só blocos de ancoragem
 ```
 
 Copie para o desktop, um pen drive ou uma pasta de rede e dê **dois cliques**.
@@ -125,6 +126,22 @@ cada ponto, soma e subtrai a sobrepressão do transitório e mostra, ponto a pon
 onde a pressão estoura a classe do tubo e onde cai abaixo de zero (subpressão) ou
 abaixo de −10 mca (separação de coluna).
 
+**Blocos de ancoragem** — aba opcional (e uma **versão avulsa**,
+`dist/Bloco-de-Ancoragem.html`, só com esta calculadora, para pré-dimensionar um
+bloco sem montar projeto nenhum). Cada bloco escolhe a peça (curvas de 90° a
+11°15′, tê, CAP/flange cego, válvula fechada, redução), herda o tubo do trecho
+da adutora — DN e DE vêm sozinhos — e a pressão de cálculo: envoltória do
+transitório, fator de ensaio sobre a pressão de serviço ou valor informado. O
+empuxo sai pelo **DE** (`E = 2·p·A·sen(θ/2)` nas curvas, `p·A` nas
+extremidades, `p·(A₁−A₂)` nas reduções) e o resultado vem por duas vias lado a
+lado: a **tabela de blocos padronizados** da concessionária (tipos 1 a 26, por
+DN e recobrimento, com ★ no menor tipo que resiste — clique para adotar outro)
+e o **bloco calculado pelo apoio no solo** (`A = FS·E/σ`, com a tensão
+admissível por tipo de solo, editável), que cobre também curvas verticais e os
+empuxos acima de toda a tabela. Um desenho esquemático mostra a direção do
+empuxo e o encosto. Com a aba ligada, o memorial ganha o capítulo de blocos —
+fórmula, aplicação numérica, tabela-resumo e fontes (Azevedo Netto; AWWA M41).
+
 **Análise econômica de diâmetro** — opcional. Acrescenta à tabela de comparação
 o custo do tubo, o custo anual da energia associada à perda de carga daquele
 trecho e o custo anual total, marcando com **$** o diâmetro de menor custo. O
@@ -215,6 +232,7 @@ src/js/02-hidraulica.js     núcleo hidráulico (perda de carga, potência, NPSH
 src/js/03-rugosidade.js     coeficientes por material/idade/fluido, com fontes
 src/js/04-catalogos.js      catálogos de tubos da base
 src/js/05-pecas-motores.js  peças e coeficientes K, motores, critérios de verificação
+src/js/05c-blocos.js        blocos de ancoragem (empuxo, blocos-padrão, apoio no solo)
 src/js/06-estado.js         modelo de dados, persistência, migração
 src/js/07-calculo.js        motor de cálculo (cenários, varredura, piezométrica, golpe)
 src/js/00-marca.js          marca do cabeçalho e carregamento da logo
@@ -222,6 +240,7 @@ src/js/08-ui-base.js        utilidades de interface
 src/js/08b-esquemas.js      desenhos esquemáticos
 src/js/09-ui-forms.js       painéis de entrada
 src/js/09b-ui-perfil.js     perfil da linha e envoltórias
+src/js/09c-ui-blocos.js     aba de blocos de ancoragem
 src/js/10-ui-resultados.js  resultados, piezométrica e memorial
 src/js/11-ui-catalogos.js   catálogos e fontes
 src/js/11b-ui-biblioteca.js biblioteca de projetos
@@ -229,9 +248,9 @@ src/js/12-app.js            aplicação, ações, arquivos
 src/js/08c-formula.js       compositor de fórmulas (frações, radicais, índices)
 src/js/13-memorial.js       texto, fórmulas, tabelas e figuras do memorial
 src/js/14-exportar.js       paginação A4, sumário/índices, PDF e Word
-build.py                    gera dist/Pre-dimensionamento-Adutora.html
-tests/run.js                243 testes do núcleo de cálculo
-tests/ui.js                 309 testes de interface em navegador
+build.py                    gera os dois arquivos de dist/
+tests/run.js                273 testes do núcleo de cálculo
+tests/ui.js                 336 testes de interface em navegador
 docs/AUDITORIA-PLANILHAS.md auditoria das planilhas de origem
 ```
 

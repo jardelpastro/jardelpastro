@@ -900,6 +900,99 @@ var ctxT = C.contexto(stTipo, cats);
 ok('trecho de sucção usa o critério de sucção',
    C.criterioDe(stTipo, ctxT, 'succao').vMax !== C.criterioDe(stTipo, ctxT, 'barrilete').vMax);
 
+/* ---------------------------------------------------------------- */
+titulo('30. Blocos de ancoragem — empuxo');
+const BA = PDA.BA;
+/* com DE igual ao DN, reproduz os empuxos unitários da planilha */
+prox('tê DN 250 (DE=DN): 49,09 kgf/mca', BA.empuxoUnit('te', 0.25), 49.09, 1e-3);
+prox('curva 90° DN 250: 69,42', BA.empuxoUnit('c90', 0.25), 69.42, 1e-3);
+prox('curva 45° DN 250: 37,57', BA.empuxoUnit('c45', 0.25), 37.57, 1e-3);
+prox('curva 22°30′ DN 250: 19,15', BA.empuxoUnit('c22', 0.25), 19.15, 1e-3);
+prox('curva 11°15′ DN 250: 9,62', BA.empuxoUnit('c11', 0.25), 9.62, 1e-3);
+prox('redução 400→300 = A1−A2', BA.empuxoUnit('reducao', 0.4, 0.3),
+     1000 * Math.PI / 4 * (0.16 - 0.09), 1e-9);
+ok('curva 90° = √2 × tê', Math.abs(BA.empuxoUnit('c90', 0.3) / BA.empuxoUnit('te', 0.3) - Math.SQRT2) < 1e-9);
+
+titulo('31. Blocos de ancoragem — seleção do bloco padronizado');
+/* casos da planilha (aba GCAC), com o DN nominal para reproduzir a seleção */
+let selB = BA.selecionarPadrao(200, 0.65, 31.42 * 60);      /* tê DN 200, 60 mca */
+ok('tê DN 200 a 60 mca -> tipo 2 com 0,65 m',
+   selB.achou && selB.linha.tipo === 2 && selB.rec === 0.65, JSON.stringify(selB));
+selB = BA.selecionarPadrao(400, 0.65, 125.66 * 60);         /* tê DN 400, 60 mca */
+ok('tê DN 400 a 60 mca -> cai para 0,90 m, tipo 8',
+   selB.achou && selB.linha.tipo === 8 && selB.rec === 0.90 && !selB.recPedido, JSON.stringify(selB));
+prox('e a capacidade dele é 7800 kgf', selB.achou ? selB.linha.cap : 0, 7800, 1e-9);
+selB = BA.selecionarPadrao(800, 0.65, 200000);
+ok('empuxo acima de toda a tabela -> "a ser calculado"', !selB.achou);
+/* na fronteira exata, o bloco ainda atende (como o PROCV aproximado da planilha) */
+selB = BA.selecionarPadrao(200, 0.65, 1800);
+ok('empuxo igual à capacidade ainda usa o tipo 1', selB.achou && selB.linha.tipo === 1);
+selB = BA.selecionarPadrao(200, 0.65, 1801);
+ok('1 kgf acima já pede o tipo 2', selB.achou && selB.linha.tipo === 2);
+/* os dois erros de digitação da planilha ficaram corrigidos */
+const t175 = BA.capacidades.filter(c => c.rec === 1.75)[0];
+const iDN700 = t175.dns.indexOf(700), iDN800 = t175.dns.indexOf(800);
+ok('1,75 m / DN 700 / tipo 6 corrigido para 7000', t175.cap[t175.tipos.indexOf(6)][iDN700] === 7000);
+ok('1,75 m / DN 800 / tipo 17 corrigido para 14000', t175.cap[t175.tipos.indexOf(17)][iDN800] === 14000);
+ok('colunas DN 900/1000 de 1,75 m omitidas',
+   t175.cap.every(l => l[t175.dns.indexOf(900)] === null && l[t175.dns.indexOf(1000)] === null));
+/* capacidade nunca menor que o empuxo em nenhuma célula usada na seleção */
+let coerente = true;
+BA.capacidades.forEach(t => t.cap.forEach((linha, i) => linha.forEach((cap, j) => {
+  if (cap === null) return;
+  const s = BA.selecionarPadrao(t.dns[j], t.rec, cap);
+  if (!s.achou || s.linha.cap < cap) coerente = false;
+})));
+ok('toda capacidade tabelada é atingível pela seleção', coerente);
+
+titulo('32. Blocos de ancoragem — apoio no solo e peso');
+let ap = BA.dimensionarApoio(7540, 10000, 1.5, 0.4264);
+prox('A = FS·E/σ = 1,131 m²', ap.Anec, 1.5 * 7540 / 10000, 1e-9);
+ok('encosto sugerido cobre a área', ap.Aefetiva >= ap.Anec - 1e-9);
+ok('FS efetivo ≥ FS pedido', ap.fsEfetivo >= 1.5 - 1e-9);
+ok('proporção do encosto contida (L ≤ 2,6·b)', ap.L <= 2.6 * ap.b + 1e-9);
+ap = BA.dimensionarApoio(131035, 10000, 1.5, 0.842);          /* caso DN 800 */
+ok('empuxo grande não gera encosto em fita (L ≤ 2,6·b)', ap.L <= 2.6 * ap.b + 1e-9,
+   ap.b + ' x ' + ap.L);
+ok('solo sem capacidade -> sem dimensionamento', BA.dimensionarApoio(5000, 0, 1.5, 0.2).ok === false);
+let pesoB = BA.dimensionarPeso(10000, 1.5, 2400, 0.5);
+prox('bloco de peso: V = FS·E/γ', pesoB.concreto, 1.5 * 10000 / 2400, 1e-9);
+
+titulo('33. Blocos de ancoragem — resolução no projeto');
+const stB = stNPSH();
+stB.blocos.ativo = true;
+stB.blocos.itens = [E.novoBloco(1)];
+stB.blocos.itens[0].pressaoFonte = 'informada';
+stB.blocos.itens[0].pressaoInformada = 60;
+const ctxB = C.contexto(stB, cats);
+const resB = C.resumo(stB, cats);
+let infoB = C.blocoInfo(stB, ctxB, resB, stB.blocos.itens[0]);
+ok('herda o DE do trecho da adutora', infoB.deMm > 0 && infoB.trechoRot !== null,
+   JSON.stringify({ de: infoB.deMm, tr: infoB.trechoRot }));
+prox('empuxo = unit × pressão', infoB.calc.E, infoB.calc.unit * 60, 1e-9);
+/* pressão pela envoltória/golpe */
+stB.blocos.itens[0].pressaoFonte = 'transitorio';
+infoB = C.blocoInfo(stB, ctxB, resB, stB.blocos.itens[0]);
+const pMaxGolpe = resB.golpe.reduce((a, g) => Math.max(a, g.pressaoMaxMca || 0), 0);
+ok('pressão do transitório = máxima do golpe (sem perfil)',
+   Math.abs(infoB.pMca - pMaxGolpe) < 1e-9, infoB.pMca + ' x ' + pMaxGolpe);
+/* pressão de ensaio */
+stB.blocos.itens[0].pressaoFonte = 'ensaio';
+stB.blocos.itens[0].fatorEnsaio = 1.5;
+infoB = C.blocoInfo(stB, ctxB, resB, stB.blocos.itens[0]);
+prox('pressão de ensaio = 1,5 × Hm', infoB.pMca, resB.projeto.Hm * 1.5, 1e-9);
+/* tipo escolhido manualmente que não atende é acusado */
+stB.blocos.itens[0].pressaoFonte = 'informada';
+stB.blocos.itens[0].tipoEscolhido = 1;
+infoB = C.blocoInfo(stB, ctxB, resB, stB.blocos.itens[0]);
+ok('tipo manual insuficiente vira "ruim"',
+   infoB.calc.escolhido && !infoB.calc.escolhido.atende ? infoB.classe === 'ruim' : true);
+/* bloco em curva vertical sai pelo cálculo */
+stB.blocos.itens[0].tipoEscolhido = null;
+stB.blocos.itens[0].orientacao = 'vert_cima';
+infoB = C.blocoInfo(stB, ctxB, resB, stB.blocos.itens[0]);
+ok('curva vertical convexa dimensiona por peso', infoB.calc.peso && infoB.calc.peso.concreto > 0);
+
 console.log('\n' + '='.repeat(60));
 console.log(falhas === 0 ? `TODOS OS ${total} TESTES PASSARAM` : `${falhas} de ${total} TESTES FALHARAM`);
 console.log('='.repeat(60));

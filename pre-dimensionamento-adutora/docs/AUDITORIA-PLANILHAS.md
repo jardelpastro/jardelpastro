@@ -310,7 +310,54 @@ indicativo numérico.
 A única divergência deliberada em relação à norma é o **espaçamento entre
 linhas: 1,2 em vez de 1,5**, a pedido do usuário.
 
-## 4. Itens que dependem de conferência do fornecedor
+## 4. Planilha de blocos de ancoragem (Blocos_de_Ancoragem.xlsx)
+
+Auditada em separado, ao transportar a sistemática para a aba **Blocos de
+ancoragem** e para a versão avulsa (`dist/Bloco-de-Ancoragem.html`).
+
+### 4.1 O que a planilha faz — e está certo
+
+O método é a **seleção entre blocos padronizados** de concessionária (tipos 1 a
+26, com concreto, forma e aço tabelados) pela capacidade de empuxo por DN e
+recobrimento (0,65 / 0,90 / 1,50 / 1,75 m). Verificado numericamente:
+
+- os empuxos unitários (aba `Bloco calculado`) seguem `E = p·A` para tê, CAP e
+  flange e `E = 2·p·A·sen(θ/2)` para as curvas, com erro menor que 0,1 %;
+- o PROCV aproximado com linhas duplicadas somando 10⁻¹⁷ (aba `Empuxos`)
+  funciona como tabela de degraus: o bloco escolhido sempre tem capacidade
+  maior ou igual ao empuxo, inclusive nas fronteiras exatas;
+- a lógica de recuo para o recobrimento maior (0,65 m → 0,90 m → "a ser
+  calculado") está coerente.
+
+### 4.2 Erros encontrados
+
+1. **Dois zeros a mais na tabela de 1,75 m**: DN 700 / tipo 6 trazia
+   **70000** kgf (é 7000) e DN 800 / tipo 17 trazia **140000** (é 14000).
+   Nenhuma fórmula referencia essa tabela hoje, mas o erro estava armado —
+   um bloco pareceria dez vezes mais capaz do que é. Corrigidos na
+   transcrição para o programa.
+2. **As colunas DN 900 e DN 1000 da tabela de 1,75 m** trazem valores menores
+   que os de DN 800 no mesmo tipo (por exemplo, tipo 10: 11000 kgf em DN 800 e
+   8100 em DN 900), aparentemente arrastados de outra tabela. Foram omitidas:
+   nesses DN o bloco sai pelo cálculo de apoio.
+3. **Empuxo calculado com o DN nominal, não com o DE.** A pressão atua na
+   seção externa da junta; em FD DN 200 (DE 222 mm) a diferença é **+23 %
+   contra a segurança**. O DN 150 usava a área do DN 200, o que compensava
+   por acidente só nesse diâmetro. O programa calcula com o DE do catálogo.
+4. **Piso fixo de 60 mca e fator 1,5** embutidos nas fórmulas das abas de
+   setor (herança de rede de distribuição). No programa, a pressão de cálculo
+   é explícita: envoltória do transitório, fator de ensaio editável sobre a
+   pressão de serviço, ou valor informado.
+
+### 4.3 O que a planilha não faz
+
+Não há verificação de apoio no solo: a resistência vem só das capacidades
+tabeladas, cuja origem não está no arquivo. O programa acrescenta o cálculo
+clássico de anteprojeto — área de encosto `A = FS·E/σ` contra a parede não
+escavada da vala (Azevedo Netto; AWWA M41 / DIPRA) — que também cobre curvas
+verticais e os empuxos acima de toda a tabela.
+
+## 5. Itens que dependem de conferência do fornecedor
 
 Marcados no programa com a etiqueta **"conferir catálogo"** e listados no painel
 de avisos dos resultados:

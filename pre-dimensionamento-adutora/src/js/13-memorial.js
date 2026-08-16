@@ -54,6 +54,8 @@
     nbr5590: { cit: 'ABNT NBR 5590', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 5590</b>: tubos de aço-carbono com costura, com ou sem revestimento, para condução de fluidos. Rio de Janeiro.' },
     nbr8890: { cit: 'ABNT NBR 8890', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 8890</b>: tubo de concreto de seção circular para água pluvial e esgoto sanitário. Rio de Janeiro.' },
     nbr15536: { cit: 'ABNT NBR 15536', ref: 'ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. <b>NBR 15536</b>: sistemas para adução e distribuição de água e coletores de esgoto — tubos e conexões de PRFV. Rio de Janeiro.' },
+    m41: { cit: 'AWWA M41',
+          ref: 'AMERICAN WATER WORKS ASSOCIATION. <b>Manual M41</b>: ductile-iron pipe and fittings. 3. ed. Denver: AWWA. Cap. Thrust restraint design (DIPRA).' },
     asme: { cit: 'ASME B36.10M', ref: 'AMERICAN SOCIETY OF MECHANICAL ENGINEERS. <b>ASME B36.10M</b>: welded and seamless wrought steel pipe. New York.' },
     en545: { cit: 'EN 545', ref: 'EUROPEAN COMMITTEE FOR STANDARDIZATION. <b>EN 545</b>: ductile iron pipes, fittings, accessories and their joints for water pipelines. Brussels.' },
     en1092: { cit: 'EN 1092-2', ref: 'EUROPEAN COMMITTEE FOR STANDARDIZATION. <b>EN 1092-2</b>: flanges and their joints — cast iron flanges. Brussels.' }
@@ -371,6 +373,7 @@
     if (!submersivel) MEM.capituloNPSH(D);
     if (res.curvaBomba && res.operacao && !res.operacao.erro) MEM.capituloOperacao(D);
     if (st.golpe.avaliar && res.golpe && res.golpe.length) MEM.capituloTransitorio(D);
+    if (st.blocos && st.blocos.ativo && (st.blocos.itens || []).length) MEM.capituloBlocos(D);
 
     /* ---------------- considerações finais ---------------- */
     D.capitulo('Considerações finais');
@@ -827,6 +830,110 @@
       D.p('Em associação em paralelo o ganho de vazão obtido ao acionar um conjunto adicional é sempre inferior ' +
           'à vazão de uma bomba operando isoladamente, porque a altura exigida pelo sistema cresce com a vazão.');
     }
+  };
+
+  /* ================================================================
+     Blocos de ancoragem
+     ================================================================ */
+
+  MEM.capituloBlocos = function (D) {
+    var st = D.st, ctx = D.ctx, res = D.res;
+    var infos = PDA.C.blocosResolvidos(st, ctx, res)
+      .filter(function (i) { return i.deMm > 0 && i.pMca > 0; });
+    if (!infos.length) return;
+
+    D.capitulo('Blocos de ancoragem');
+    D.p('Nas mudanças de direção e de seção de tubulação com junta não travada, a pressão interna gera um ' +
+        'empuxo que precisa ser transmitido ao terreno por blocos de ancoragem. O empuxo foi calculado com o ' +
+        'diâmetro EXTERNO do tubo, porque a pressão atua na seção da junta ' + D.usar('az') + ' ' +
+        MEM.cit('m41') + '.');
+    D.usar('m41');
+    D.formula(['E = p \\cdot A', 'E = 2 \\cdot p \\cdot A \\cdot sen ( \\frac{\\theta}{2} )',
+               'E = p \\cdot ( A_1 - A_2 )'],
+      'E é o empuxo (kgf); p, a pressão de cálculo (mca, tomada como kgf/m² por metro de coluna); ' +
+      'A, a área da seção externa do tubo (m²); \u03b8, o ângulo da curva. A primeira forma vale para ' +
+      'extremidades, tês e válvulas fechadas; a segunda, para curvas; a terceira, para reduções.');
+
+    D.p('Cada bloco foi pré-dimensionado por duas vias: a seleção entre os blocos padronizados da ' +
+        'concessionária, pela capacidade tabelada por DN e recobrimento, e a verificação clássica de apoio ' +
+        'no solo, em que a área de encosto na parede não escavada da vala deve transmitir o empuxo majorado ' +
+        'sem exceder a tensão admissível do terreno ' + MEM.cit('m41') + '.');
+    D.formula('A_{nec} = \\frac{FS \\cdot E}{\\sigma_{adm}}',
+      'A_{nec} é a área de encosto necessária (m²); FS, o fator de segurança adotado (' +
+      ne(st.blocos.fs) + '); e \u03c3_{adm}, a tensão admissível de apoio do solo (kgf/m²).');
+
+    infos.forEach(function (info) {
+      var calc = info.calc;
+      D.secao(info.b.rot + ' — ' + PDA.BA.peca(info.b.pecaId).rot +
+              (info.dn ? ', DN ' + info.dn : ''));
+      D.p('Tubo com DE de ' + n(info.deMm, 1) + ' mm' +
+          (info.trechoRot ? ' (herdado de ' + info.trechoRot + ')' : '') +
+          '. Pressão de cálculo de ' + n(info.pMca, 1) + ' mca — ' + info.pOrigem + '. ' +
+          'Solo de apoio: ' + calc.solo.rot.toLowerCase() + ', com σ admissível de ' +
+          n(calc.sigma, 0) + ' kgf/m².');
+
+      D.aplicacao('E = ' + n(calc.unit, 2) + ' \\cdot ' + n(info.pMca, 1) + ' = ' +
+                  n(calc.E, 0) + '\\ \\text{kgf}' );
+
+      if (calc.orientacao === 'horizontal') {
+        var adotado = calc.escolhido ||
+          (calc.padrao && calc.padrao.achou ? calc.padrao.linha : null);
+        if (adotado) {
+          var tipoN = calc.escolhido ? calc.escolhido.tipo : calc.padrao.linha.tipo;
+          var recAd = calc.escolhido ? info.b.recobrimento : calc.padrao.rec;
+          D.p('Bloco padronizado adotado: tipo ' + tipoN + ' (capacidade de ' +
+              n(adotado.cap || 0, 0) + ' kgf com recobrimento de ' + ne(recAd) +
+              ' m), com ' + n(adotado.concreto, 2) + ' m³ de concreto, ' + n(adotado.forma, 2) +
+              ' m² de forma e ' + n(adotado.aco, 0) + ' kg de aço.');
+        } else {
+          D.p('Nenhum bloco padronizado resiste ao empuxo — vale o bloco calculado pelo apoio.');
+        }
+        if (calc.apoio && calc.apoio.ok) {
+          D.aplicacao('A_{nec} = \\frac{' + ne(st.blocos.fs) + ' \\cdot ' + n(calc.E, 0) + '}{' +
+                      n(calc.sigma, 0) + '} = ' + n(calc.apoio.Anec, 2) + '\\ \\text{m}^2',
+                      { rot: 'Encosto sugerido: ' + n(calc.apoio.b, 2) + ' × ' + n(calc.apoio.L, 2) +
+                        ' m (' + n(calc.apoio.Aefetiva, 2) + ' m²), com ' + n(calc.apoio.concreto, 2) +
+                        ' m³ de concreto.' });
+        }
+      } else if (calc.orientacao === 'vert_cima' && calc.peso) {
+        D.p('Curva vertical convexa: o empuxo é ascendente e a resistência vem do peso próprio do bloco.');
+        D.aplicacao('G = ' + ne(st.blocos.fs) + ' \\cdot ' + n(calc.E, 0) + ' = ' + n(calc.peso.G, 0) +
+                    '\\ \\text{kgf}',
+                    'V = \\frac{' + n(calc.peso.G, 0) + '}{' + ne(st.blocos.gamaConcreto) + '} = ' +
+                    n(calc.peso.concreto, 2) + '\\ \\text{m}^3');
+      } else if (calc.apoio && calc.apoio.ok) {
+        D.p('Curva vertical côncava: o empuxo é descendente, apoiado no fundo da vala.');
+        D.aplicacao('A_{nec} = \\frac{' + ne(st.blocos.fs) + ' \\cdot ' + n(calc.E, 0) + '}{' +
+                    n(calc.sigma, 0) + '} = ' + n(calc.apoio.Anec, 2) + '\\ \\text{m}^2');
+      }
+      info.avisos.forEach(function (avz) { D.nota('Atenção: ' + avz); });
+    });
+
+    /* tabela-resumo */
+    var linhasB = infos.map(function (info) {
+      var calc = info.calc;
+      var adot = calc.escolhido || (calc.padrao && calc.padrao.achou ? calc.padrao.linha : null);
+      return h('tr', {},
+        h('td', { class: 'esq' }, info.b.rot),
+        h('td', { class: 'esq' }, PDA.BA.peca(info.b.pecaId).rot),
+        h('td', {}, info.dn ? String(info.dn) : '—'),
+        h('td', {}, n(info.deMm, 0)),
+        h('td', {}, n(info.pMca, 1)),
+        h('td', {}, n(calc.E, 0)),
+        h('td', { class: 'esq' }, calc.orientacao === 'horizontal'
+          ? (adot ? 'tipo ' + (calc.escolhido ? calc.escolhido.tipo : calc.padrao.linha.tipo) : 'calculado')
+          : (calc.orientacao === 'vert_cima' ? 'peso' : 'apoio no fundo')),
+        h('td', {}, adot ? n(adot.concreto, 2)
+          : (calc.peso ? n(calc.peso.concreto, 2)
+            : (calc.apoio && calc.apoio.ok ? n(calc.apoio.concreto, 2) : '—'))));
+    });
+    D.tabela('Blocos de ancoragem', [{ rot: 'Bloco', esq: true }, { rot: 'Peça', esq: true },
+      'DN', 'DE (mm)', 'p (mca)', 'E (kgf)', { rot: 'Solução', esq: true }, 'Concreto (m³)'], linhasB,
+      'Resultados calculados pelo programa; blocos padronizados conforme padrão da concessionária.');
+
+    D.p('O dimensionamento acima é de anteprojeto e considera o empuxo transmitido a solo firme, não ' +
+        'escavado. Blocos de grande porte, solos moles e travessias exigem verificação geotécnica e ' +
+        'estrutural específicas.');
   };
 
   /* ================================================================

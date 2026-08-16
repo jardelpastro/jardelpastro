@@ -29,7 +29,7 @@ function titulo(t) { console.log('\n' + t); }
   await page.waitForSelector('#abas button');
 
   titulo('1. Carregamento');
-  ok('abas montadas', (await page.locator('#abas button').count()) === 11,
+  ok('abas montadas', (await page.locator('#abas button').count()) === 12,
      String(await page.locator('#abas button').count()));
   ok('marca no cabeçalho', (await page.locator('#marca .marca-bloco').count()) === 1);
   ok('projeto em branco abre sem pendências',
@@ -1454,6 +1454,132 @@ function titulo(t) { console.log('\n' + t); }
   await page.waitForTimeout(200);
   await page.evaluate(() => window.PDA.UI.fecharModal());
   await page.waitForTimeout(300);
+
+  titulo('35. Blocos de ancoragem — aba');
+  await page.evaluate(() => window.PDA.UI.fecharModal());
+  await page.waitForTimeout(200);
+  await page.locator('[data-acao="exemplo"]').click();
+  await page.waitForSelector('.modal');
+  await page.locator('.modal button', { hasText: 'Linha de recalque de esgoto' }).click();
+  await page.waitForTimeout(500);
+  await page.locator('#abas button', { hasText: 'Blocos' }).click();
+  await page.waitForTimeout(350);
+  ok('aba existe e explica antes de ligar',
+     /Dimensionar os blocos de ancoragem/.test(await page.locator('#conteudo').innerText()));
+  await page.locator('input[data-bind="blocos.ativo"]').click();
+  await page.waitForTimeout(450);
+  const txtBl = await page.locator('#conteudo').innerText();
+  ok('ligou e já veio um bloco pronto', /Bloco padronizado|bloco calculado/i.test(txtBl));
+  ok('herda o tubo do trecho da adutora', /travessia até a ETE/.test(txtBl));
+  ok('pressão padrão é a envoltória do transitório', /Envoltória do transitório/.test(txtBl));
+  ok('mostra o empuxo em kgf', /Empuxo:\s*[\d.]+/.test(txtBl.replace(/ /g, ' ')));
+  ok('duas vias: padronizado e apoio no solo',
+     /Bloco padronizado/.test(txtBl) && /apoio no solo/.test(txtBl));
+  ok('esquema desenhado', (await page.locator('#conteudo svg.esquema').count()) >= 1);
+
+  /* pressão informada baixa: aparece a estrela e dá para adotar por clique */
+  await page.evaluate(() => {
+    const b = window.PDA.App.st.blocos.itens[0];
+    b.pressaoFonte = 'informada';
+    b.pressaoInformada = 20;
+    b.tuboOrigem = 'manual';
+    b.catalogoId = 'fd_k7';
+    b.itemRot = 'DN 200';
+    b.pecaId = 'te';
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(400);
+  ok('sugestão marcada com estrela', (await page.locator('#conteudo tr.selecionada').count()) >= 1 &&
+     /★/.test(await page.locator('#conteudo').innerText()));
+  const linhasOk = page.locator('#conteudo tr[data-acao="blocoTipo"].bom, #conteudo tr[data-acao="blocoTipo"].selecionada');
+  const antesTipo = await page.evaluate(() => window.PDA.App.st.blocos.itens[0].tipoEscolhido);
+  ok('sem escolha manual, tipoEscolhido é nulo', antesTipo === null);
+  await page.locator('#conteudo tr[data-acao="blocoTipo"]').last().click();
+  await page.waitForTimeout(350);
+  const depoisTipo = await page.evaluate(() => window.PDA.App.st.blocos.itens[0].tipoEscolhido);
+  ok('clique adota o tipo', typeof depoisTipo === 'number', String(depoisTipo));
+  await page.locator('#conteudo button', { hasText: 'Voltar à sugestão' }).click();
+  await page.waitForTimeout(300);
+  ok('voltar à sugestão limpa a escolha',
+     (await page.evaluate(() => window.PDA.App.st.blocos.itens[0].tipoEscolhido)) === null);
+
+  /* adicionar, duplicar, excluir */
+  await page.locator('[data-acao="blocoNovo"]').click();
+  await page.waitForTimeout(300);
+  ok('adiciona bloco', (await page.evaluate(() => window.PDA.App.st.blocos.itens.length)) === 2);
+  await page.locator('[data-acao="blocoDuplicar"]').first().click();
+  await page.waitForTimeout(300);
+  ok('duplica bloco', (await page.evaluate(() => window.PDA.App.st.blocos.itens.length)) === 3);
+  await page.locator('[data-acao="blocoExcluir"]').last().click();
+  await page.waitForTimeout(300);
+  ok('exclui bloco', (await page.evaluate(() => window.PDA.App.st.blocos.itens.length)) === 2);
+
+  /* memorial ganha o capítulo */
+  const memBl = await page.evaluate(() => {
+    const P = window.PDA;
+    const ctx = P.C.contexto(P.App.st, P.App.cats);
+    const res = P.C.resumo(P.App.st, P.App.cats);
+    const D = P.MEM.documento(P.App.st, ctx, res);
+    const tmp = document.createElement('div');
+    D.blocos.forEach(b => tmp.appendChild(b));
+    return {
+      capitulo: /Blocos de ancoragem/.test(tmp.textContent),
+      formula: /sen/.test(tmp.textContent),
+      tabela: D.tabelas.some(t => /Blocos de ancoragem/.test(t.titulo)),
+      fonte: /AWWA M41|M41/.test(tmp.textContent)
+    };
+  });
+  ok('memorial tem o capítulo de blocos', memBl.capitulo);
+  ok('com a fórmula do empuxo', memBl.formula);
+  ok('com a tabela-resumo', memBl.tabela);
+  ok('citando a fonte (AWWA M41)', memBl.fonte);
+
+  /* desligar limpa tudo do memorial e das abas */
+  await page.evaluate(() => { window.PDA.App.st.blocos.ativo = false; window.PDA.App.render(); });
+  await page.waitForTimeout(300);
+  const memSem = await page.evaluate(() => {
+    const P = window.PDA;
+    const ctx = P.C.contexto(P.App.st, P.App.cats);
+    const res = P.C.resumo(P.App.st, P.App.cats);
+    const D = P.MEM.documento(P.App.st, ctx, res);
+    return D.capitulos.some(c => /Blocos de ancoragem/.test(c.titulo));
+  });
+  ok('desligado, o memorial não menciona blocos', !memSem);
+
+  titulo('35b. Blocos de ancoragem — versão avulsa');
+  const pagBloco = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  pagBloco.on('pageerror', e => { console.log('  [PAGEERROR avulsa]', e.message); falhas++; total++; });
+  await pagBloco.goto('file://' + path.join(__dirname, '..', 'dist', 'Bloco-de-Ancoragem.html'));
+  await pagBloco.waitForSelector('#abas button');
+  await pagBloco.waitForTimeout(400);
+  const tituloAv = await pagBloco.evaluate(() => document.querySelector('header.topo h1').textContent);
+  ok('cabeçalho identifica a versão avulsa', /Bloco de Ancoragem/.test(tituloAv), tituloAv);
+  const abasAv = await pagBloco.locator('#abas button').allInnerTexts();
+  ok('só as abas de blocos e catálogos', abasAv.length === 2 &&
+     /Blocos/.test(abasAv[0]) && /Catálogos/.test(abasAv[1]), abasAv.join(' | '));
+  ok('sem botão de exemplos', (await pagBloco.locator('[data-acao="exemplo"]:visible').count()) === 0);
+  const txtAv = await pagBloco.locator('#conteudo').innerText();
+  ok('abre com um bloco pronto', /Peça/.test(txtAv) && /Pressão/.test(txtAv));
+  ok('sem seletor de trecho da adutora', !/travessia|Trecho 1 —/.test(txtAv));
+  await pagBloco.evaluate(() => {
+    const b = window.PDA.App.st.blocos.itens[0];
+    b.catalogoId = 'fd_k7'; b.itemRot = 'DN 300'; b.pecaId = 'c90'; b.pressaoInformada = 80;
+    window.PDA.App.render();
+  });
+  await pagBloco.waitForTimeout(400);
+  const calcAv = await pagBloco.evaluate(() => {
+    const P = window.PDA, st = P.App.st;
+    const info = P.C.blocoInfo(st, P.C.contexto(st, P.App.cats), null, st.blocos.itens[0]);
+    return { E: info.calc.E, de: info.deMm, p: info.pMca };
+  });
+  ok('calcula com pressão informada e DE do catálogo',
+     calcAv.p === 80 && calcAv.de > 300 && calcAv.E > 0, JSON.stringify(calcAv));
+  /* guarda em chave própria, sem atropelar o projeto principal */
+  const chaves = await pagBloco.evaluate(() => ({
+    bloco: !!localStorage.getItem('pda.projeto.blocos.v1')
+  }));
+  ok('projeto avulso guardado em chave própria', chaves.bloco);
+  await pagBloco.close();
 
   titulo('25. Impressão fiel');
   await page.locator('[data-acao="exemplo"]').click();

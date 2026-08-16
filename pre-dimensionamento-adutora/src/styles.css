@@ -747,3 +747,12 @@ html.imprimindo-doc #doc-saida { display: block; }
   }
   html.imprimindo-doc .doc .pagina:last-child { page-break-after: auto; break-after: auto; }
 }
+
+/* ---------------- blocos de ancoragem ---------------- */
+.blocos-vias { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; }
+.blocos-vias .via { flex: 1 1 380px; min-width: 300px; }
+.blocos-vias .via h4 { margin: 0 0 6px; font-size: 13.5px; color: var(--azul); }
+[data-tema="escuro"] .blocos-vias .via h4 { color: #cfe0f5; }
+.tab-apoio { border-collapse: collapse; width: 100%; font-size: 13px; }
+.tab-apoio td { padding: 5px 8px; border-bottom: 1px solid var(--borda); }
+.tab-apoio td:last-child { text-align: right; white-space: nowrap; }

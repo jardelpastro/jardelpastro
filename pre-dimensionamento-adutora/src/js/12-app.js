@@ -17,6 +17,7 @@
     { id: 'barrilete', rot: 'Barriletes' },
     { id: 'adutoras', rot: 'Adutora / Recalque' },
     { id: 'perfil', rot: 'Perfil da linha' },
+    { id: 'blocos', rot: 'Blocos de ancoragem' },
     { sep: true },
     { id: 'resultados', rot: 'Resultados' },
     { sep: true },
@@ -33,7 +34,32 @@
   App.iniciar = function () {
     h = UI.h;
     PDA.F.init(); PDA.Res.init(); PDA.K.init(); PDA.Q.init(); PDA.Pf.init(); PDA.B.init();
-    PDA.MEM.init(); PDA.X.init();
+    PDA.MEM.init(); PDA.X.init(); PDA.UB.init();
+
+    /* Versão avulsa de blocos de ancoragem: só a aba de blocos, projeto
+       guardado em chave própria para não atropelar o da versão completa. */
+    PDA.MODO_BLOCO = !!window.PDA_BLOCO;
+    if (PDA.MODO_BLOCO) {
+      App.abas = [
+        { id: 'blocos', rot: 'Blocos de ancoragem' },
+        { id: 'catalogos', rot: 'Catálogos' }
+      ];
+      App.aba = 'blocos';
+      var h1 = document.querySelector('header.topo h1');
+      if (h1) {
+        h1.innerHTML = '';
+        h1.appendChild(document.createTextNode('Bloco de Ancoragem'));
+        var sub = document.createElement('span');
+        sub.className = 'sub';
+        sub.textContent = 'pré-dimensionamento · empuxo, bloco padronizado e apoio no solo';
+        h1.appendChild(sub);
+      }
+      /* sem exemplos nem memorial na versão avulsa */
+      var esc = document.querySelectorAll('[data-acao="exemplo"]');
+      for (var kk = 0; kk < esc.length; kk++) esc[kk].style.display = 'none';
+      var exp = document.querySelector('[data-acao="exportarProjeto"]');
+      if (exp) { exp.setAttribute('data-acao', 'exportarArquivo'); exp.title = 'Baixar os blocos em arquivo .json'; }
+    }
     App.montarMarca();
 
     App.cats = PDA.E.carregarCatalogos();
@@ -128,6 +154,7 @@
       case 'barrilete':  conteudo = PDA.F.abaBarrilete(st, ctx); break;
       case 'adutoras':   conteudo = PDA.F.abaAdutoras(st, ctx, res); break;
       case 'perfil':     conteudo = PDA.Pf.aba(st, ctx, res); break;
+      case 'blocos':     conteudo = PDA.UB.aba(st, ctx, res); break;
       case 'resultados': conteudo = PDA.Res.aba(st, ctx, res); break;
       case 'catalogos':  conteudo = PDA.K.aba(st, ctx); break;
       case 'parametros': conteudo = PDA.F.abaParametros(st, ctx); break;
@@ -515,6 +542,47 @@
         UI.confirmar('Novo projeto', 'Descartar os dados atuais e começar um projeto em branco?',
           function () { App.st = PDA.E.padrao(); App.aba = 'projeto'; App.render(); });
         return;
+      case 'blocoNovo': {
+        var bl = App.st.blocos;
+        var modeloB = bl.itens.length ? bl.itens[bl.itens.length - 1] : null;
+        var novoB = PDA.E.novoBloco(bl.itens.length + 1, modeloB);
+        if (PDA.MODO_BLOCO) { novoB.tuboOrigem = 'manual'; novoB.pressaoFonte = 'informada'; }
+        bl.itens.push(novoB);
+        App.render();
+        return;
+      }
+      case 'blocoDuplicar': {
+        var iD = Number(el.getAttribute('data-i'));
+        var copia = PDA.E.clone(App.st.blocos.itens[iD]);
+        copia.rot += ' (cópia)';
+        App.st.blocos.itens.splice(iD + 1, 0, copia);
+        App.render();
+        return;
+      }
+      case 'blocoExcluir': {
+        var iE = Number(el.getAttribute('data-i'));
+        App.st.blocos.itens.splice(iE, 1);
+        App.render();
+        return;
+      }
+      case 'blocoMover': {
+        var iM = Number(el.getAttribute('data-i'));
+        var dM = Number(el.getAttribute('data-d'));
+        var arr = App.st.blocos.itens;
+        var jM = iM + dM;
+        if (jM >= 0 && jM < arr.length) {
+          var tmpB = arr[iM]; arr[iM] = arr[jM]; arr[jM] = tmpB;
+          App.render();
+        }
+        return;
+      }
+      case 'blocoTipo': {
+        var baseT = el.getAttribute('data-base');
+        var tipoT = el.getAttribute('data-tipo-bloco');
+        UI.set(App.st, baseT + '.tipoEscolhido', tipoT ? Number(tipoT) : null);
+        App.render();
+        return;
+      }
       case 'abrirProjeto': PDA.B.abrir(); return;
       case 'importarProjeto': UI.fecharModal(); App.abrirArquivo(App.carregarProjeto); return;
       case 'salvarProjeto': App.guardarNaBiblioteca(); return;

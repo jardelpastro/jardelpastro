@@ -5,7 +5,7 @@
   'use strict';
 
   var E = {};
-  var LS_PROJ = 'pda.projeto.v1';
+  var LS_PROJ = window.PDA_BLOCO ? 'pda.projeto.blocos.v1' : 'pda.projeto.v1';
   var LS_CAT  = 'pda.catalogos.v1';
   var LS_CFG  = 'pda.config.v1';
 
@@ -78,6 +78,43 @@
     return a;
   };
 
+  /* Um bloco de ancoragem. n é só para o rótulo. */
+  E.novoBloco = function (n, modelo) {
+    var b = {
+      rot: 'Bloco ' + n,
+      pecaId: 'c90',
+      orientacao: 'horizontal',      /* horizontal | vert_baixo | vert_cima */
+      /* tubo: por padrão herda do trecho da adutora; 'manual' usa catálogo/DN
+         escolhidos aqui, ou um DE digitado direto */
+      tuboOrigem: 'adutora.0',       /* 'adutora.<i>' | 'manual' */
+      catalogoId: 'fd_k7',
+      itemRot: '',
+      deOverride: null,              /* DE digitado (mm), vale sobre o catálogo */
+      dn2: null,                     /* DN de saída, quando a peça é redução */
+      /* pressão de cálculo */
+      pressaoFonte: 'transitorio',   /* transitorio | ensaio | informada */
+      fatorEnsaio: 1.5,
+      pressaoInformada: 60,
+      /* seleção do bloco-padrão e verificação de apoio */
+      recobrimento: 0.65,
+      soloId: 'areia',
+      sigmaOverride: null,
+      tipoEscolhido: null            /* null = adotar a sugestão */
+    };
+    if (modelo) {
+      b.tuboOrigem = modelo.tuboOrigem;
+      b.catalogoId = modelo.catalogoId;
+      b.itemRot = modelo.itemRot;
+      b.recobrimento = modelo.recobrimento;
+      b.soloId = modelo.soloId;
+      b.sigmaOverride = modelo.sigmaOverride;
+      b.pressaoFonte = modelo.pressaoFonte;
+      b.fatorEnsaio = modelo.fatorEnsaio;
+      b.pressaoInformada = modelo.pressaoInformada;
+    }
+    return b;
+  };
+
   /* ---------------- projeto padrão ---------------- */
   E.padrao = function () {
     var st = {
@@ -127,6 +164,12 @@
       },
       /* textos do memorial */
       memorial: { introducao: '', objetivo: '' },
+      /* blocos de ancoragem (aba opcional) */
+      blocos: {
+        ativo: false,
+        fs: 1.5, gamaConcreto: 2400,
+        itens: []
+      },
       /* análise econômica de diâmetro */
       economia: {
         ativo: false, tarifa: 0.65, horasDia: 20, anos: 20, taxa: 8,
