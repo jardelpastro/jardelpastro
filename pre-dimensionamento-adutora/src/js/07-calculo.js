@@ -526,6 +526,64 @@
      Devolve a lista de incoerências que o programa não pode resolver sozinho.
      Cada item traz uma ação de correção, aplicável com um clique. */
 
+  /* ---------------- ponto alto da linha ----------------
+     O cálculo da bomba usa partida e chegada; um ponto alto no meio pode
+     ficar acima da linha piezométrica e governar o dimensionamento. Aqui
+     ele é identificado — do perfil, quando lançado, ou do campo manual —
+     e a pressão em regime permanente nele é verificada. */
+  C.pontoAlto = function (st, ctx, res) {
+    var nch = Number(st.cotas.nivelChegada) || 0;
+    var manualCota = st.cotas.cotaPontoAlto;
+    var temManual = manualCota !== null && manualCota !== undefined && manualCota !== '';
+    var out = { fonte: null, cota: null, x: null, pPerm: null,
+                deficit: 0, hmNecessaria: null, manualCota: temManual ? Number(manualCota) : null,
+                semDistancia: false, divergencia: null };
+
+    /* extensão e perda média da adutora, para a piezométrica aproximada */
+    var Ltot = 0, hAdu = 0;
+    (res.projeto.adutoras || []).forEach(function (r) { Ltot += r.L; hAdu += r.htotal; });
+
+    if (res.envoltoria && res.envoltoria.pontos && res.envoltoria.pontos.length) {
+      /* com perfil: ponto de MENOR pressão permanente (o crítico de verdade) */
+      var pior = res.envoltoria.pontos.reduce(function (a, b) { return b.pPerm < a.pPerm ? b : a; });
+      var alto = res.envoltoria.pontos.reduce(function (a, b) { return b.cota > a.cota ? b : a; });
+      out.fonte = 'perfil';
+      out.cota = pior.cota;
+      out.x = pior.x;
+      out.pPerm = pior.pPerm;
+      out.cotaMaxPerfil = alto.cota;
+      out.xMax = alto.x;
+      if (temManual && Math.abs(Number(manualCota) - alto.cota) > 0.5) {
+        out.divergencia = { manual: Number(manualCota), perfil: alto.cota };
+      }
+    } else if (temManual) {
+      out.fonte = 'manual';
+      out.cota = Number(manualCota);
+      var d = Number(st.cotas.distPontoAlto);
+      if (d > 0 && Ltot > 0) {
+        out.x = Math.min(d, Ltot);
+        /* piezométrica aproximada: cai linearmente da saída da elevatória
+           (chegada + perdas da adutora) até a chegada */
+        var lp = nch + hAdu * (1 - out.x / Ltot);
+        out.pPerm = lp - out.cota;
+      } else if (out.cota > nch) {
+        /* acima da chegada e sem distância: não dá para verificar */
+        out.semDistancia = true;
+      } else {
+        /* abaixo da chegada, a piezométrica sempre passa por cima */
+        out.pPerm = nch - out.cota;
+      }
+    } else {
+      return out;
+    }
+
+    if (out.pPerm !== null && out.pPerm < 0) {
+      out.deficit = -out.pPerm;
+      out.hmNecessaria = res.projeto.Hm + out.deficit;
+    }
+    return out;
+  };
+
   C.validar = function (st, ctx, res) {
     var av = [];
     var ativas = st.adutoras.filter(function (a) { return a.ativo !== false; });
@@ -598,6 +656,50 @@
              ' ativo(s) mas sem diâmetro escolhido, e por isso fora do cálculo: as perdas de carga desse(s) ' +
              'trecho(s) não entram na altura manométrica nem no NPSH. Escolha o diâmetro na tabela de ' +
              'comparação, ou desmarque o trecho.',
+        acoes: []
+      });
+    }
+
+    /* ---- ponto alto acima da linha piezométrica ---- */
+    var pa = res.pontoAlto;
+    if (pa && pa.pPerm !== null && pa.pPerm < 0) {
+      av.push({
+        id: 'pontoAlto', grave: true,
+        txt: 'O ponto alto da linha (cota ' + pa.cota.toFixed(2) + ' m' +
+             (pa.x !== null ? ', a ' + pa.x.toFixed(0) + ' m da elevatória' : '') +
+             ') fica ACIMA da linha piezométrica em regime permanente: a pressão ali resulta ' +
+             pa.pPerm.toFixed(2) + ' mca. A vazão de projeto não se estabelece nessa condição — o ponto ' +
+             'alto governa o dimensionamento, não a cota de chegada. Para vencê-lo, a altura manométrica ' +
+             'precisaria ser de pelo menos ' + pa.hmNecessaria.toFixed(2) + ' mca (hoje: ' +
+             res.projeto.Hm.toFixed(2) + ' mca). Aumente o diâmetro para reduzir as perdas, reveja o ' +
+             'traçado, ou trate o trecho final como conduto livre a jusante do ponto alto.',
+        acoes: []
+      });
+    } else if (pa && pa.pPerm !== null && pa.fonte && pa.pPerm < 2 && pa.cota > Math.max(Number(st.cotas.nivelChegada) || 0, C.cotaPartida(st))) {
+      av.push({
+        id: 'pontoAltoFolga',
+        txt: 'A folga de pressão no ponto alto (cota ' + pa.cota.toFixed(2) + ' m) é de apenas ' +
+             pa.pPerm.toFixed(2) + ' mca em regime permanente. Pequenas variações de vazão ou de rugosidade ' +
+             'podem levá-lo à pressão negativa — considere ventosa no ponto alto e confirme com o perfil completo.',
+        acoes: []
+      });
+    }
+    if (pa && pa.semDistancia) {
+      av.push({
+        id: 'pontoAltoSemDist', grave: true,
+        txt: 'A cota do ponto mais alto informada (' + pa.cota.toFixed(2) + ' m) é MAIOR que a cota de ' +
+             'chegada (' + (Number(st.cotas.nivelChegada) || 0).toFixed(2) + ' m), mas sem a distância até ' +
+             'ele não dá para verificar se a linha piezométrica passa por cima. Informe a distância no campo ' +
+             'ao lado, ou lance o perfil da linha (bastam três pontos).',
+        acoes: []
+      });
+    }
+    if (pa && pa.divergencia) {
+      av.push({
+        id: 'pontoAltoDiverge',
+        txt: 'A cota do ponto mais alto informada em "Bombas e níveis" é ' + pa.divergencia.manual.toFixed(2) +
+             ' m, mas o ponto mais alto do perfil lançado é ' + pa.divergencia.perfil.toFixed(2) +
+             ' m. Com o perfil ativo vale o perfil — confira qual dos dois está certo.',
         acoes: []
       });
     }
@@ -881,7 +983,7 @@
     if (item && item.custoM) return Number(item.custoM);
     var e = st.economia;
     var dn = item && item.dn ? Number(item.dn) : diMm;
-    return (Number(e.custoA) || 0) * Math.pow(dn, Number(e.custoB) || 1.45);
+    return (Number(e.custoA) || 0) * Math.pow(dn, Number(e.custoB) || 1.2);
   };
 
   /* Fator de recuperação de capital */
@@ -1065,6 +1167,7 @@
       golpe: golpe,
       envoltoria: (st.perfil && st.perfil.ativo) ? C.envoltoria(st, ctx, proj, golpe) : null
     };
+    res.pontoAlto = C.pontoAlto(st, ctx, res);
     res.avisosDados = C.validar(st, ctx, res);
 
     if (st.curvaBomba && st.curvaBomba.ativo) {

@@ -653,7 +653,8 @@
     var submersivel = st.bombas.tipo === 'submersivel';
     var cen = res.projeto;
     var avisos = (res.avisosDados || []).filter(function (a) {
-      return a.id === 'cotaChegada' || a.id === 'cotaPartida' || a.id === 'niveis' || a.id === 'eixoDistante';
+      return ['cotaChegada', 'cotaPartida', 'niveis', 'eixoDistante',
+              'pontoAlto', 'pontoAltoFolga', 'pontoAltoSemDist', 'pontoAltoDiverge'].indexOf(a.id) >= 0;
     });
 
     var cartaoCotas = UI.cartao('Níveis e cotas',
@@ -676,7 +677,26 @@
           dica: 'ALTITUDE da saída da elevatória, onde a adutora começa. Em branco, usa o nível de sucção mínimo.' }),
         UI.campo(st, 'Cota de chegada', 'cotas.nivelChegada', {
           chave: true,
-          dica: 'ALTITUDE do fim da adutora: nível d\'água do reservatório de chegada ou ponto de descarga. NÃO é a cota da bomba.\n\nEste campo e a cota final do último trecho da adutora são o mesmo número — o programa mantém os dois iguais.' })),
+          dica: 'ALTITUDE do fim da adutora: nível d\'água do reservatório de chegada ou ponto de descarga. NÃO é a cota da bomba.\n\nEste campo e a cota final do último trecho da adutora são o mesmo número — o programa mantém os dois iguais.' }),
+        st.perfil.ativo ? null : UI.campo(st, 'Cota do ponto mais alto (m)', 'cotas.cotaPontoAlto', {
+          placeholder: 'se for a chegada, deixe em branco',
+          dica: 'Preencha quando o ponto mais alto da linha NÃO é a chegada — um morro no meio do traçado, por exemplo. O programa verifica se a linha piezométrica passa acima dele; se não passar, é ele que governa a altura manométrica, não a cota de chegada.\n\nCom o perfil da linha lançado, este campo é dispensado: o ponto alto sai do próprio perfil.' }),
+        st.perfil.ativo ? null : UI.campo(st, 'Distância até ele (m)', 'cotas.distPontoAlto', {
+          placeholder: 'da elevatória',
+          dica: 'Distância da elevatória até o ponto mais alto, medida ao longo da linha. Com ela o programa interpola a linha piezométrica no ponto e calcula a pressão disponível ali. Sem ela, só dá para verificar quando o ponto alto é mais baixo que a chegada.' })),
+
+      (function () {
+        var pa = res.pontoAlto;
+        if (!pa || pa.fonte !== 'perfil') return null;
+        var okP = pa.pPerm !== null && pa.pPerm >= 0;
+        return h('div', { class: 'aviso' + (okP ? ' info' : ' erro'), style: 'margin-top:9px' },
+          h('b', {}, 'Ponto alto (do perfil da linha): '),
+          'cota ' + UI.num(pa.cotaMaxPerfil, 2) + ' m na distância ' + UI.num(pa.xMax, 0) + ' m. ' +
+          'Pressão mínima em regime permanente: ' + UI.num(pa.pPerm, 2) + ' mca (cota ' +
+          UI.num(pa.cota, 2) + ' m, a ' + UI.num(pa.x, 0) + ' m). ' +
+          (okP ? 'A linha piezométrica passa acima de toda a tubulação.'
+               : 'A piezométrica passa ABAIXO da tubulação — veja o aviso no Resumo.'));
+      })(),
 
       h('div', { class: 'faixa-resumo', style: 'margin:11px 0 0' },
         chip('Hg máxima', UI.num(cen.HgMax, 2), 'm  (N.A. de sucção mínimo)', 'forte'),
@@ -1182,7 +1202,8 @@
     ];
     if (st.economia.ativo) {
       corpo.push(h('div', { class: 'grade', style: 'margin-top:11px' },
-        UI.campo(st, 'Tarifa de energia', 'economia.tarifa', { sufixo: 'R$/kWh' }),
+        UI.campo(st, 'Tarifa de energia', 'economia.tarifa', { sufixo: 'R$/kWh',
+          dica: 'Entra só na coluna "Energia (mil R$/ano)" da comparação de diâmetros — o custo anual da perda de carga. Se a coluna do tubo estiver muito maior que a de energia, mudar a tarifa quase não move o total: confira os coeficientes de custo do tubo logo abaixo, com a tabela de conferência em R$/m.' }),
         UI.campo(st, 'Horas de operação por dia', 'economia.horasDia', { sufixo: 'h/dia' }),
         UI.campo(st, 'Horizonte de análise', 'economia.anos', { sufixo: 'anos' }),
         UI.campo(st, 'Taxa de desconto', 'economia.taxa', { sufixo: '% a.a.',
@@ -1192,12 +1213,12 @@
         UI.campo(st, 'Coeficiente A', 'economia.custoA', {
           dica: 'O custo por metro é estimado por custo = A · DN^B, com DN em mm. Ajuste A e B para que o custo caia na ordem de grandeza dos seus preços — o que define o ponto de mínimo é a forma da curva, não o valor absoluto.' }),
         UI.campo(st, 'Expoente B', 'economia.custoB', {
-          dica: 'Expoente da lei de potência. Valores usuais entre 1,3 e 1,6 para tubos de pressão.' }),
+          dica: 'Expoente da lei de potência. Entre 1,1 e 1,3 o custo cresce quase linearmente com o DN (usual para fornecimento + assentamento); acima de 1,4 o tubo domina a comparação e o ótimo econômico desce de diâmetro.' }),
         UI.campo(st, 'Acréscimo de assentamento', 'economia.custoInstalacao', { sufixo: '%',
           dica: 'Percentual sobre o custo do tubo para cobrir escavação, assentamento, reaterro e conexões.' })));
 
       var ex = [200, 300, 400, 500, 600, 800].map(function (dn) {
-        var base = (Number(st.economia.custoA) || 0) * Math.pow(dn, Number(st.economia.custoB) || 1.45);
+        var base = (Number(st.economia.custoA) || 0) * Math.pow(dn, Number(st.economia.custoB) || 1.2);
         return h('tr', {}, h('td', { class: 'esq' }, 'DN ' + dn),
           h('td', {}, UI.num(base, 2)),
           h('td', {}, UI.num(base * (1 + (Number(st.economia.custoInstalacao) || 0) / 100), 2)));

@@ -85,6 +85,23 @@
     if (s === null || s === undefined) return null;
     s = String(s).trim().replace(/\s/g, '');
     if (s === '') return null;
+
+    /* Conta no próprio campo, como no Excel: "=10+25+30" ou "10+25+30"
+       vira 65. Vale soma, subtração, multiplicação, divisão, potência (^)
+       e parênteses, com vírgula decimal. */
+    if (s.charAt(0) === '=') s = s.slice(1);
+    var temOperador = /[0-9)][+\-*/^]/.test(s) || /[+\-*/^]\(/.test(s);
+    if (temOperador && /^[0-9.,+\-*/^()]+$/.test(s)) {
+      var expr = s.replace(/\./g, '§').replace(/,/g, '.').replace(/§/g, '.')
+                  .replace(/\^/g, '**');
+      /* só dígitos, ponto, operadores e parênteses chegam aqui */
+      try {
+        /* eslint-disable no-new-func */
+        var r = Function('"use strict"; return (' + expr + ');')();
+        if (typeof r === 'number' && isFinite(r)) return r;
+      } catch (e) { /* expressão malformada: cai no parse comum */ }
+    }
+
     /* aceita 1.234,56 e 1234.56 */
     if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
     var v = parseFloat(s);

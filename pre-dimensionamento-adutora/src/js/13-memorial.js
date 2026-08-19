@@ -906,6 +906,18 @@
         D.aplicacao('A_{nec} = \\frac{' + ne(st.blocos.fs) + ' \\cdot ' + n(calc.E, 0) + '}{' +
                     n(calc.sigma, 0) + '} = ' + n(calc.apoio.Anec, 2) + '\\ \\text{m}^2');
       }
+      /* vistas do bloco adotado, com as dimensões */
+      var solM = PDA.BA.solucao(calc, info.b);
+      if (solM && PDA.UB && PDA.UB.desenhoBloco) {
+        D.figura(info.b.rot + ' — vistas do bloco adotado (' +
+          (solM.via === 'padrao' ? 'padronizado tipo ' + solM.tipo : 'calculado') + ', ' +
+          n(solM.largura, 2) + ' × ' + n(solM.altura, 2) + ' × ' + n(solM.espessura, 2) + ' m)',
+          PDA.UB.desenhoBloco(info, solM),
+          'Elaborado pelo programa. Dimensões em metros; armadura ' +
+          (solM.acoEstimado ? 'estimada por ' + PDA.BA.TAXA_ACO + ' kg/m³, a detalhar no projeto estrutural.'
+                            : 'conforme o padrão da concessionária.'));
+      }
+
       info.avisos.forEach(function (avz) { D.nota('Atenção: ' + avz); });
     });
 

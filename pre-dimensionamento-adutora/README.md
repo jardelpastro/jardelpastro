@@ -59,6 +59,20 @@ econômica e linha de motores.
 L/dia ou gpm; extensão em m, km, cm, ft ou mi; pressão em mca, kPa, bar, MPa,
 kgf/cm² ou psi.
 
+**Conta no próprio campo, como no Excel** — qualquer campo numérico aceita uma
+expressão: `=10+25+30` (ou só `10+25+30`) vira 65 ao confirmar com Tab ou
+Enter. Vale soma, subtração, multiplicação, divisão, potência (`^`) e
+parênteses, com vírgula decimal — útil na vazão, nas extensões e nas cotas.
+
+**Ponto alto no meio da linha** — quando o ponto mais alto do traçado não é a
+chegada, ele pode ficar acima da linha piezométrica e governar o
+dimensionamento. Com o perfil lançado, o programa verifica isso sozinho, ponto
+a ponto; sem o perfil, a aba Bombas e níveis tem os campos *cota do ponto mais
+alto* e *distância até ele*, e a piezométrica é interpolada ali. Nos dois casos,
+pressão negativa no ponto alto gera aviso grave no Resumo, com a altura
+manométrica mínima necessária — e se o campo manual divergir do perfil, os dois
+são confrontados.
+
 **Catálogos de tubos com diâmetro interno e rugosidade** — 35 catálogos na base:
 
 | Família | Catálogos |
@@ -138,9 +152,15 @@ lado: a **tabela de blocos padronizados** da concessionária (tipos 1 a 26, por
 DN e recobrimento, com ★ no menor tipo que resiste — clique para adotar outro)
 e o **bloco calculado pelo apoio no solo** (`A = FS·E/σ`, com a tensão
 admissível por tipo de solo, editável), que cobre também curvas verticais e os
-empuxos acima de toda a tabela. Um desenho esquemático mostra a direção do
-empuxo e o encosto. Com a aba ligada, o memorial ganha o capítulo de blocos —
-fórmula, aplicação numérica, tabela-resumo e fontes (Azevedo Netto; AWWA M41).
+empuxos acima de toda a tabela — o solo altera só esta verificação, nunca o
+bloco padronizado, e a tela diz isso com todas as letras. A **solução adotada**
+sai em destaque e vira **desenho em quatro vistas** (planta, corte transversal,
+corte longitudinal e perspectiva) com as dimensões cotadas, a profundidade da
+vala, o berço e um quadro de quantidades — concreto, forma e previsão de
+armadura. A **memória de cálculo** aparece na própria aba, num cartão separado,
+com as fórmulas compostas e os números do projeto. Com a aba ligada, o memorial
+ganha o capítulo de blocos — fórmula, aplicação numérica, vistas de cada bloco,
+tabela-resumo e fontes (Azevedo Netto; AWWA M41).
 
 **Análise econômica de diâmetro** — opcional. Acrescenta à tabela de comparação
 o custo do tubo, o custo anual da energia associada à perda de carga daquele
@@ -249,8 +269,8 @@ src/js/08c-formula.js       compositor de fórmulas (frações, radicais, índic
 src/js/13-memorial.js       texto, fórmulas, tabelas e figuras do memorial
 src/js/14-exportar.js       paginação A4, sumário/índices, PDF e Word
 build.py                    gera os dois arquivos de dist/
-tests/run.js                273 testes do núcleo de cálculo
-tests/ui.js                 336 testes de interface em navegador
+tests/run.js                304 testes do núcleo de cálculo
+tests/ui.js                 357 testes de interface em navegador
 docs/AUDITORIA-PLANILHAS.md auditoria das planilhas de origem
 ```
 

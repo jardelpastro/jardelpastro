@@ -141,6 +141,8 @@
         nivelSuccaoMin: 0, nivelSuccaoMax: 0, eixoBomba: 0,
         cotaPartida: null,        /* em branco = igual ao nível de sucção mínimo */
         nivelChegada: 0,
+        cotaPontoAlto: null,      /* ponto mais alto da linha, quando não for a chegada */
+        distPontoAlto: null,      /* distância dele até a elevatória (m) */
         unid: 'm'
       },
       criterios: clone(PDA.P.criterios),
@@ -173,7 +175,9 @@
       /* análise econômica de diâmetro */
       economia: {
         ativo: false, tarifa: 0.65, horasDia: 20, anos: 20, taxa: 8,
-        custoA: 0.9, custoB: 1.45, custoInstalacao: 40
+        /* custo = A·DN^B [R$/m]. Calibrado para FD assentado: DN 100 ≈ 240,
+           DN 300 ≈ 890, DN 800 ≈ 2900 R$/m (antes do acréscimo). */
+        custoA: 0.95, custoB: 1.2, custoInstalacao: 40
       },
       selecao: {}   /* { conjuntoKey: itemRot } escolhas manuais de diâmetro */
     };
@@ -316,6 +320,16 @@
       return alvo;
     }
     st = fundir(st || {}, p);
+
+    /* Recalibração do custo do tubo: os padrões antigos (A = 0,9; B = 1,45)
+       superestimavam o tubo em ~4x, e o custo de energia — e a tarifa —
+       ficavam irrelevantes na comparação. Projetos que ainda estão com os
+       dois valores antigos (não editados) passam para os novos. */
+    if (st.economia && Number(st.economia.custoA) === 0.9 && Number(st.economia.custoB) === 1.45) {
+      st.economia.custoA = p.economia.custoA;
+      st.economia.custoB = p.economia.custoB;
+    }
+
     st.versao = E.VERSAO;
     return st;
   };

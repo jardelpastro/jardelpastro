@@ -993,6 +993,108 @@ stB.blocos.itens[0].orientacao = 'vert_cima';
 infoB = C.blocoInfo(stB, ctxB, resB, stB.blocos.itens[0]);
 ok('curva vertical convexa dimensiona por peso', infoB.calc.peso && infoB.calc.peso.concreto > 0);
 
+/* ---------------------------------------------------------------- */
+titulo('34. Contas nos campos numéricos');
+/* o módulo de interface não entra no sandbox padrão; carrega só o parseNum
+   com um stub mínimo de document */
+const sb2 = { window: {}, document: { addEventListener: function () {}, createElement: function () { return { style: {}, setAttribute: function () {}, appendChild: function () {}, classList: { add: function () {} } }; }, createElementNS: function () { return { style: {}, setAttribute: function () {}, appendChild: function () {} }; } }, console, JSON, Math, Number, Object, Array, String, isNaN, parseFloat, parseInt };
+sb2.globalThis = sb2;
+vm.createContext(sb2);
+vm.runInContext(fs.readFileSync(path.join(raiz, '08-ui-base.js'), 'utf8'), sb2, { filename: '08-ui-base.js' });
+const UIb = sb2.window.PDA.UI;
+prox('=10+25+30 -> 65', UIb.parseNum('=10+25+30'), 65, 1e-12);
+prox('10+25+30 sem igual também', UIb.parseNum('10+25+30'), 65, 1e-12);
+prox('vírgula decimal: 2,5*4', UIb.parseNum('2,5*4'), 10, 1e-12);
+prox('parênteses: (170-120)/2', UIb.parseNum('(170-120)/2'), 25, 1e-12);
+prox('potência: 2^10', UIb.parseNum('2^10'), 1024, 1e-12);
+prox('número simples continua igual', UIb.parseNum('123,45'), 123.45, 1e-12);
+prox('milhar brasileiro preservado', UIb.parseNum('1.234,56'), 1234.56, 1e-12);
+prox('negativo simples não vira conta', UIb.parseNum('-5'), -5, 1e-12);
+ok('expressão malformada não explode', UIb.parseNum('10++') === 10 || UIb.parseNum('10++') === null);
+ok('texto malicioso não avalia', UIb.parseNum('alert(1)') === null);
+
+titulo('35. Ponto alto da linha');
+function stAlto() {
+  const st = E.padrao();
+  st.vazao.valor = 100;
+  st.cotas.nivelSuccaoMin = 170; st.cotas.nivelSuccaoMax = 171; st.cotas.eixoBomba = 168;
+  st.cotas.nivelChegada = 180;
+  st.adutoras[0].itemRot = 'DN 300';
+  st.adutoras[0].extensao = 2000;
+  return st;
+}
+/* sem ponto alto informado: nada acontece */
+let stA = stAlto();
+let resA = C.resumo(stA, cats);
+ok('sem campo e sem perfil, sem verificação', resA.pontoAlto.fonte === null);
+/* ponto alto manual acima da chegada, sem distância: cobra a distância */
+stA = stAlto(); stA.cotas.cotaPontoAlto = 190;
+resA = C.resumo(stA, cats);
+ok('acima da chegada sem distância -> aviso grave pedindo distância',
+   resA.pontoAlto.semDistancia && resA.avisosDados.some(a => a.id === 'pontoAltoSemDist' && a.grave));
+/* com distância: piezométrica aproximada acusa o déficit */
+stA.cotas.distPontoAlto = 1000;
+resA = C.resumo(stA, cats);
+ok('com distância, calcula a pressão no ponto alto', resA.pontoAlto.pPerm !== null);
+ok('cota 190 entre 170 e 180 dá pressão negativa', resA.pontoAlto.pPerm < 0,
+   String(resA.pontoAlto.pPerm));
+ok('aviso grave com a Hm necessária',
+   resA.avisosDados.some(a => a.id === 'pontoAlto' && a.grave && /precisaria ser de pelo menos/.test(a.txt)));
+prox('Hm necessária = Hm + déficit', resA.pontoAlto.hmNecessaria,
+     resA.projeto.Hm + resA.pontoAlto.deficit, 1e-9);
+/* ponto alto abaixo da chegada: sempre passa */
+stA = stAlto(); stA.cotas.cotaPontoAlto = 175;
+resA = C.resumo(stA, cats);
+ok('abaixo da chegada, sem aviso', resA.pontoAlto.pPerm >= 0 &&
+   !resA.avisosDados.some(a => a.id === 'pontoAlto'));
+/* com o perfil lançado, vale o perfil — e o campo divergente é acusado */
+stA = stAlto(); stA.cotas.cotaPontoAlto = 186;
+stA.perfil = { ativo: true, modo: 'acumulada', unidExt: 'm',
+  pontos: [{ est: 0, cota: 170 }, { est: 1000, cota: 190 }, { est: 2000, cota: 180 }] };
+resA = C.resumo(stA, cats);
+ok('perfil ativo: fonte é o perfil', resA.pontoAlto.fonte === 'perfil');
+ok('crista do perfil identificada', Math.abs(resA.pontoAlto.cotaMaxPerfil - 190) < 1e-9);
+ok('campo manual divergente do perfil é acusado',
+   resA.avisosDados.some(a => a.id === 'pontoAltoDiverge'));
+ok('pressão negativa no perfil gera o aviso grave',
+   resA.pontoAlto.pPerm < 0 && resA.avisosDados.some(a => a.id === 'pontoAlto' && a.grave));
+
+titulo('36. Custo do tubo recalibrado');
+const stEcoN = E.padrao();
+prox('novo padrão: DN 300 ≈ 890 R$/m',
+     stEcoN.economia.custoA * Math.pow(300, stEcoN.economia.custoB), 890, 0.05);
+ok('DN 800 entre 2500 e 3300 R$/m', (function () {
+  const v = stEcoN.economia.custoA * Math.pow(800, stEcoN.economia.custoB);
+  return v > 2500 && v < 3300;
+})());
+const stMigN = E.padrao();
+stMigN.economia.custoA = 0.9; stMigN.economia.custoB = 1.45;
+const stMigN2 = E.migrar(JSON.parse(JSON.stringify(stMigN)));
+ok('projeto antigo com os padrões antigos migra para os novos',
+   stMigN2.economia.custoA === stEcoN.economia.custoA && stMigN2.economia.custoB === stEcoN.economia.custoB);
+const stMigN3 = E.padrao();
+stMigN3.economia.custoA = 1.1; stMigN3.economia.custoB = 1.45;
+ok('coeficiente editado pelo usuário não é tocado',
+   E.migrar(JSON.parse(JSON.stringify(stMigN3))).economia.custoA === 1.1);
+
+titulo('37. Blocos — solução adotada (dimensões e quantidades)');
+const calcSol = BA.calcular({ pecaId: 'c90', deMm: 326, pMca: 80, orientacao: 'horizontal',
+  dn: 300, rec: 0.65, soloId: 'areia', fs: 1.5, gamaConcreto: 2400 });
+const solB = BA.solucao(calcSol, { recobrimento: 0.65 });
+ok('solução é o padronizado quando ele existe', solB.via === 'padrao' && solB.tipo === 10);
+prox('espessura equivalente = V/(H·A)', solB.espessura,
+     Math.ceil(1.22 / (1.5 * 1.5) * 20) / 20, 1e-9);
+const calcSol2 = BA.calcular({ pecaId: 'c90', deMm: 842, pMca: 160, orientacao: 'horizontal',
+  dn: 800, rec: 0.65, soloId: 'areia', fs: 1.5, gamaConcreto: 2400 });
+const solB2 = BA.solucao(calcSol2, { recobrimento: 0.65 });
+ok('sem padronizado que atenda, a solução é o apoio', solB2.via === 'apoio');
+ok('apoio traz forma e aço estimados', solB2.forma > 0 && solB2.aco > 0 && solB2.acoEstimado);
+prox('aço estimado = 70 kg/m³', solB2.aco, Math.round(70 * solB2.concreto), 1e-9);
+const calcSol3 = BA.calcular({ pecaId: 'c90', deMm: 326, pMca: 80, orientacao: 'vert_cima',
+  dn: 300, rec: 0.65, soloId: 'areia', fs: 1.5, gamaConcreto: 2400 });
+const solB3 = BA.solucao(calcSol3, { recobrimento: 0.65 });
+ok('curva vertical convexa: solução por peso', solB3.via === 'peso' && solB3.concreto > 0);
+
 console.log('\n' + '='.repeat(60));
 console.log(falhas === 0 ? `TODOS OS ${total} TESTES PASSARAM` : `${falhas} de ${total} TESTES FALHARAM`);
 console.log('='.repeat(60));

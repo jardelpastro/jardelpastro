@@ -323,7 +323,15 @@
     var valor;
     if (tipo === 'bool') valor = el.checked;
     else if (tipo === 'texto') valor = el.value;
-    else valor = el.value.trim() === '' ? null : UI.parseNum(el.value);
+    else {
+      var bruto = el.value.trim();
+      /* Conta no campo (=10+25+30): só entra no estado quando confirmada
+         com Tab/Enter ou ao sair do campo — senão cada tecla digitada
+         avaliaria uma expressão pela metade. */
+      var pareceConta = /^=/.test(bruto) || /[0-9)][+\-*/^]/.test(bruto) || /[+\-*/^]\(/.test(bruto);
+      if (pareceConta && !ehChange) return;
+      valor = bruto === '' ? null : UI.parseNum(bruto);
+    }
 
     UI.set(App.st, bind, valor);
 

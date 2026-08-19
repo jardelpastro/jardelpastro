@@ -307,6 +307,84 @@
   };
 
   /* ================================================================
+     Solução adotada: dimensões e quantidades em um único formato
+     ================================================================ */
+
+  /* Taxa de aço observada nos blocos padronizados (~70 kg/m³); usada como
+     PREVISÃO de armadura nos blocos calculados, para quantitativo. */
+  BA.TAXA_ACO = 70;
+
+  function arred05(v) { return Math.ceil(v * 20) / 20; }
+
+  /* calc: saída de BA.calcular; b: o bloco (para recobrimento).
+     Devolve a solução que vale: bloco padronizado quando existe (ou o tipo
+     escolhido a dedo), senão o bloco calculado. Sempre com altura, largura,
+     espessura, concreto, forma e aço — para o desenho e o quantitativo. */
+  BA.solucao = function (calc, b) {
+    if (!calc || !(calc.E > 0)) return null;
+
+    if (calc.orientacao === 'horizontal') {
+      var pad = calc.escolhido ||
+        (calc.padrao && calc.padrao.achou ? calc.padrao.linha : null);
+      if (pad) {
+        var espEq = arred05(pad.concreto / (pad.H * pad.A));
+        return {
+          via: 'padrao',
+          tipo: calc.escolhido ? calc.escolhido.tipo : calc.padrao.linha.tipo,
+          cap: pad.cap,
+          rec: calc.escolhido ? Number(b.recobrimento) : calc.padrao.rec,
+          altura: pad.H, largura: pad.A, espessura: espEq, espessuraEquivalente: true,
+          concreto: pad.concreto, forma: pad.forma, aco: pad.aco,
+          atende: calc.escolhido ? calc.escolhido.atende : true
+        };
+      }
+      if (calc.apoio && calc.apoio.ok) {
+        var a = calc.apoio;
+        return {
+          via: 'apoio',
+          rec: Number(b.recobrimento),
+          altura: a.b, largura: a.L, espessura: a.esp,
+          concreto: a.concreto,
+          forma: (a.L + 2 * a.esp) * a.b,
+          aco: Math.round(BA.TAXA_ACO * a.concreto),
+          acoEstimado: true,
+          Anec: a.Anec, sigmaAtuante: a.sigmaAtuante, fsEfetivo: a.fsEfetivo,
+          atende: a.fsEfetivo >= (calc.fs || 1.5) - 1e-9
+        };
+      }
+      return null;
+    }
+
+    if (calc.orientacao === 'vert_cima' && calc.peso) {
+      var p = calc.peso;
+      var alt = arred05(p.concreto / (p.b * p.L));
+      return {
+        via: 'peso', rec: Number(b.recobrimento),
+        altura: alt, largura: p.L, espessura: p.b,
+        concreto: p.concreto,
+        forma: 2 * (p.L + p.b) * alt,
+        aco: Math.round(BA.TAXA_ACO * p.concreto),
+        acoEstimado: true, G: p.G, atende: true
+      };
+    }
+
+    if (calc.apoio && calc.apoio.ok) {
+      var a2 = calc.apoio;
+      return {
+        via: 'fundo', rec: Number(b.recobrimento),
+        altura: a2.esp, largura: a2.L, espessura: a2.b,
+        concreto: a2.concreto,
+        forma: (a2.L + 2 * a2.b) * a2.esp,
+        aco: Math.round(BA.TAXA_ACO * a2.concreto),
+        acoEstimado: true, Anec: a2.Anec, atende: true
+      };
+    }
+    return null;
+  };
+
+  BA.LASTRO = 0.05;   /* berço de concreto magro sob o bloco (m) */
+
+  /* ================================================================
      Fontes
      ================================================================ */
 

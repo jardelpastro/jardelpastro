@@ -98,6 +98,210 @@
   };
 
   /* ================================================================
+     Desenho do bloco adotado: 4 vistas com cotas
+     ================================================================ */
+
+  /* linha de cota horizontal com setas e texto */
+  function cotaH(g, x1, x2, y, rot) {
+    var c = 'var(--texto-2, #556)';
+    g.appendChild(sv('line', { x1: x1, y1: y, x2: x2, y2: y, stroke: c, 'stroke-width': 1 }));
+    [[x1, 1], [x2, -1]].forEach(function (p) {
+      g.appendChild(sv('path', { d: 'M ' + p[0] + ' ' + y + ' l ' + (6 * p[1]) + ' -2.6 l 0 5.2 Z', fill: c }));
+      g.appendChild(sv('line', { x1: p[0], y1: y - 5, x2: p[0], y2: y + 5, stroke: c, 'stroke-width': 1 }));
+    });
+    g.appendChild(sv('text', { x: (x1 + x2) / 2, y: y - 4, 'text-anchor': 'middle',
+      'font-size': 9.5, fill: c, stroke: 'var(--surface)', 'stroke-width': 3,
+      'paint-order': 'stroke', 'stroke-linejoin': 'round' }, rot));
+  }
+
+  function cotaV(g, x, y1, y2, rot) {
+    var c = 'var(--texto-2, #556)';
+    g.appendChild(sv('line', { x1: x, y1: y1, x2: x, y2: y2, stroke: c, 'stroke-width': 1 }));
+    [[y1, 1], [y2, -1]].forEach(function (p) {
+      g.appendChild(sv('path', { d: 'M ' + x + ' ' + p[0] + ' l -2.6 ' + (6 * p[1]) + ' l 5.2 0 Z', fill: c }));
+      g.appendChild(sv('line', { x1: x - 5, y1: p[0], x2: x + 5, y2: p[0], stroke: c, 'stroke-width': 1 }));
+    });
+    var t = sv('text', { x: x + 4, y: (y1 + y2) / 2 + 3, 'font-size': 9.5, fill: c,
+      stroke: 'var(--surface)', 'stroke-width': 3, 'paint-order': 'stroke',
+      'stroke-linejoin': 'round' });
+    t.textContent = rot;
+    g.appendChild(t);
+  }
+
+  function mRot(v) { return UI.num(v, 2) + ' m'; }
+
+  var COR_BLOCO = 'var(--teal)';
+  var COR_BORDA = 'var(--teal-escuro, #0E6F66)';
+  var COR_TUBO = 'var(--azul)';
+  var COR_SOLO = 'var(--texto-suave, #99a)';
+
+  function vista(titulo, viewW, viewH, montar) {
+    var svg = sv('svg', { viewBox: '0 0 ' + viewW + ' ' + viewH, class: 'vista-bloco', role: 'img' });
+    svg.appendChild(sv('text', { x: viewW / 2, y: 13, 'text-anchor': 'middle', 'font-size': 10.5,
+      'font-weight': 700, fill: 'var(--azul)' }, titulo));
+    montar(svg);
+    return svg;
+  }
+
+  function retBloco(g, x, y, w, hh) {
+    g.appendChild(sv('rect', { x: x, y: y, width: w, height: hh,
+      fill: COR_BLOCO, opacity: 0.28, stroke: COR_BORDA, 'stroke-width': 1.6 }));
+  }
+
+  /* 4 vistas do bloco adotado. info: C.blocoInfo; sol: BA.solucao */
+  UB.desenhoBloco = function (info, sol) {
+    var deM = info.deMm / 1000;
+    var rec = sol.rec || 0.65;
+    var lastro = BA.LASTRO;
+    var profGeratriz = rec + deM;                 /* topo do tubo a fundo */
+    var profVala = rec + deM + lastro;
+
+    /* escala comum: cabe a maior dimensão em ~120 px */
+    var maxDim = Math.max(sol.largura, sol.altura, sol.espessura, profVala, 0.8);
+    var esc = 120 / maxDim;
+    function m2px(v) { return v * esc; }
+
+    var vistas = [];
+
+    /* ---- PLANTA ---- */
+    vistas.push(vista('PLANTA', 230, 190, function (svg) {
+      var L = m2px(sol.largura), T = m2px(sol.espessura);
+      var x0 = 115 - L / 2, y0 = 95 - T / 2;
+      /* tubo passando */
+      var dTubo = Math.max(6, m2px(deM));
+      svg.appendChild(sv('rect', { x: 10, y: 95 - dTubo / 2, width: 210, height: dTubo,
+        fill: COR_TUBO, opacity: 0.75 }));
+      retBloco(svg, x0, y0, L, T);
+      cotaH(svg, x0, x0 + L, y0 - 12, mRot(sol.largura));
+      cotaV(svg, Math.min(x0, 10) - 0 + (x0 > 30 ? x0 - 14 : 18), y0, y0 + T, mRot(sol.espessura));
+      svg.appendChild(sv('text', { x: 115, y: 182, 'text-anchor': 'middle', 'font-size': 9,
+        fill: COR_SOLO }, 'largura × espessura (no sentido do empuxo)'));
+    }));
+
+    /* ---- CORTE TRANSVERSAL (perpendicular ao tubo) ----
+       geometria do padrão de concessionária: o topo do bloco fica
+       RECB_BLOCO abaixo do terreno e o bloco desce a altura H, envolvendo
+       o tubo; sob ele, o berço de concreto magro. */
+    var RECB_BLOCO = 0.20;
+    var profValaDes = Math.max(profVala, RECB_BLOCO + sol.altura + lastro);
+    vistas.push(vista('CORTE TRANSVERSAL', 250, 218, function (svg) {
+      var terreno = 42;
+      var A = m2px(sol.largura), H = m2px(sol.altura);
+      var dTubo = Math.max(8, m2px(deM));
+      var yTuboTopo = terreno + m2px(rec);
+      var yBloco = terreno + m2px(RECB_BLOCO);
+      var x0 = 125 - A / 2;
+      svg.appendChild(sv('line', { x1: 14, y1: terreno, x2: 240, y2: terreno, stroke: COR_SOLO, 'stroke-width': 1.6 }));
+      for (var xh = 18; xh < 240; xh += 14) {
+        svg.appendChild(sv('line', { x1: xh, y1: terreno, x2: xh - 6, y2: terreno - 6, stroke: COR_SOLO, 'stroke-width': 1 }));
+      }
+      retBloco(svg, x0, yBloco, A, H);
+      /* tubo em corte, dentro do bloco */
+      svg.appendChild(sv('circle', { cx: 125, cy: yTuboTopo + dTubo / 2, r: dTubo / 2,
+        fill: 'var(--surface)', stroke: COR_TUBO, 'stroke-width': 2.4 }));
+      /* berço */
+      svg.appendChild(sv('rect', { x: x0 - 6, y: yBloco + H, width: A + 12, height: Math.max(3, m2px(lastro)),
+        fill: COR_SOLO, opacity: 0.45 }));
+      cotaV(svg, x0 - 16, terreno, yTuboTopo, mRot(rec));
+      cotaV(svg, x0 + A + 14, yBloco, yBloco + H, mRot(sol.altura));
+      cotaH(svg, x0, x0 + A, yBloco + H + Math.max(3, m2px(lastro)) + 12, mRot(sol.largura));
+      cotaV(svg, 22, terreno, yBloco + H + Math.max(3, m2px(lastro)), mRot(profValaDes));
+      svg.appendChild(sv('text', { x: 125, y: 211, 'text-anchor': 'middle', 'font-size': 9,
+        fill: COR_SOLO }, 'topo do bloco a ' + UI.num(RECB_BLOCO, 2) + ' m do terreno; tubo DE ' +
+        UI.num(info.deMm, 0) + ' mm; berço de ' + UI.num(lastro * 100, 0) + ' cm'));
+    }));
+
+    /* ---- CORTE LONGITUDINAL (ao longo do tubo) ---- */
+    vistas.push(vista('CORTE LONGITUDINAL', 230, 190, function (svg) {
+      var terreno = 40;
+      var T = m2px(sol.espessura), H = m2px(sol.altura);
+      var dTubo = Math.max(8, m2px(deM));
+      var yTuboTopo = terreno + m2px(rec);
+      var yBloco = Math.max(terreno + 6, yTuboTopo + dTubo / 2 - H / 2);
+      var x0 = 115 - T / 2;
+      svg.appendChild(sv('line', { x1: 10, y1: terreno, x2: 220, y2: terreno, stroke: COR_SOLO, 'stroke-width': 1.6 }));
+      for (var xh = 14; xh < 220; xh += 14) {
+        svg.appendChild(sv('line', { x1: xh, y1: terreno, x2: xh - 6, y2: terreno - 6, stroke: COR_SOLO, 'stroke-width': 1 }));
+      }
+      /* tubo longitudinal */
+      svg.appendChild(sv('rect', { x: 10, y: yTuboTopo, width: 210, height: dTubo,
+        fill: 'var(--surface)', stroke: COR_TUBO, 'stroke-width': 2 }));
+      retBloco(svg, x0, yBloco, T, H);
+      cotaH(svg, x0, x0 + T, yBloco - 10, mRot(sol.espessura));
+      cotaV(svg, x0 - 16, yBloco, yBloco + H, mRot(sol.altura));
+      svg.appendChild(sv('text', { x: 115, y: 182, 'text-anchor': 'middle', 'font-size': 9,
+        fill: COR_SOLO }, 'espessura no sentido da linha; o bloco envolve a peça'));
+    }));
+
+    /* ---- PERSPECTIVA ---- */
+    vistas.push(vista('PERSPECTIVA', 230, 190, function (svg) {
+      var c30 = Math.cos(Math.PI / 6), s30 = Math.sin(Math.PI / 6);
+      var e2 = 78 / Math.max(sol.largura + sol.espessura, sol.altura * 1.5);
+      function iso(x, y, z) {
+        return [115 + (x - y) * c30 * e2, 118 + (x + y) * s30 * e2 - z * e2];
+      }
+      function face(pts, op) {
+        svg.appendChild(sv('path', {
+          d: 'M ' + pts.map(function (p) { return p[0] + ' ' + p[1]; }).join(' L ') + ' Z',
+          fill: COR_BLOCO, opacity: op, stroke: COR_BORDA, 'stroke-width': 1.4, 'stroke-linejoin': 'round'
+        }));
+      }
+      var Lx = sol.largura, Ey = sol.espessura, Hz = sol.altura;
+      /* topo, frente, lado */
+      face([iso(0, 0, Hz), iso(Lx, 0, Hz), iso(Lx, Ey, Hz), iso(0, Ey, Hz)], 0.18);
+      face([iso(0, Ey, 0), iso(Lx, Ey, 0), iso(Lx, Ey, Hz), iso(0, Ey, Hz)], 0.34);
+      face([iso(Lx, 0, 0), iso(Lx, Ey, 0), iso(Lx, Ey, Hz), iso(Lx, 0, Hz)], 0.26);
+      /* tubo atravessando (na meia altura) */
+      var r = Math.max(4, m2px(deM) / 2) * 0.8;
+      var pA = iso(-Lx * 0.35, Ey / 2, Hz / 2), pB = iso(Lx * 1.35, Ey / 2, Hz / 2);
+      svg.appendChild(sv('line', { x1: pA[0], y1: pA[1], x2: pB[0], y2: pB[1],
+        stroke: COR_TUBO, 'stroke-width': r * 2, opacity: 0.5, 'stroke-linecap': 'round' }));
+      /* cotas nas arestas */
+      var a1 = iso(0, Ey, 0), a2 = iso(Lx, Ey, 0), a3 = iso(Lx, 0, 0), a4 = iso(Lx, Ey, Hz);
+      function rotIso(x, y, txt, anc) {
+        svg.appendChild(sv('text', { x: x, y: y, 'text-anchor': anc || 'middle', 'font-size': 9.5,
+          fill: COR_SOLO, stroke: 'var(--surface)', 'stroke-width': 3, 'paint-order': 'stroke',
+          'stroke-linejoin': 'round' }, txt));
+      }
+      rotIso((a1[0] + a2[0]) / 2 - 8, (a1[1] + a2[1]) / 2 + 15, mRot(Lx));
+      rotIso((a2[0] + a3[0]) / 2 + 4, (a2[1] + a3[1]) / 2 + 13, mRot(Ey), 'start');
+      rotIso(Math.min((a2[0] + a4[0]) / 2 + 6, 200), (a2[1] + a4[1]) / 2, mRot(Hz), 'start');
+    }));
+
+    var grade = h('div', { class: 'vistas-bloco' });
+    vistas.forEach(function (v) { grade.appendChild(h('div', { class: 'vista-caixa' }, v)); });
+    return grade;
+  };
+
+  /* quantidades e dimensões da solução adotada */
+  UB.quadroSolucao = function (info, sol) {
+    var deM = info.deMm / 1000;
+    var profVala = (sol.rec || 0) + deM + BA.LASTRO;
+    var linhas = [
+      ['Bloco adotado', sol.via === 'padrao'
+        ? 'padronizado tipo ' + sol.tipo + ' (recobrimento ' + UI.numEdit(sol.rec) + ' m)'
+        : (sol.via === 'peso' ? 'calculado — bloco de peso' : 'calculado — apoio no solo')],
+      ['Dimensões (largura × altura × espessura)',
+        UI.num(sol.largura, 2) + ' × ' + UI.num(sol.altura, 2) + ' × ' + UI.num(sol.espessura, 2) + ' m' +
+        (sol.espessuraEquivalente ? '  (espessura média equivalente ao volume tabelado)' : '')],
+      sol.via === 'padrao' ? ['Capacidade tabelada', UI.num(sol.cap, 0) + ' kgf  ≥  E = ' + UI.num(info.calc.E, 0) + ' kgf'] : null,
+      sol.Anec ? ['Área de encosto  A = FS·E/σ', UI.num(sol.Anec, 2) + ' m²  (adotada ' + UI.num(sol.largura * sol.altura, 2) + ' m²)'] : null,
+      sol.G ? ['Peso necessário  G = FS·E', UI.num(sol.G, 0) + ' kgf'] : null,
+      ['Profundidade da vala', UI.num(Math.max(profVala, 0.20 + sol.altura + BA.LASTRO), 2) +
+        ' m  (governa o maior entre recobrimento + DE + berço e 0,20 m + altura do bloco + berço)'],
+      ['Concreto', UI.num(sol.concreto, 2) + ' m³'],
+      ['Forma', UI.num(sol.forma, 2) + ' m²'],
+      ['Armadura', UI.num(sol.aco, 0) + ' kg' + (sol.acoEstimado
+        ? '  (previsão: ' + BA.TAXA_ACO + ' kg/m³ — malha nas faces, a detalhar no projeto estrutural)'
+        : '  (do padrão da concessionária)')]
+    ].filter(Boolean);
+    return h('table', { class: 'tab-apoio' }, h('tbody', {},
+      linhas.map(function (l) {
+        return h('tr', {}, h('td', { class: 'esq' }, l[0]), h('td', {}, l[1]));
+      })));
+  };
+
+  /* ================================================================
      Cartão de um bloco
      ================================================================ */
 
@@ -172,12 +376,20 @@
   /* tabela dos blocos padronizados, com ★ no sugerido e clique para adotar */
   function tabelaPadrao(info, base) {
     var calc = info.calc;
+    /* quando a sugestão só coube em recobrimento maior, é a tabela DESSE
+       recobrimento que interessa ver — com a estrela nela */
+    var recExib = (calc.padrao && calc.padrao.achou && !calc.padrao.recPedido)
+      ? calc.padrao.rec : null;
+    if (recExib !== null && info.dn) {
+      calc = Object.assign({}, calc, { tabela: BA.tabelaPadrao(info.dn, recExib) });
+    }
     if (!calc.tabela) {
       return h('p', { class: 'vazio' }, info.dn
         ? 'Não há blocos padronizados para DN ' + info.dn + ' com este recobrimento — vale o bloco calculado ao lado.'
         : 'Escolha o tubo para listar os blocos padronizados.');
     }
-    var sugerido = calc.padrao && calc.padrao.achou && calc.padrao.recPedido ? calc.padrao.linha.tipo : null;
+    var sugerido = calc.padrao && calc.padrao.achou &&
+      (calc.padrao.recPedido || recExib !== null) ? calc.padrao.linha.tipo : null;
     var adotado = calc.escolhido ? calc.escolhido.tipo : sugerido;
 
     var linhas = calc.tabela.linhas.filter(function (l) { return l.cap !== null; }).map(function (l) {
@@ -205,8 +417,9 @@
         { rot: 'E máx (kgf)', dica: 'Capacidade tabelada do bloco padronizado para este DN e recobrimento (tabela da concessionária transcrita da sua planilha, com as correções registradas na aba Fontes do memorial).' },
         'H × A (m)', 'Concreto (m³)', 'Forma (m²)', 'Aço (kg)', 'Situação'], linhas),
       h('p', { class: 'nota', style: 'margin-top:5px' },
-        'DN da tabela: ' + calc.tabela.dnTabela + ' · recobrimento ' + UI.numEdit(calc.tabela.rec) +
-        ' m. Clique para adotar um tipo; ★ é a sugestão. ',
+        'DN da tabela: ' + calc.tabela.dnTabela + ' · recobrimento ' + UI.numEdit(calc.tabela.rec) + ' m' +
+        (recExib !== null ? ' (nenhum tipo coube com o recobrimento pedido; esta é a tabela em que a sugestão coube)' : '') +
+        '. Clique para adotar um tipo; ★ é a sugestão. ',
         info.b.tipoEscolhido ? h('button', { class: 'btn mini', type: 'button', 'data-acao': 'blocoTipo',
           'data-base': base, 'data-tipo-bloco': '' }, 'Voltar à sugestão') : null));
   }
@@ -234,13 +447,29 @@
       out.push(h('div', { class: 'aviso' }, a));
     });
 
+    /* a solução que vale, dita com todas as letras — o tipo de solo altera
+       só a verificação de apoio, nunca o bloco padronizado */
+    var sol = BA.solucao(calc, info.b);
+    if (sol) {
+      out.push(h('div', { class: 'solucao-bloco ' + (sol.atende ? 'bom' : 'ruim') },
+        h('b', {}, 'Solução adotada: '),
+        sol.via === 'padrao'
+          ? 'bloco padronizado tipo ' + sol.tipo + ' — ' + UI.num(sol.largura, 2) + ' × ' +
+            UI.num(sol.altura, 2) + ' × ' + UI.num(sol.espessura, 2) + ' m, ' +
+            UI.num(sol.concreto, 2) + ' m³ de concreto (capacidade ' + UI.num(sol.cap, 0) +
+            ' kgf ≥ E = ' + UI.num(calc.E, 0) + ' kgf)'
+          : 'bloco calculado — ' + UI.num(sol.largura, 2) + ' × ' + UI.num(sol.altura, 2) + ' × ' +
+            UI.num(sol.espessura, 2) + ' m, ' + UI.num(sol.concreto, 2) + ' m³ de concreto' +
+            (sol.via === 'peso' ? ' (bloco de peso)' : ' (apoio no solo)')));
+    }
+
     if (calc.orientacao === 'horizontal') {
       out.push(h('div', { class: 'blocos-vias' },
         h('div', { class: 'via' },
-          h('h4', {}, 'Bloco padronizado', UI.dica('Seleção entre os blocos-padrão da concessionária (tipos 1 a 26), pela capacidade tabelada por DN e recobrimento — a sistemática da sua planilha, com o empuxo calculado pelo DE.')),
+          h('h4', {}, 'Bloco padronizado', UI.dica('Seleção entre os blocos-padrão da concessionária (tipos 1 a 26), pela capacidade tabelada por DN e recobrimento — a sistemática da sua planilha, com o empuxo calculado pelo DE. As capacidades são tabeladas: NÃO dependem do tipo de solo escolhido.')),
           tabelaPadrao(info, base)),
         h('div', { class: 'via' },
-          h('h4', {}, 'Bloco calculado pelo apoio no solo', UI.dica('Método clássico de anteprojeto: a área de encosto na parede da vala precisa transmitir FS·E ao terreno sem exceder a tensão admissível σ. A = FS·E/σ (Azevedo Netto; AWWA M41).')),
+          h('h4', {}, 'Verificação de apoio no solo (bloco calculado)', UI.dica('Método clássico de anteprojeto: a área de encosto na parede da vala precisa transmitir FS·E ao terreno sem exceder a tensão admissível σ. A = FS·E/σ (Azevedo Netto; AWWA M41).\n\nÉ ESTA coluna que muda quando o tipo de solo muda — o bloco padronizado ao lado continua o mesmo. As duas vias são independentes: a tabela dá o bloco-padrão; o cálculo dá o bloco mínimo para o SEU solo.')),
           viaApoio(calc))));
     } else {
       out.push(h('div', { class: 'blocos-vias' },
@@ -249,6 +478,14 @@
             ? 'Curva vertical convexa — bloco de peso'
             : 'Curva vertical côncava — apoio no fundo da vala'),
           calc.orientacao === 'vert_cima' ? viaPeso(calc) : viaApoio(calc))));
+    }
+
+    /* desenho do bloco adotado + quantidades */
+    if (sol) {
+      out.push(h('div', { style: 'margin-top:12px' },
+        h('h4', { class: 'titulo-desenho' }, 'Desenho do bloco adotado'),
+        UB.desenhoBloco(info, sol),
+        h('div', { style: 'max-width:640px;margin-top:8px' }, UB.quadroSolucao(info, sol))));
     }
     return h('div', {}, out);
   }
@@ -266,7 +503,7 @@
           h('td', {}, UI.num(a.b, 2) + ' × ' + UI.num(a.L, 2) + ' m  (' + UI.num(a.Aefetiva, 2) + ' m²)')),
         h('tr', {}, h('td', { class: 'esq' }, 'Espessura no sentido do empuxo'),
           h('td', {}, UI.num(a.esp, 2) + ' m')),
-        h('tr', {}, h('td', { class: 'esq' }, 'Concreto estimado'),
+        h('tr', {}, h('td', { class: 'esq' }, 'Concreto do bloco calculado (muda com o solo)'),
           h('td', {}, UI.num(a.concreto, 2) + ' m³')),
         h('tr', {}, h('td', { class: 'esq' }, 'Tensão atuante com o encosto sugerido'),
           h('td', {}, UI.num(a.sigmaAtuante, 0) + ' kgf/m²  (FS efetivo ' + UI.num(a.fsEfetivo, 2) + ')')))),
@@ -326,6 +563,86 @@
   };
 
   /* ================================================================
+     Memória de cálculo na tela (card separado, no fim da aba)
+     ================================================================ */
+
+  function memoriaDeUm(st, info) {
+    var calc = info.calc;
+    var b = info.b;
+    if (!(info.deMm > 0) || !(info.pMca > 0)) return null;
+    var p = BA.peca(b.pecaId);
+    var deM = info.deMm / 1000;
+    var A = Math.PI * deM * deM / 4;
+    var nn = function (v, d) { return UI.num(v, d === undefined ? 2 : d); };
+    var linhas = [];
+
+    /* empuxo */
+    linhas.push('A = \\frac{\\pi \\cdot ' + nn(deM, 4) + '^2}{4} = ' + nn(A, 4) + '\\ \\text{m}^2');
+    if (p.reducao) {
+      var de2M = info.de2Mm / 1000;
+      var A2 = Math.PI * de2M * de2M / 4;
+      linhas.push('A_2 = \\frac{\\pi \\cdot ' + nn(de2M, 4) + '^2}{4} = ' + nn(A2, 4) + '\\ \\text{m}^2');
+      linhas.push('E = 1000 \\cdot p \\cdot ( A - A_2 ) = 1000 \\cdot ' + nn(info.pMca, 1) +
+        ' \\cdot ' + nn(A - A2, 4) + ' = ' + nn(calc.E, 0) + '\\ \\text{kgf}');
+    } else if (p.axial) {
+      linhas.push('E = 1000 \\cdot p \\cdot A = 1000 \\cdot ' + nn(info.pMca, 1) +
+        ' \\cdot ' + nn(A, 4) + ' = ' + nn(calc.E, 0) + '\\ \\text{kgf}');
+    } else {
+      linhas.push('E = 2 \\cdot 1000 \\cdot p \\cdot A \\cdot sen ( \\frac{' + nn(p.ang, 1) +
+        '°}{2} ) = ' + nn(calc.E, 0) + '\\ \\text{kgf}');
+    }
+
+    var passos = [
+      h('p', { class: 'nota' }, 'Pressão de cálculo: ' + nn(info.pMca, 1) + ' mca — ' + info.pOrigem +
+        '. DE = ' + nn(info.deMm, 1) + ' mm' + (info.trechoRot ? ' (de ' + info.trechoRot + ')' : '') + '.'),
+      PDA.FX.bloco(linhas, { tam: 15 })
+    ];
+
+    /* seleção do padronizado */
+    if (calc.orientacao === 'horizontal' && calc.padrao && calc.padrao.achou) {
+      passos.push(h('p', { class: 'nota' },
+        'Bloco padronizado: menor tipo com capacidade ≥ E na tabela do DN ' +
+        (calc.tabela ? calc.tabela.dnTabela : info.dn) + ' → tipo ' + calc.padrao.linha.tipo +
+        ' (capacidade ' + nn(calc.padrao.linha.cap, 0) + ' kgf, recobrimento ' +
+        UI.numEdit(calc.padrao.rec) + ' m)' +
+        (calc.escolhido ? '; adotado manualmente o tipo ' + calc.escolhido.tipo + '.' : '.')));
+    }
+
+    /* apoio / peso */
+    if (calc.apoio && calc.apoio.ok && calc.orientacao !== 'vert_cima') {
+      var ap = calc.apoio;
+      passos.push(PDA.FX.bloco([
+        'A_{nec} = \\frac{FS \\cdot E}{\\sigma_{adm}} = \\frac{' + UI.numEdit(calc.fs) +
+          ' \\cdot ' + nn(calc.E, 0) + '}{' + nn(calc.sigma, 0) + '} = ' + nn(ap.Anec, 2) + '\\ \\text{m}^2',
+        '\\sigma = \\frac{' + nn(calc.E, 0) + '}{' + nn(ap.b, 2) + ' \\cdot ' + nn(ap.L, 2) +
+          '} = ' + nn(ap.sigmaAtuante, 0) + '\\ \\text{kgf/m}^2 \\qquad \\text{(admissível: ' +
+          nn(calc.sigma, 0) + ' kgf/m², ' + calc.solo.rot.toLowerCase() + ')}'
+      ], { tam: 15 }));
+    }
+    if (calc.peso) {
+      passos.push(PDA.FX.bloco([
+        'G = FS \\cdot E = ' + UI.numEdit(calc.fs) + ' \\cdot ' + nn(calc.E, 0) + ' = ' +
+          nn(calc.peso.G, 0) + '\\ \\text{kgf}',
+        'V = \\frac{G}{\\gamma} = \\frac{' + nn(calc.peso.G, 0) + '}{' +
+          UI.numEdit(st.blocos.gamaConcreto) + '} = ' + nn(calc.peso.concreto, 2) + '\\ \\text{m}^3'
+      ], { tam: 15 }));
+    }
+
+    return h('div', { class: 'memoria-bloco' },
+      h('h4', {}, b.rot + ' — ' + p.rot + (info.dn ? ', DN ' + info.dn : '')),
+      passos);
+  }
+
+  UB.cartaoMemoria = function (st, ctx, res) {
+    var itens = (st.blocos.itens || [])
+      .map(function (b) { return memoriaDeUm(st, PDA.C.blocoInfo(st, ctx, res, b)); })
+      .filter(Boolean);
+    if (!itens.length) return null;
+    return UI.cartao('Memória de cálculo dos blocos',
+      'As mesmas contas que vão para o memorial, com os números do projeto', itens);
+  };
+
+  /* ================================================================
      Aba
      ================================================================ */
 
@@ -365,6 +682,9 @@
     out.push(h('div', { class: 'linha', style: 'margin:4px 0 10px' },
       h('button', { class: 'btn', type: 'button', 'data-acao': 'blocoNovo' },
         '+ Adicionar bloco de ancoragem')));
+
+    var mem = UB.cartaoMemoria(st, ctx, res);
+    if (mem) out.push(mem);
 
     out.push(UI.cartao('Como este pré-dimensionamento funciona', null,
       h('div', { class: 'nota', style: 'line-height:1.6' },

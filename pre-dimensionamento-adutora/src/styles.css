@@ -756,3 +756,19 @@ html.imprimindo-doc #doc-saida { display: block; }
 .tab-apoio { border-collapse: collapse; width: 100%; font-size: 13px; }
 .tab-apoio td { padding: 5px 8px; border-bottom: 1px solid var(--borda); }
 .tab-apoio td:last-child { text-align: right; white-space: nowrap; }
+
+.solucao-bloco {
+  margin: 8px 0; padding: 9px 12px; border-radius: 6px; font-size: 13.5px;
+  border-left: 4px solid var(--teal-vivo); background: color-mix(in srgb, var(--teal) 12%, transparent);
+}
+.solucao-bloco.ruim { border-left-color: var(--vermelho, #b3261e); background: rgba(179, 38, 30, .08); }
+.vistas-bloco { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; max-width: 980px; }
+.vista-caixa { border: 1px solid var(--borda); border-radius: 6px; background: var(--surface); }
+.vista-bloco { width: 100%; height: auto; display: block; }
+.vista-bloco text { font-family: inherit; }
+.titulo-desenho { margin: 0 0 7px; font-size: 13.5px; color: var(--azul); }
+[data-tema="escuro"] .titulo-desenho { color: #cfe0f5; }
+.memoria-bloco { margin: 6px 0 14px; }
+.memoria-bloco h4 { margin: 0 0 5px; font-size: 13.5px; color: var(--azul); }
+[data-tema="escuro"] .memoria-bloco h4 { color: #cfe0f5; }
+.memoria-bloco svg.formula-svg { max-width: 100%; height: auto; }

@@ -1581,6 +1581,130 @@ function titulo(t) { console.log('\n' + t); }
   ok('projeto avulso guardado em chave própria', chaves.bloco);
   await pagBloco.close();
 
+  titulo('36. Ponto alto da linha');
+  await page.evaluate(() => window.PDA.UI.fecharModal());
+  await page.waitForTimeout(200);
+  await page.evaluate(() => {
+    const P = window.PDA;
+    P.App.st = P.E.padrao();
+    const st = P.App.st;
+    st.vazao.valor = 100;
+    st.cotas.nivelSuccaoMin = 170; st.cotas.nivelSuccaoMax = 171; st.cotas.eixoBomba = 168;
+    st.cotas.nivelChegada = 180;
+    st.adutoras[0].itemRot = 'DN 300';
+    st.adutoras[0].extensao = 2000;
+    P.App.irPara('bombas');
+  });
+  await page.waitForTimeout(450);
+  const txtBom = await page.locator('#conteudo').innerText();
+  ok('campo do ponto mais alto na aba Bombas', /Cota do ponto mais alto/.test(txtBom));
+  ok('campo da distância até ele', /Distância até ele/.test(txtBom));
+  await page.locator('input[data-bind="cotas.cotaPontoAlto"]').fill('190');
+  await page.locator('input[data-bind="cotas.cotaPontoAlto"]').press('Tab');
+  await page.waitForTimeout(500);
+  ok('cota alta sem distância pede a distância',
+     /sem a distância até ele/.test(await page.locator('#conteudo').innerText()));
+  await page.locator('input[data-bind="cotas.distPontoAlto"]').fill('1000');
+  await page.locator('input[data-bind="cotas.distPontoAlto"]').press('Tab');
+  await page.waitForTimeout(500);
+  const txtBom2 = await page.locator('#conteudo').innerText();
+  ok('acusa a piezométrica abaixo do ponto alto', /ACIMA da linha piezométrica/.test(txtBom2));
+  ok('diz a Hm necessária', /precisaria ser de pelo menos/.test(txtBom2));
+  /* com o perfil lançado, os campos manuais saem e o perfil manda */
+  await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    st.cotas.cotaPontoAlto = 186;   /* divergente do perfil, de propósito */
+    st.perfil = { ativo: true, modo: 'acumulada', unidExt: 'm',
+      pontos: [{ est: 0, cota: 170 }, { est: 1000, cota: 190 }, { est: 2000, cota: 180 }] };
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(450);
+  const txtBom3 = await page.locator('#conteudo').innerText();
+  ok('com perfil, o campo manual dá lugar ao resumo do perfil',
+     /Ponto alto \(do perfil da linha\)/.test(txtBom3) && !/Cota do ponto mais alto \(m\)/.test(txtBom3));
+  ok('divergência entre campo e perfil é acusada', /confira qual dos dois está certo/.test(txtBom3));
+  ok('aviso também aparece no Resumo', await page.evaluate(() => {
+    const P = window.PDA;
+    const res = P.C.resumo(P.App.st, P.App.cats);
+    return res.avisosDados.some(a => a.id === 'pontoAlto' && a.grave);
+  }));
+
+  titulo('37. Conta nos campos numéricos');
+  await page.evaluate(() => { window.PDA.App.st = window.PDA.E.padrao(); window.PDA.App.irPara('resumo'); });
+  await page.waitForTimeout(400);
+  const campoVazao = page.locator('input[data-bind="vazao.valor"]').first();
+  await campoVazao.fill('=10+25+30');
+  await campoVazao.press('Enter');
+  await page.waitForTimeout(500);
+  ok('=10+25+30 vira 65 na vazão',
+     (await page.evaluate(() => window.PDA.App.st.vazao.valor)) === 65);
+  await campoVazao.fill('2,5*40');
+  await campoVazao.press('Tab');
+  await page.waitForTimeout(500);
+  ok('2,5*40 vira 100', (await page.evaluate(() => window.PDA.App.st.vazao.valor)) === 100);
+  /* digitar a expressão não aplica pela metade: só no Enter/Tab */
+  await campoVazao.fill('50');
+  await campoVazao.press('Tab');
+  await page.waitForTimeout(400);
+  await campoVazao.fill('50+');
+  await page.waitForTimeout(600);
+  ok('expressão incompleta não entra no estado enquanto digita',
+     (await page.evaluate(() => window.PDA.App.st.vazao.valor)) === 50);
+  await campoVazao.press('Escape');
+
+  titulo('38. Blocos — solução adotada, desenho e memória');
+  await page.evaluate(() => {
+    const P = window.PDA;
+    P.App.st = P.E.padrao();
+    const st = P.App.st;
+    st.blocos.ativo = true;
+    st.blocos.itens = [P.E.novoBloco(1)];
+    st.blocos.itens[0].tuboOrigem = 'manual';
+    st.blocos.itens[0].catalogoId = 'fd_k7';
+    st.blocos.itens[0].itemRot = 'DN 300';
+    st.blocos.itens[0].pressaoFonte = 'informada';
+    st.blocos.itens[0].pressaoInformada = 80;
+    P.App.irPara('blocos');
+  });
+  await page.waitForTimeout(500);
+  const txtBl2 = await page.locator('#conteudo').innerText();
+  ok('faixa "Solução adotada" presente', /Solução adotada:/.test(txtBl2));
+  ok('deixa claro que o solo muda só a verificação',
+     /muda com o solo/i.test(txtBl2) || /Verificação de apoio no solo/.test(txtBl2));
+  ok('4 vistas desenhadas', (await page.locator('#conteudo svg.vista-bloco').count()) === 4);
+  ok('vistas nomeadas', /PLANTA/.test(txtBl2) && /CORTE TRANSVERSAL/.test(txtBl2) &&
+     /CORTE LONGITUDINAL/.test(txtBl2) && /PERSPECTIVA/.test(txtBl2));
+  ok('quadro com profundidade da vala', /Profundidade da vala/.test(txtBl2));
+  ok('previsão de armadura', /Armadura/.test(txtBl2));
+  ok('memória de cálculo na tela', /Memória de cálculo dos blocos/.test(txtBl2));
+  ok('memória com fórmulas compostas',
+     (await page.locator('#conteudo .memoria-bloco svg.formula-svg').count()) >= 1);
+  /* trocar o solo NÃO muda o bloco padronizado adotado, e a tela diz isso */
+  const antesSolo = await page.evaluate(() => {
+    const P = window.PDA;
+    const info = P.C.blocoInfo(P.App.st, P.C.contexto(P.App.st, P.App.cats), null, P.App.st.blocos.itens[0]);
+    return P.BA.solucao(info.calc, P.App.st.blocos.itens[0]);
+  });
+  await page.evaluate(() => { window.PDA.App.st.blocos.itens[0].soloId = 'argila_mole'; window.PDA.App.render(); });
+  await page.waitForTimeout(400);
+  const depoisSolo = await page.evaluate(() => {
+    const P = window.PDA;
+    const info = P.C.blocoInfo(P.App.st, P.C.contexto(P.App.st, P.App.cats), null, P.App.st.blocos.itens[0]);
+    return P.BA.solucao(info.calc, P.App.st.blocos.itens[0]);
+  });
+  ok('trocar o solo mantém o bloco padronizado adotado',
+     antesSolo.via === 'padrao' && depoisSolo.via === 'padrao' &&
+     antesSolo.tipo === depoisSolo.tipo && antesSolo.concreto === depoisSolo.concreto);
+  /* memorial ganha a figura das vistas */
+  const memVistas = await page.evaluate(() => {
+    const P = window.PDA;
+    const ctx = P.C.contexto(P.App.st, P.App.cats);
+    const res = P.C.resumo(P.App.st, P.App.cats);
+    const D = P.MEM.documento(P.App.st, ctx, res);
+    return D.figuras.some(f => /vistas do bloco adotado/.test(f.titulo));
+  });
+  ok('memorial traz a figura das vistas do bloco', memVistas);
+
   titulo('25. Impressão fiel');
   await page.locator('[data-acao="exemplo"]').click();
   await page.waitForSelector('.modal');
