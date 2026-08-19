@@ -140,6 +140,30 @@ cada ponto, soma e subtrai a sobrepressão do transitório e mostra, ponto a pon
 onde a pressão estoura a classe do tubo e onde cai abaixo de zero (subpressão) ou
 abaixo de −10 mca (separação de coluna).
 
+**Transitório e proteção** — aba opcional que dá o passo seguinte à
+pré-avaliação: calcula o **requisito** (quanto o golpe precisa ser limitado para
+a envoltória caber na classe do tubo, com folga editável e piso de pressão
+mínima), separa o que é problema de transitório do que já está fora **em regime
+permanente** (que proteção nenhuma resolve), **sugere os pontos de instalação**
+lidos do perfil (pontos altos e espaçamento de ~600 m) e pré-dimensiona os
+quatro dispositivos usuais: **RHO** pelo método da coluna rígida com ar
+isotérmico (tabela de vasos comerciais com ★ no menor que atende, clique para
+adotar, e o Δh que cada volume seguraria), **TAU** pelo volume da zona de
+depressão, **chaminé de equilíbrio** pela altura necessária e **ventosas** por
+função — simples (automática), dupla (cinética), tríplice (combinada) e
+quádrupla (non-slam) — com DN pela regra 1/12 a 1/8 da linha e campo para o
+modelo do fabricante (ARI, BERMAD, Saint-Gobain). Tudo com alerta de
+**sub/superdimensionamento**, e as **envoltórias antes/depois** lado a lado. O
+memorial ganha o capítulo de proteção. É anteprojeto: o dimensionamento final
+sai do estudo pelo método das características (Allievi, Hammer).
+
+**Tipo de junta por trecho** — ao lado do catálogo, o trecho escolhe a junta:
+no FD, JGS (elástica), JTI/JTE (travadas) ou flangeada; no PEAD, solda de topo,
+eletrofusão ou flange; no aço, soldada, flangeada ou ranhurada. A junta sai no
+memorial, e junta travada avisa na aba de blocos que o trecho travado dispensa
+ancoragem. A PFA por DN e por junta é do catálogo do fabricante — a estrutura
+está pronta para receber o catálogo Saint-Gobain.
+
 **Blocos de ancoragem** — aba opcional (e uma **versão avulsa**,
 `dist/Bloco-de-Ancoragem.html`, só com esta calculadora, para pré-dimensionar um
 bloco sem montar projeto nenhum). Cada bloco escolhe a peça (curvas de 90° a
@@ -253,6 +277,7 @@ src/js/03-rugosidade.js     coeficientes por material/idade/fluido, com fontes
 src/js/04-catalogos.js      catálogos de tubos da base
 src/js/05-pecas-motores.js  peças e coeficientes K, motores, critérios de verificação
 src/js/05c-blocos.js        blocos de ancoragem (empuxo, blocos-padrão, apoio no solo)
+src/js/05d-protecao.js      proteção do transitório (requisito, RHO, TAU, chaminé, ventosas)
 src/js/06-estado.js         modelo de dados, persistência, migração
 src/js/07-calculo.js        motor de cálculo (cenários, varredura, piezométrica, golpe)
 src/js/00-marca.js          marca do cabeçalho e carregamento da logo
@@ -261,6 +286,7 @@ src/js/08b-esquemas.js      desenhos esquemáticos
 src/js/09-ui-forms.js       painéis de entrada
 src/js/09b-ui-perfil.js     perfil da linha e envoltórias
 src/js/09c-ui-blocos.js     aba de blocos de ancoragem
+src/js/09d-ui-protecao.js   aba de transitório e proteção
 src/js/10-ui-resultados.js  resultados, piezométrica e memorial
 src/js/11-ui-catalogos.js   catálogos e fontes
 src/js/11b-ui-biblioteca.js biblioteca de projetos
@@ -269,8 +295,8 @@ src/js/08c-formula.js       compositor de fórmulas (frações, radicais, índic
 src/js/13-memorial.js       texto, fórmulas, tabelas e figuras do memorial
 src/js/14-exportar.js       paginação A4, sumário/índices, PDF e Word
 build.py                    gera os dois arquivos de dist/
-tests/run.js                304 testes do núcleo de cálculo
-tests/ui.js                 357 testes de interface em navegador
+tests/run.js                331 testes do núcleo de cálculo
+tests/ui.js                 381 testes de interface em navegador
 docs/AUDITORIA-PLANILHAS.md auditoria das planilhas de origem
 ```
 

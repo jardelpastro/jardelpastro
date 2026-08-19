@@ -84,7 +84,7 @@
     var pior = null;
     (res.golpe || []).forEach(function (g) {
       if (g.atende === false) pior = { grave: true, txt: g.rot + ': pressão máxima de ' + UI.num(g.pressaoMaxMca, 1) +
-        ' mca com o transitório, acima da admissível do tubo (' + UI.num(g.pnMca, 0) + ' mca).' };
+        ' mca com o transitório SEM proteção, acima da admissível do tubo (' + UI.num(g.pnMca, 0) + ' mca) — veja a aba Transitório e proteção.' };
       else if (!pior && g.subpressao) pior = { grave: false, txt: g.rot + ': o transitório leva a pressão a ' +
         UI.num(g.pressaoMinMca, 1) + ' mca. Subpressão pede avaliação de ventosas e de proteção contra o golpe.' };
     });
@@ -193,7 +193,7 @@
     (res.golpe || []).forEach(function (g) {
       if (g.atende === false) {
         push(g.rot + ': com a sobrepressão do transitório a pressão máxima chega a ' + UI.num(g.pressaoMaxMca, 1) +
-             ' mca, acima do PN do tubo (' + UI.num(g.pnMca, 0) + ' mca). Reveja a classe de pressão ou preveja proteção contra o golpe.');
+             ' mca, acima do PN do tubo (' + UI.num(g.pnMca, 0) + ' mca) — SEM proteção. Dimensione a proteção na aba "Transitório e proteção" ou reveja a classe do tubo deste trecho.');
       }
     });
 

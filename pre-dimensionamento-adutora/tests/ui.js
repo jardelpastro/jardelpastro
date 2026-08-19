@@ -29,7 +29,7 @@ function titulo(t) { console.log('\n' + t); }
   await page.waitForSelector('#abas button');
 
   titulo('1. Carregamento');
-  ok('abas montadas', (await page.locator('#abas button').count()) === 12,
+  ok('abas montadas', (await page.locator('#abas button').count()) === 13,
      String(await page.locator('#abas button').count()));
   ok('marca no cabeçalho', (await page.locator('#marca .marca-bloco').count()) === 1);
   ok('projeto em branco abre sem pendências',
@@ -1704,6 +1704,135 @@ function titulo(t) { console.log('\n' + t); }
     return D.figuras.some(f => /vistas do bloco adotado/.test(f.titulo));
   });
   ok('memorial traz a figura das vistas do bloco', memVistas);
+
+  titulo('39. Transitório e proteção — aba');
+  await page.evaluate(() => window.PDA.UI.fecharModal());
+  await page.waitForTimeout(200);
+  await page.evaluate(() => {
+    const P = window.PDA;
+    P.App.st = P.E.padrao();
+    const st = P.App.st;
+    st.vazao.valor = 400; st.bombas.instaladas = 3; st.bombas.operando = 2;
+    st.cotas.nivelSuccaoMin = 100; st.cotas.nivelSuccaoMax = 101; st.cotas.eixoBomba = 98;
+    st.cotas.nivelChegada = 140;
+    st.adutoras[0].itemRot = 'DN 500';
+    st.adutoras[0].extensao = 3000;
+    st.adutoras[0].pnMcaOverride = 160;
+    st.perfil = { ativo: true, modo: 'acumulada', unidExt: 'm',
+      pontos: [{ est: 0, cota: 100 }, { est: 1500, cota: 142 }, { est: 3000, cota: 140 }] };
+    P.App.irPara('protecao');
+  });
+  await page.waitForTimeout(450);
+  ok('aba existe e explica antes de ligar',
+     /Estudar a proteção contra o transitório/.test(await page.locator('#conteudo').innerText()));
+  await page.locator('input[data-bind="protecao.ativo"]').click();
+  await page.waitForTimeout(500);
+  const txtPr = await page.locator('#conteudo').innerText();
+  ok('mostra o requisito com Δh sem proteção e Δh tolerado',
+     /Δh sem proteção/.test(txtPr) && /Δh que a linha tolera/.test(txtPr));
+  ok('sugere pontos de instalação do perfil', /Pontos sugeridos de instalação/.test(txtPr));
+  ok('ponto alto do perfil vem com função e botão de lançar',
+     /ponto alto do perfil/.test(txtPr) && (await page.locator('[data-acao="protVentosaAqui"]').count()) >= 1);
+  ok('botões dos quatro dispositivos', (await page.locator('[data-acao="protNovo"]').count()) === 4);
+
+  /* lança a ventosa sugerida e depois um RHO */
+  await page.locator('[data-acao="protVentosaAqui"]').first().click();
+  await page.waitForTimeout(400);
+  const vLancada = await page.evaluate(() => window.PDA.App.st.protecao.dispositivos[0]);
+  ok('ventosa lançada com posição, função e DN sugeridos',
+     vLancada.tipo === 'ventosa' && vLancada.x > 0 && vLancada.dn > 0, JSON.stringify(vLancada));
+  await page.locator('[data-acao="protNovo"][data-tipo="rho"]').click();
+  await page.waitForTimeout(500);
+  const txtRho = await page.locator('#conteudo').innerText();
+  ok('RHO com pré-dimensionamento pela coluna rígida',
+     /coluna rígida/.test(txtRho) && /Volume do tanque/.test(txtRho));
+  ok('tabela de volumes comerciais com estrela',
+     (await page.locator('tr[data-acao="protVolume"]').count()) > 10 && /★/.test(txtRho));
+  /* adota o volume sugerido clicando na linha com estrela */
+  const volNec = await page.evaluate(() => {
+    const P = window.PDA, st = P.App.st;
+    const res = P.C.resumo(st, P.App.cats);
+    const req = P.PR.requisito(st, P.C.contexto(st, P.App.cats), res);
+    return P.PR.rho(st, P.C.contexto(st, P.App.cats), res, req).comercial;
+  });
+  await page.locator('tr[data-acao="protVolume"][data-v="' + volNec + '"]').click();
+  await page.waitForTimeout(500);
+  ok('clique adota o volume', (await page.evaluate(() => window.PDA.App.st.protecao.dispositivos[1].volumeM3)) === volNec);
+  const txtPr2 = await page.locator('#conteudo').innerText();
+  ok('mostra o Δh que o volume adotado segura', /limita o transitório a Δh/.test(txtPr2));
+  ok('envoltórias lado a lado (sem e com proteção)',
+     /Sem proteção \(Δh/.test(txtPr2) && /Com o RHO lançado/.test(txtPr2));
+  ok('dois gráficos desenhados', (await page.locator('#conteudo .blocos-vias svg').count()) >= 2);
+  /* subdimensionar acusa */
+  await page.evaluate(() => { window.PDA.App.st.protecao.dispositivos[1].volumeM3 = 0.5; window.PDA.App.render(); });
+  await page.waitForTimeout(400);
+  ok('RHO pequeno acusa SUBDIMENSIONADO na tela',
+     /SUBDIMENSIONADO/.test(await page.locator('#conteudo').innerText()));
+  /* memorial ganha o capítulo */
+  await page.evaluate(() => { window.PDA.App.st.protecao.dispositivos[1].volumeM3 = 30; });
+  const memPr = await page.evaluate(() => {
+    const P = window.PDA;
+    const ctx = P.C.contexto(P.App.st, P.App.cats);
+    const res = P.C.resumo(P.App.st, P.App.cats);
+    const D = P.MEM.documento(P.App.st, ctx, res);
+    return {
+      cap: D.capitulos.some(c => /Proteção contra o transitório/.test(c.titulo)),
+      fig: D.figuras.some(f => /proteção lançada/.test(f.titulo)),
+      tab: D.tabelas.some(t => /Dispositivos de proteção/.test(t.titulo))
+    };
+  });
+  ok('memorial tem o capítulo de proteção', memPr.cap);
+  ok('com a figura da envoltória protegida', memPr.fig);
+  ok('e a tabela de dispositivos', memPr.tab);
+
+  titulo('40. Tipo de junta no trecho');
+  await page.evaluate(() => { window.PDA.App.irPara('adutoras'); });
+  await page.waitForTimeout(450);
+  const selJunta = page.locator('select[data-bind="adutoras.0.junta"]');
+  ok('seletor de junta no trecho FD', (await selJunta.count()) === 1);
+  const opsJunta = await selJunta.locator('option').allInnerTexts();
+  ok('com JGS, JTI, JTE e flangeada',
+     /JGS/.test(opsJunta.join('|')) && /JTI/.test(opsJunta.join('|')) &&
+     /JTE/.test(opsJunta.join('|')) && /Flangeada/.test(opsJunta.join('|')), opsJunta.join(' | '));
+  ok('padrão do K7 é a elástica',
+     (await page.evaluate(() => window.PDA.App.st.adutoras[0].junta)) === 'jgs');
+  await selJunta.selectOption('jti');
+  await page.waitForTimeout(400);
+  ok('troca para JTI gravada',
+     (await page.evaluate(() => window.PDA.App.st.adutoras[0].junta)) === 'jti');
+  /* memorial menciona a junta */
+  const memJ = await page.evaluate(() => {
+    const P = window.PDA;
+    const ctx = P.C.contexto(P.App.st, P.App.cats);
+    const res = P.C.resumo(P.App.st, P.App.cats);
+    const D = P.MEM.documento(P.App.st, ctx, res);
+    const tmp = document.createElement('div');
+    D.blocos.forEach(b => tmp.appendChild(b));
+    return /junta travada interna|jti/i.test(tmp.textContent);
+  });
+  ok('memorial cita a junta do trecho', memJ);
+  /* trocar de catálogo re-padroniza a junta */
+  await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    st.adutoras[0].catalogoId = 'fd_flg_agua';
+    st.adutoras[0].junta = '';
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(400);
+  ok('catálogo flangeado assume junta flangeada',
+     (await page.evaluate(() => window.PDA.App.st.adutoras[0].junta)) === 'flg');
+  /* PEAD tem juntas próprias */
+  await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    const pead = window.PDA.App.cats.todos.filter(c => c.familia === 'PEAD')[0];
+    st.adutoras[0].catalogoId = pead.id;
+    st.adutoras[0].junta = '';
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(400);
+  const opsPead = await page.locator('select[data-bind="adutoras.0.junta"] option').allInnerTexts();
+  ok('PEAD oferece solda de topo / eletrofusão / flange',
+     /Solda de topo/.test(opsPead.join('|')) && /Eletrofusão/.test(opsPead.join('|')), opsPead.join(' | '));
 
   titulo('25. Impressão fiel');
   await page.locator('[data-acao="exemplo"]').click();

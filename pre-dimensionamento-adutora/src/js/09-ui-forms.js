@@ -349,9 +349,17 @@
       return op.arr ? UI.blocoArrastavel(caixa, op.arr, op.i) : caixa;
     }
 
+    var catAtualJ = PDA.CAT.buscar(ctx.cats.todos, conj.catalogoId);
+    var juntasFam = catAtualJ ? PDA.CAT.juntas[catAtualJ.familia] : null;
+    if (juntasFam && !conj.junta) conj.junta = PDA.CAT.juntaPadrao(catAtualJ);
+
     var campos = [
       h('label', { class: 'campo' }, h('span', { class: 'rot' }, 'Catálogo / material do tubo'),
         F.selectCatalogo(st, ctx.cats, base + '.catalogoId')),
+      juntasFam ? UI.select(st, 'Tipo de junta', base + '.junta',
+        juntasFam.map(function (j) { return { v: j.id, rot: j.rot }; }),
+        { dica: juntasFam.map(function (j) { return j.rot + ' — ' + j.nota; }).join('\n\n') +
+          '\n\nA junta define a pressão admissível do CONJUNTO (a PFA da junta travada difere da elástica e varia com o DN — conferir no catálogo do fabricante) e a necessidade de blocos de ancoragem: junta travada transmite o esforço axial e dispensa bloco no trecho travado.' }) : null,
       h('label', { class: 'campo' + (op.adutora ? ' chave' : '') },
         h('span', { class: 'rot' }, 'Diâmetro adotado'),
         F.selectDiametro(st, ctx.cats, conj, base + '.itemRot')),

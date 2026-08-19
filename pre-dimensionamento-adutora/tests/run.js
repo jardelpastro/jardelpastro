@@ -1095,6 +1095,138 @@ const calcSol3 = BA.calcular({ pecaId: 'c90', deMm: 326, pMca: 80, orientacao: '
 const solB3 = BA.solucao(calcSol3, { recobrimento: 0.65 });
 ok('curva vertical convexa: solução por peso', solB3.via === 'peso' && solB3.concreto > 0);
 
+/* ---------------------------------------------------------------- */
+titulo('38. Proteção do transitório — requisito');
+const PR = PDA.PR;
+function stProt() {
+  const st = E.padrao();
+  st.vazao.valor = 400; st.bombas.instaladas = 3; st.bombas.operando = 2;
+  st.cotas.nivelSuccaoMin = 100; st.cotas.nivelSuccaoMax = 101; st.cotas.eixoBomba = 98;
+  st.cotas.nivelChegada = 140;
+  st.adutoras[0].itemRot = 'DN 500';
+  st.adutoras[0].extensao = 3000;
+  st.adutoras[0].pnMcaOverride = 160;
+  st.protecao.ativo = true;
+  st.perfil = { ativo: true, modo: 'acumulada', unidExt: 'm',
+    pontos: [{ est: 0, cota: 100 }, { est: 1500, cota: 120 }, { est: 3000, cota: 140 }] };
+  return st;
+}
+let stPR = stProt();
+let resP = C.resumo(stPR, cats);
+let reqP = PR.requisito(stPR, C.contexto(stPR, cats), resP);
+ok('requisito calculado do perfil', reqP && reqP.temPerfil);
+ok('linha não passa sem proteção', reqP.precisa === (resP.envoltoria.dh > reqP.dhAlvo));
+ok('Δh alvo positivo e menor que o sem proteção', reqP.dhAlvo > 0 && reqP.dhAlvo < reqP.dhSemProtecao,
+   JSON.stringify({ alvo: reqP.dhAlvo, sem: reqP.dhSemProtecao }));
+/* o limite por sobrepressão bate com a conta manual no ponto governante */
+if (reqP.pontoSobre) {
+  const pgov = reqP.pontoSobre;
+  const frac = 1 - pgov.xEscalado / resP.envoltoria.lTrechos;
+  prox('limite por sobrepressão = (PN − folga − pPerm)/frac',
+       reqP.dhAdmSobre, (pgov.pn - reqP.folga - pgov.pPerm) / frac, 1e-9);
+}
+/* ponto já inviável em regime permanente sai do requisito e é listado */
+stPR = stProt();
+stPR.perfil.pontos[1].cota = 170;         /* crista acima da piezométrica */
+resP = C.resumo(stPR, cats);
+reqP = PR.requisito(stPR, C.contexto(stPR, cats), resP);
+ok('crista inviável no permanente é isolada do requisito',
+   reqP.permInviavel.length >= 1 && reqP.dhAlvo !== null && reqP.dhAlvo >= 0);
+
+titulo('39. Proteção — RHO pela coluna rígida');
+stPR = stProt();
+resP = C.resumo(stPR, cats);
+const ctxP = C.contexto(stPR, cats);
+reqP = PR.requisito(stPR, ctxP, resP);
+const rhoP = PR.rho(stPR, ctxP, resP, reqP);
+ok('dimensiona sem erro', !rhoP.erro && rhoP.vTanque > 0, JSON.stringify(rhoP.erro || rhoP.vTanque));
+/* verificação de energia: KE = γ·p0·V0·ln(p1/p0) no caso de sobrepressão */
+prox('balanço de energia fechado (sobrepressão)',
+     9810 * rhoP.p0 * rhoP.v0Sobre * Math.log(rhoP.p1 / rhoP.p0), rhoP.KE, 1e-9);
+prox('balanço de energia fechado (depressão)',
+     9810 * rhoP.p0 * rhoP.v0Sub * Math.log(rhoP.p0 / rhoP.p2), rhoP.KE, 1e-9);
+ok('folga de 20 % e ar = metade do tanque',
+   Math.abs(rhoP.vTanque - Math.max(rhoP.v0Sobre, rhoP.v0Sub) * 1.2 * 2) < 1e-9);
+ok('volume comercial é o menor que atende',
+   rhoP.comercial === null || (rhoP.comercial >= rhoP.vTanque &&
+     PR.VOLUMES_RHO.filter(v => v >= rhoP.vTanque)[0] === rhoP.comercial));
+/* dhComRho é o inverso do dimensionamento */
+if (rhoP.comercial) {
+  const eff = PR.dhComRho(stPR, ctxP, resP, rhoP.vTanque);
+  ok('com o volume necessário, o Δh efetivo ≈ alvo (ou melhor)',
+     eff.dh <= Math.max(2, reqP.dhAlvo) + 1.0, JSON.stringify({ eff: eff.dh, alvo: reqP.dhAlvo }));
+}
+/* avaliação acusa sub e superdimensionamento */
+stPR.protecao.dispositivos = [E.novoDispositivo('rho')];
+stPR.protecao.dispositivos[0].volumeM3 = 0.5;
+let avalP = PR.avaliar(stPR, ctxP, resP, reqP, stPR.protecao.dispositivos[0]);
+ok('RHO pequeno acusa SUBDIMENSIONADO', avalP.classe === 'ruim' &&
+   avalP.avisos.some(a => /SUBDIMENSIONADO/.test(a)));
+stPR.protecao.dispositivos[0].volumeM3 = 1000;
+avalP = PR.avaliar(stPR, ctxP, resP, reqP, stPR.protecao.dispositivos[0]);
+ok('RHO gigante acusa SUPERDIMENSIONADO', avalP.classe === 'atencao' &&
+   avalP.avisos.some(a => /SUPERDIMENSIONADO/.test(a)));
+
+titulo('40. Proteção — ventosas, TAU e chaminé');
+const regraV = PR.dnVentosa(500);
+ok('regra 1/12 a 1/8: DN 500 -> mín 50, rec 80',
+   regraV.dnMin === 50 && regraV.dnRec === 80, JSON.stringify(regraV));
+/* ventosa simples em ponto com depressão é acusada */
+stPR.protecao.dispositivos = [E.novoDispositivo('ventosa')];
+stPR.protecao.dispositivos[0].funcao = 'simples';
+stPR.protecao.dispositivos[0].dn = 80;
+stPR.protecao.dispositivos[0].x = 1500;
+stPR.perfil.pontos[1].cota = 145;          /* crista real (acima da chegada), com depressão na envoltória */
+resP = C.resumo(stPR, cats);
+const ptsV = PR.pontosSugeridos(stPR, ctxP, resP);
+ok('sugere pontos do perfil', ptsV.length >= 1);
+ok('ponto alto sugerido com função de admissão',
+   ptsV.some(p => /ponto alto/.test(p.motivo) && (p.funcao === 'tripla' || p.funcao === 'quadrupla')));
+reqP = PR.requisito(stPR, ctxP, resP);
+avalP = PR.avaliar(stPR, ctxP, resP, reqP, stPR.protecao.dispositivos[0]);
+ok('função simples onde há depressão é FUNÇÃO INSUFICIENTE',
+   avalP.avisos.some(a => /FUNÇÃO INSUFICIENTE/.test(a)));
+/* ventosa subdimensionada */
+stPR.protecao.dispositivos[0].funcao = 'quadrupla';
+stPR.protecao.dispositivos[0].dn = 25;
+avalP = PR.avaliar(stPR, ctxP, resP, reqP, stPR.protecao.dispositivos[0]);
+ok('DN abaixo de 1/12 acusa SUBDIMENSIONADA', avalP.avisos.some(a => /SUBDIMENSIONADA/.test(a)));
+/* TAU dimensiona volume onde a envoltória mínima é negativa */
+const tauP = PR.tau(stPR, ctxP, resP, 1400);
+ok('TAU calcula o volume da zona de depressão', !tauP.erro && (tauP.volume >= 0));
+const chP = PR.chamine(stPR, ctxP, resP, 1500);
+ok('chaminé devolve a altura necessária', !chP.erro && chP.altura > 0);
+/* envoltória protegida usa o Δh do RHO adotado */
+stPR.protecao.dispositivos = [E.novoDispositivo('rho')];
+stPR.protecao.dispositivos[0].volumeM3 = 30;
+resP = C.resumo(stPR, cats);
+const protP = PR.envoltoriaProtegida(stPR, ctxP, resP);
+ok('envoltória protegida existe e tem Δh menor',
+   protP && protP.env && protP.dh < resP.envoltoria.dh,
+   protP ? JSON.stringify({ prot: protP.dh, sem: resP.envoltoria.dh }) : 'null');
+
+titulo('41. Tipos de junta');
+const catFDj = CAT.buscar(cats.todos, 'fd_k7');
+ok('FD tem 4 juntas (JGS, JTI, JTE, flangeada)', CAT.juntas['Ferro fundido dúctil'].length === 4);
+ok('junta padrão do K7 é a elástica', CAT.juntaPadrao(catFDj) === 'jgs');
+ok('catálogo flangeado tem junta padrão flangeada',
+   CAT.juntaPadrao(CAT.buscar(cats.todos, 'fd_flg_agua')) === 'flg');
+ok('JGS não ancora; JTI ancora',
+   CAT.junta(catFDj, 'jgs').ancora === false && CAT.junta(catFDj, 'jti').ancora === true);
+ok('PEAD: solda de topo autotravada',
+   CAT.junta(CAT.buscar(cats.todos, 'pead_pn10_pe100') || cats.todos.filter(c => c.familia === 'PEAD')[0], 'solda_topo').ancora === true);
+/* bloco herdando trecho com junta travada recebe o aviso */
+const stJ = stProt();
+stJ.adutoras[0].junta = 'jti';
+stJ.blocos.ativo = true;
+stJ.blocos.itens = [E.novoBloco(1)];
+stJ.blocos.itens[0].pressaoFonte = 'informada';
+stJ.blocos.itens[0].pressaoInformada = 60;
+const resJ = C.resumo(stJ, cats);
+const infoJ = C.blocoInfo(stJ, C.contexto(stJ, cats), resJ, stJ.blocos.itens[0]);
+ok('bloco em trecho com junta travada avisa que o travamento dispensa bloco',
+   infoJ.avisos.some(a => /junta travada|travad/i.test(a)));
+
 console.log('\n' + '='.repeat(60));
 console.log(falhas === 0 ? `TODOS OS ${total} TESTES PASSARAM` : `${falhas} de ${total} TESTES FALHARAM`);
 console.log('='.repeat(60));

@@ -29,6 +29,7 @@
       unidExt: 'm',
       pnMcaOverride: null,
       pnAuto: true,          /* enquanto verdadeiro, o PN acompanha o catálogo */
+      junta: '',             /* '' = junta padrão do catálogo (CAT.juntaPadrao) */
       pecas: []
     };
   }
@@ -76,6 +77,16 @@
     a.vazaoAbs = 0;
     a.unidVazaoAbs = 'L/s';
     return a;
+  };
+
+  /* Um dispositivo de proteção contra o transitório */
+  E.novoDispositivo = function (tipo) {
+    var d = { tipo: tipo || 'rho', rot: '', x: 0 };
+    if (d.tipo === 'rho') { d.volumeM3 = null; }
+    if (d.tipo === 'tau') { d.volumeM3 = null; }
+    if (d.tipo === 'chamine') { d.altura = null; }
+    if (d.tipo === 'ventosa') { d.funcao = 'tripla'; d.dn = null; d.modelo = ''; }
+    return d;
   };
 
   /* Um bloco de ancoragem. n é só para o rótulo. */
@@ -166,6 +177,13 @@
       },
       /* textos do memorial */
       memorial: { introducao: '', objetivo: '' },
+      /* proteção contra o transitório (aba opcional) */
+      protecao: {
+        ativo: false,
+        folgaPN: 5,          /* folga mantida abaixo do PN, em mca */
+        pMinAlvo: 0,         /* pressão mínima admitida na envoltória protegida */
+        dispositivos: []
+      },
       /* blocos de ancoragem (aba opcional) */
       blocos: {
         ativo: false,

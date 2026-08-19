@@ -17,6 +17,7 @@
     { id: 'barrilete', rot: 'Barriletes' },
     { id: 'adutoras', rot: 'Adutora / Recalque' },
     { id: 'perfil', rot: 'Perfil da linha' },
+    { id: 'protecao', rot: 'Transitório e proteção' },
     { id: 'blocos', rot: 'Blocos de ancoragem' },
     { sep: true },
     { id: 'resultados', rot: 'Resultados' },
@@ -34,7 +35,7 @@
   App.iniciar = function () {
     h = UI.h;
     PDA.F.init(); PDA.Res.init(); PDA.K.init(); PDA.Q.init(); PDA.Pf.init(); PDA.B.init();
-    PDA.MEM.init(); PDA.X.init(); PDA.UB.init();
+    PDA.MEM.init(); PDA.X.init(); PDA.UB.init(); PDA.UP.init();
 
     /* Versão avulsa de blocos de ancoragem: só a aba de blocos, projeto
        guardado em chave própria para não atropelar o da versão completa. */
@@ -154,6 +155,7 @@
       case 'barrilete':  conteudo = PDA.F.abaBarrilete(st, ctx); break;
       case 'adutoras':   conteudo = PDA.F.abaAdutoras(st, ctx, res); break;
       case 'perfil':     conteudo = PDA.Pf.aba(st, ctx, res); break;
+      case 'protecao':   conteudo = PDA.UP.aba(st, ctx, res); break;
       case 'blocos':     conteudo = PDA.UB.aba(st, ctx, res); break;
       case 'resultados': conteudo = PDA.Res.aba(st, ctx, res); break;
       case 'catalogos':  conteudo = PDA.K.aba(st, ctx); break;
@@ -339,7 +341,7 @@
     if (/\.catalogoId$/.test(bind) || bind === 'catalogoId') {
       var basePai = bind.replace(/\.?catalogoId$/, '');
       var c = basePai ? UI.get(App.st, basePai) : App.st;
-      if (c) c.itemRot = '';
+      if (c) { c.itemRot = ''; if (c.junta !== undefined) c.junta = ''; }
     }
 
     /* pressão admissível: acompanha o catálogo enquanto o usuário não digitar
@@ -550,6 +552,42 @@
         UI.confirmar('Novo projeto', 'Descartar os dados atuais e começar um projeto em branco?',
           function () { App.st = PDA.E.padrao(); App.aba = 'projeto'; App.render(); });
         return;
+      case 'protNovo': {
+        App.st.protecao.dispositivos.push(PDA.E.novoDispositivo(el.getAttribute('data-tipo')));
+        App.render();
+        return;
+      }
+      case 'protExcluir': {
+        App.st.protecao.dispositivos.splice(Number(el.getAttribute('data-i')), 1);
+        App.render();
+        return;
+      }
+      case 'protVolume': {
+        UI.set(App.st, 'protecao.dispositivos.' + el.getAttribute('data-i') + '.volumeM3',
+               Number(el.getAttribute('data-v')));
+        App.render();
+        return;
+      }
+      case 'protVentosaAqui': {
+        var dv = PDA.E.novoDispositivo('ventosa');
+        dv.x = Number(el.getAttribute('data-x')) || 0;
+        dv.funcao = el.getAttribute('data-funcao') || 'tripla';
+        var resAt = PDA.C.resumo(App.st, App.cats);
+        var dnL = PDA.PR.dnDaLinha(resAt);
+        if (dnL) dv.dn = PDA.PR.dnVentosa(dnL).dnRec;
+        App.st.protecao.dispositivos.push(dv);
+        App.render();
+        UI.toast('Ventosa lançada em ' + UI.num(dv.x, 0) + ' m.');
+        return;
+      }
+      case 'protTauAqui': {
+        var dt = PDA.E.novoDispositivo('tau');
+        dt.x = Number(el.getAttribute('data-x')) || 0;
+        App.st.protecao.dispositivos.push(dt);
+        App.render();
+        UI.toast('TAU lançado em ' + UI.num(dt.x, 0) + ' m.');
+        return;
+      }
       case 'blocoNovo': {
         var bl = App.st.blocos;
         var modeloB = bl.itens.length ? bl.itens[bl.itens.length - 1] : null;

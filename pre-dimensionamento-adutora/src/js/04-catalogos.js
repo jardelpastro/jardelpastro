@@ -449,6 +449,66 @@
     return g;
   };
 
+  /* ----------------------------------------------------------------
+     Tipos de junta por família de material.
+
+     A junta define a pressão admissível do CONJUNTO (tubo + junta) e o
+     comportamento de ancoragem: junta elástica não transmite esforço
+     axial (pede bloco); junta travada transmite (dispensa bloco no
+     trecho travado). Os PFA por DN e por junta são do catálogo do
+     fabricante — os campos ficam prontos para receber o catálogo
+     Saint-Gobain; até lá, o PN/PFA segue informado por trecho.
+     ---------------------------------------------------------------- */
+  CAT.juntas = {
+    'Ferro fundido dúctil': [
+      { id: 'jgs', rot: 'JGS — junta elástica', ancora: false,
+        nota: 'Ponta e bolsa com anel de borracha. Não transmite esforço axial: curvas, tês e extremidades pedem bloco de ancoragem. É a junta de linha corrente.' },
+      { id: 'jti', rot: 'JTI — junta travada interna', ancora: true,
+        nota: 'Travamento pelo próprio anel (com insertos). Transmite o esforço axial: o trecho travado dispensa bloco, mas a PFA do conjunto cai em relação à elástica e varia com o DN — conferir no catálogo do fabricante.' },
+      { id: 'jte', rot: 'JTE — junta travada externa', ancora: true,
+        nota: 'Travamento por contra-flange/cordão externo. Transmite o esforço axial; PFA por DN conforme o catálogo do fabricante.' },
+      { id: 'flg', rot: 'Flangeada', ancora: true,
+        nota: 'União rígida por flanges — barrilete e casa de bombas. A classe do flange (PN 10/16/25/40) define a pressão admissível.' }
+    ],
+    'PEAD': [
+      { id: 'solda_topo', rot: 'Solda de topo', ancora: true,
+        nota: 'Emenda por termofusão de topo: a linha vira um tubo contínuo, autotravado — dispensa blocos. A pressão admissível é o PN do próprio tubo.' },
+      { id: 'eletrofusao', rot: 'Eletrofusão', ancora: true,
+        nota: 'Luvas eletrossoldáveis; autotravada como a solda de topo. PN do tubo.' },
+      { id: 'flange_pead', rot: 'Flange (colarinho + flange solto)', ancora: true,
+        nota: 'Transições para válvulas e equipamentos. A classe do flange pode limitar a pressão do conjunto.' }
+    ],
+    'Aço': [
+      { id: 'soldada', rot: 'Soldada', ancora: true,
+        nota: 'Linha contínua autotravada; a pressão admissível vem da espessura (SCH) e da solda.' },
+      { id: 'flg_aco', rot: 'Flangeada', ancora: true,
+        nota: 'Classe do flange (PN/classe ANSI) define a pressão admissível do conjunto.' },
+      { id: 'ranhurada', rot: 'Ranhurada (grooved)', ancora: false,
+        nota: 'Acoplamentos ranhurados: montagem rápida; verificar a pressão admissível do acoplamento e a necessidade de ancoragem conforme o fabricante.' }
+    ]
+  };
+  CAT.juntas['Aço galvanizado'] = CAT.juntas['Aço'];
+  CAT.juntas['Aço inoxidável'] = CAT.juntas['Aço'];
+
+  /* junta padrão de um catálogo: flangeados são flangeados; o resto,
+     a junta corrente da família */
+  CAT.juntaPadrao = function (cat) {
+    if (!cat) return '';
+    var lista = CAT.juntas[cat.familia];
+    if (!lista) return '';
+    if (/flangead|_flg|flg_/i.test(cat.id + ' ' + cat.nome)) {
+      var f = lista.filter(function (j) { return /^flg|flange/.test(j.id); })[0];
+      if (f) return f.id;
+    }
+    return lista[0].id;
+  };
+
+  CAT.junta = function (cat, id) {
+    var lista = cat ? CAT.juntas[cat.familia] : null;
+    if (!lista) return null;
+    return lista.filter(function (j) { return j.id === id; })[0] || null;
+  };
+
   CAT.buscar = function (todos, id) {
     for (var i = 0; i < todos.length; i++) if (todos[i].id === id) return todos[i];
     return null;

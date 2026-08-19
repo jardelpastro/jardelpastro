@@ -1123,6 +1123,14 @@
     if (calc.escolhido && !calc.escolhido.atende) {
       avisos.push('O tipo escolhido manualmente NÃO resiste ao empuxo calculado.');
     }
+    if (b.tuboOrigem && b.tuboOrigem.indexOf('adutora.') === 0 && cat) {
+      var conjJ = (st.adutoras || [])[Number(b.tuboOrigem.split('.')[1])];
+      var jt = conjJ ? PDA.CAT.junta(cat, conjJ.junta || PDA.CAT.juntaPadrao(cat)) : null;
+      if (jt && jt.ancora) {
+        avisos.push('O trecho usa ' + jt.rot + ', que transmite o esforço axial: o comprimento travado ' +
+                    'dispensa bloco. Este bloco só é necessário se a peça ficar fora do trecho travado.');
+      }
+    }
     if (calc.E > 30000) {
       avisos.push('Empuxo elevado (' + (calc.E / 1000).toFixed(0) + ' tf): avalie junta travada ' +
                   '(autotravamento dos tubos) ou tirantes em vez de bloco — o bloco resultante pode ser antieconômico.');
