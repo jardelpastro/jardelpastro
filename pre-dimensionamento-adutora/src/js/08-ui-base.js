@@ -52,7 +52,13 @@
     if (v === null || v === undefined || v === '' || isNaN(v)) return '—';
     if (!isFinite(v)) return '∞';
     var d = dec === undefined ? 2 : dec;
-    return Number(v).toFixed(d).replace('.', ',');
+    var s = Number(v).toFixed(d);
+    var neg = s.charAt(0) === '-';
+    if (neg) s = s.slice(1);
+    var partes = s.split('.');
+    /* ponto de milhar pt-BR: 1234567,89 → 1.234.567,89 */
+    var int = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (neg ? '-' : '') + int + (partes[1] ? ',' + partes[1] : '');
   };
 
   /* formatação com nº de casas adaptado à magnitude */

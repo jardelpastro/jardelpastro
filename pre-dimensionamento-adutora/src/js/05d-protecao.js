@@ -74,8 +74,10 @@
     /* pontos já inviáveis em REGIME PERMANENTE não são problema de
        transitório: proteção nenhuma os resolve (é diâmetro, traçado ou
        altura manométrica). Eles saem do requisito e viram alerta próprio. */
+    var zonas = PR.zonasAlivio(st, ctx, res);           /* ventosas/TAU/chaminé lançados */
     var permInviavel = [];
     var dhSobreMin = Infinity, dhSubMin = Infinity, govSobre = null, govSub = null;
+    var dhSubBrutoMin = Infinity, aliviadosSub = 0;
     env.pontos.forEach(function (p) {
       var frac = 1 - Math.min(1, Math.max(0, p.xEscalado / env.lTrechos));
       if (frac < 0.02) return;              /* na chegada o Δh é nulo por hipótese */
@@ -86,10 +88,19 @@
         if (s < dhSobreMin) { dhSobreMin = s; govSobre = p; }
       }
       var d = (p.pPerm - pMinAlvo) / frac;
+      if (d < dhSubBrutoMin) dhSubBrutoMin = d;
+      /* ponto coberto por ventosa de admissão / TAU / chaminé: a depressão
+         ali é tratada localmente e deixa de exigir Δh do RHO */
+      var coberto = zonas.some(function (z) {
+        return (z.efeito === 'depressao' || z.efeito === 'ambos') &&
+               p.xEscalado >= z.x0 - 1e-9 && p.xEscalado <= z.x1 + 1e-9;
+      });
+      if (coberto) { aliviadosSub++; return; }
       if (d < dhSubMin) { dhSubMin = d; govSub = p; }
     });
     if (!isFinite(dhSobreMin)) dhSobreMin = null;
     if (!isFinite(dhSubMin)) dhSubMin = null;
+    if (!isFinite(dhSubBrutoMin)) dhSubBrutoMin = null;
 
     var candidatos = [dhSobreMin, dhSubMin].filter(function (v) { return v !== null; });
     var dhAlvo = candidatos.length ? Math.max(0, Math.min.apply(null, candidatos)) : null;
@@ -98,12 +109,57 @@
       dhSemProtecao: env.dh, folga: folga, pMinAlvo: pMinAlvo,
       dhAdmSobre: dhSobreMin === null ? null : Math.max(0, dhSobreMin),
       dhAdmSub: dhSubMin === null ? null : Math.max(0, dhSubMin),
+      dhAdmSubBruto: dhSubBrutoMin === null ? null : Math.max(0, dhSubBrutoMin),
+      aliviadosSub: aliviadosSub,
+      temAlivio: zonas.length > 0,
       dhAlvo: dhAlvo,
       precisa: dhAlvo !== null && env.dh > dhAlvo + 1e-9,
       governante: (dhSobreMin !== null && (dhSubMin === null || dhSobreMin <= dhSubMin)) ? 'sobrepressão' : 'depressão',
       pontoSobre: govSobre, pontoSub: govSub,
       permInviavel: permInviavel
     };
+  };
+
+  /* ================================================================
+     Zonas de alívio de depressão dos dispositivos lançados
+     ================================================================
+     Cada dispositivo que trata a DEPRESSÃO localmente cobre uma zona da
+     linha: dentro dela o requisito de subpressão do RHO é aliviado e a
+     envoltória mínima protegida não desce abaixo de zero. Raios de
+     anteprojeto: ventosa de admissão ±300 m (metade do espaçamento usual
+     de 600 m); TAU do ponto de instalação até o fim da zona de depressão
+     que ele preenche; chaminé ±150 m, limitando também a envoltória
+     máxima ao nível d'água da própria chaminé. */
+
+  var RAIO_VENTOSA = 300, RAIO_CHAMINE = 150;
+
+  PR.zonasAlivio = function (st, ctx, res) {
+    var out = [];
+    var pr = st.protecao;
+    if (!pr || !pr.ativo || !res.envoltoria) return out;
+    (pr.dispositivos || []).forEach(function (d) {
+      var x = Number(d.x) || 0;
+      if (d.tipo === 'ventosa') {
+        if (d.funcao === 'simples') return;      /* não admite ar: não alivia depressão */
+        out.push({ x0: Math.max(0, x - RAIO_VENTOSA), x1: x + RAIO_VENTOSA,
+                   efeito: 'depressao', tipo: 'ventosa',
+                   rot: 'ventosa ' + (d.funcao || 'tripla') + ' em ' + Math.round(x) + ' m' });
+      } else if (d.tipo === 'tau') {
+        var t = PR.tau(st, ctx, res, x);
+        var fim = (t && t.alcance) ? t.alcance : x + 600;
+        out.push({ x0: x, x1: Math.max(fim, x + 50), efeito: 'depressao', tipo: 'tau',
+                   rot: 'TAU em ' + Math.round(x) + ' m' });
+      } else if (d.tipo === 'chamine') {
+        var ch = PR.chamine(st, ctx, res, x);
+        var alt = Number(d.altura) > 0 ? Number(d.altura) : (ch && !ch.erro ? ch.altura : null);
+        var z = { x0: Math.max(0, x - RAIO_CHAMINE), x1: x + RAIO_CHAMINE,
+                  efeito: 'ambos', tipo: 'chamine',
+                  rot: 'chaminé em ' + Math.round(x) + ' m' };
+        if (alt !== null && ch && !ch.erro) z.headMax = ch.cota + alt;
+        out.push(z);
+      }
+    });
+    return out;
   };
 
   /* ================================================================
@@ -137,11 +193,14 @@
     var p0 = res.projeto.Hm + patm;                       /* absoluta no RHO em regime */
     var dhAlvo = req && req.dhAlvo !== null ? req.dhAlvo : 0;
     var p1 = p0 + Math.max(2, dhAlvo);                    /* sobe até o admissível */
+    /* depressão inteiramente coberta por ventosas/TAU/chaminé lançados:
+       o lado da expansão deixa de governar o RHO */
+    var subCoberta = !!(req && req.dhAdmSub === null && req.temAlivio);
     var pminLinha = (req && req.dhAdmSub !== null) ? req.dhAdmSub : res.projeto.Hm;
     var p2 = Math.max(2, p0 - Math.max(2, pminLinha));    /* nunca abaixo de 2 mca abs */
 
     var v0Sobre = e.KE / (GAMA * p0 * Math.log(p1 / p0));
-    var v0Sub = e.KE / (GAMA * p0 * Math.log(p0 / p2));
+    var v0Sub = subCoberta ? 0 : e.KE / (GAMA * p0 * Math.log(p0 / p2));
     var v0Ar = Math.max(v0Sobre, v0Sub) * 1.2;            /* 20 % de folga de anteprojeto */
     var vTanque = v0Ar * 2;                               /* ar ~50 % do tanque em regime */
 
@@ -155,6 +214,7 @@
       p0: p0, p1: p1, p2: p2, patm: patm,
       v0Sobre: v0Sobre, v0Sub: v0Sub, v0Ar: v0Ar,
       vTanque: vTanque, comercial: comercial,
+      subCoberta: subCoberta,
       governa: v0Sub > v0Sobre ? 'depressão' : 'sobrepressão'
     };
   };
@@ -379,20 +439,74 @@
   PR.dnDaLinha = dnDaLinha;
 
   /* ================================================================
-     Envoltória com a proteção lançada (estimada pelo RHO)
-     ================================================================ */
+     Envoltória com a proteção lançada
+     ================================================================
+     Considera TODOS os dispositivos:
+       - RHO: reduz o Δh global (sobrepressão e depressão) pela coluna
+         rígida — sem RHO, vale o Δh sem proteção;
+       - ventosas de admissão, TAU e chaminé: dentro da sua zona de
+         alívio a envoltória mínima não desce abaixo de zero;
+       - chaminé: além disso, limita a envoltória máxima ao nível
+         d'água da própria chaminé na sua zona.
+     Estimativa de anteprojeto — o estudo de transiente confirma. */
 
   PR.envoltoriaProtegida = function (st, ctx, res) {
     var pr = st.protecao;
     if (!pr || !pr.ativo || !res.envoltoria) return null;
-    var rhoD = (pr.dispositivos || []).filter(function (d) { return d.tipo === 'rho' && Number(d.volumeM3) > 0; })[0];
-    if (!rhoD) return null;
-    var eff = PR.dhComRho(st, ctx, res, Number(rhoD.volumeM3));
-    if (!eff) return null;
-    /* reaproveita a máquina da envoltória com o Δh que o RHO segura */
+    var disp = pr.dispositivos || [];
+    if (!disp.length) return null;
+
+    var rhoD = disp.filter(function (d) { return d.tipo === 'rho' && Number(d.volumeM3) > 0; })[0];
+    var eff = rhoD ? PR.dhComRho(st, ctx, res, Number(rhoD.volumeM3)) : null;
+    var dhSobre = eff ? eff.dhSobre : res.envoltoria.dh;
+    var dhSub = eff ? eff.dhSub : res.envoltoria.dh;
+
+    var env = PDA.C.envoltoria(st, ctx, res.projeto, [{ dh: dhSobre }]);
+    if (!env) return null;
+    var zonas = PR.zonasAlivio(st, ctx, res);
+
+    env.pontos.forEach(function (p) {
+      var frac = 1 - Math.min(1, Math.max(0, p.xEscalado / env.lTrechos));
+      /* lado da depressão com o Δh próprio (pode diferir do da sobrepressão) */
+      p.envMin = p.hgl - dhSub * frac;
+      p.pMin = p.envMin - p.cota;
+      zonas.forEach(function (z) {
+        if (p.xEscalado < z.x0 - 1e-9 || p.xEscalado > z.x1 + 1e-9) return;
+        if ((z.efeito === 'depressao' || z.efeito === 'ambos') && p.pMin < 0) {
+          p.pMin = 0; p.envMin = p.cota;
+        }
+        if (z.efeito === 'ambos' && z.headMax !== undefined && p.envMax > z.headMax) {
+          p.envMax = z.headMax; p.pMax = p.envMax - p.cota;
+        }
+      });
+      /* reclassifica o ponto com as envoltórias ajustadas */
+      var clPerm = PDA.C.classificarPressao(p.pPerm, p.pn);
+      var clMax = PDA.C.classificarPressao(p.pMax, p.pn, { transitorio: true });
+      var clMin = PDA.C.classificarPressao(p.pMin, p.pn, { transitorio: true });
+      var pior = [clPerm, clMax, clMin].reduce(function (a, b) {
+        var ordem = { ruim: 3, atencao: 2, bom: 1, na: 0 };
+        return ordem[b.classe] > ordem[a.classe] ? b : a;
+      });
+      p.classe = pior.classe;
+      p.motivos = clPerm.motivos.concat(clMax.motivos, clMin.motivos);
+    });
+    env.criticoMax = env.pontos.reduce(function (a, b) { return b.pMax > a.pMax ? b : a; }, env.pontos[0]);
+    env.criticoMin = env.pontos.reduce(function (a, b) { return b.pMin < a.pMin ? b : a; }, env.pontos[0]);
+
+    /* rótulo do que foi considerado */
+    var nomes = [];
+    if (rhoD) nomes.push('RHO ' + Number(rhoD.volumeM3).toLocaleString('pt-BR') + ' m³');
+    var nV = disp.filter(function (d) { return d.tipo === 'ventosa' && d.funcao !== 'simples'; }).length;
+    var nT = disp.filter(function (d) { return d.tipo === 'tau'; }).length;
+    var nC = disp.filter(function (d) { return d.tipo === 'chamine'; }).length;
+    if (nV) nomes.push(nV + (nV === 1 ? ' ventosa' : ' ventosas'));
+    if (nT) nomes.push(nT + ' TAU');
+    if (nC) nomes.push(nC + (nC === 1 ? ' chaminé' : ' chaminés'));
+    if (!nomes.length) return null;          /* só ventosa simples lançada: nada a mostrar */
+
     return {
-      env: PDA.C.envoltoria(st, ctx, res.projeto, [{ dh: eff.dh }]),
-      dh: eff.dh, dhSobre: eff.dhSobre, dhSub: eff.dhSub
+      env: env, dh: Math.max(dhSobre, dhSub), dhSobre: dhSobre, dhSub: dhSub,
+      temRho: !!rhoD, zonas: zonas, rotulo: nomes.join(' + ')
     };
   };
 

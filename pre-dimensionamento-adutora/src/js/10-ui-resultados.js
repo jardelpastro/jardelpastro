@@ -441,7 +441,7 @@
     return UI.cartao('Transitório hidráulico — pré-avaliação',
       'Sobrepressão estimada e conferência da classe de pressão', [
       UI.tabela([{ rot: 'Trecho', esq: true }, { rot: 'Material', esq: true }, 'E (GPa)',
-                 { rot: 'ψ', dica: 'Coeficiente de ancoragem longitudinal, do caso escolhido na aba Adutora. ψ = 1 para tubo com juntas de dilatação; 1 − ν/2 ancorado só a montante; 1 − ν² ancorado em todo o comprimento (o caso mais desfavorável).' },
+                 { rot: 'ψ', dica: 'Coeficiente de ancoragem longitudinal, do caso escolhido na aba Transitório e proteção. ψ = 1 para tubo com juntas de dilatação; 1 − ν/2 ancorado só a montante; 1 − ν² ancorado em todo o comprimento (o caso mais desfavorável).' },
                  'e (mm)', 'v (m/s)',
                  { rot: 'Celeridade (m/s)', dica: 'a = 1/√[ρ(1/K + ψD/(eE))], com K = 2,19 GPa para a água. Quanto mais rígido o tubo, maior a celeridade e maior a sobrepressão.' },
                  { rot: 'tc = 2L/a (s)', dica: 'Tempo crítico: o tempo que a onda leva para ir até a extremidade e voltar. Se a manobra for mais rápida que isso, vale a sobrepressão integral de Joukowsky.' },

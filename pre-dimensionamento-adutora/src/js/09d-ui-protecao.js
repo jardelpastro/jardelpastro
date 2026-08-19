@@ -35,7 +35,7 @@
   function cartaoRequisito(st, ctx, res, req) {
     if (!req) {
       return UI.cartao('Requisito da proteção', null, h('div', { class: 'aviso info' },
-        'Avalie o golpe de aríete (aba Adutora) e, de preferência, lance o perfil da linha — o requisito da ' +
+        'Avalie o golpe de aríete (cartão acima) e, de preferência, lance o perfil da linha — o requisito da ' +
         'proteção sai da envoltória de pressões.'));
     }
     var corpo = [
@@ -51,7 +51,18 @@
         req.dhAdmSobre !== null ? h('span', { class: 'chip' },
           h('b', {}, 'limite por sobrepressão: '), UI.num(req.dhAdmSobre, 1) + ' mca') : null,
         req.dhAdmSub !== null ? h('span', { class: 'chip' },
-          h('b', {}, 'limite por depressão: '), UI.num(req.dhAdmSub, 1) + ' mca') : null),
+          h('b', {}, 'limite por depressão: '), UI.num(req.dhAdmSub, 1) + ' mca') : null,
+        req.dhAdmSub === null && req.temAlivio && req.aliviadosSub > 0 ? h('span', { class: 'chip bom' },
+          h('b', {}, 'depressão: '), 'coberta pelos dispositivos lançados') : null),
+      req.temAlivio && req.aliviadosSub > 0 ? h('div', { class: 'aviso ok', style: 'margin-top:9px' },
+        h('b', {}, 'Os dispositivos conversam entre si. '),
+        'Ventosas de admissão, TAU e chaminé lançados cobrem a depressão em ' + req.aliviadosSub +
+        ' ponto(s) do perfil — esses pontos saíram do requisito de subpressão do RHO' +
+        (req.dhAdmSubBruto !== null && req.dhAdmSub !== null && req.dhAdmSub > req.dhAdmSubBruto + 0.05
+          ? ' (o limite por depressão subiu de ' + UI.num(req.dhAdmSubBruto, 1) + ' para ' +
+            UI.num(req.dhAdmSub, 1) + ' mca)'
+          : (req.dhAdmSub === null ? ' (a depressão deixou de governar o RHO)' : '')) +
+        ', e o volume necessário do RHO cai de acordo.') : null,
       req.permInviavel && req.permInviavel.length ? h('div', { class: 'aviso erro', style: 'margin-top:9px' },
         h('b', {}, 'Há ponto fora já em REGIME PERMANENTE — proteção de transitório não resolve isso. '),
         req.permInviavel.slice(0, 3).map(function (p) {
@@ -154,7 +165,10 @@
               h('td', {}, h('b', {}, UI.num(rho.vTanque, 1) + ' m³'))))),
           UI.campo(st, 'Volume adotado (m³)', base + '.volumeM3',
             { placeholder: rho.comercial !== null ? UI.numEdit(rho.comercial) : 'escolher',
-              dica: 'Clique em um volume comercial na tabela ao lado, ou digite. O programa confere se o volume segura o Δh alvo.' })),
+              dica: 'Clique em um volume comercial na tabela ao lado, ou digite. O programa confere se o volume segura o Δh alvo.' }),
+          rho.subCoberta ? h('p', { class: 'nota', style: 'margin-top:4px' },
+            'A depressão está coberta pelas ventosas/TAU/chaminé lançados: o RHO é dimensionado só para a ' +
+            'sobrepressão — por isso o volume necessário caiu.') : null),
         h('div', { class: 'via' },
           h('h4', {}, 'Volumes comerciais', UI.dica('Série usual de vasos hidropneumáticos. ★ é o menor que atende ao requisito. A coluna Δh mostra a oscilação que cada volume seguraria nesta linha.')),
           UI.tabela([{ rot: 'Vaso', esq: true }, 'Δh que segura (mca)', 'Situação'], linhas))),
@@ -258,22 +272,30 @@
     if (prot && prot.env) {
       var res2 = Object.assign({}, res, { envoltoria: prot.env });
       lados.push(h('div', { class: 'via' },
-        h('h4', {}, 'Com o RHO lançado (Δh ≈ ' + UI.num(prot.dh, 1) + ' mca) — estimada'),
-        PDA.Pf.grafico(st, ctx, res2)));
+        h('h4', {}, 'Com a proteção lançada (' + prot.rotulo + ') — estimada'),
+        PDA.Pf.grafico(st, ctx, res2),
+        prot.temRho ? h('p', { class: 'nota', style: 'margin-top:4px' },
+          'O RHO limita o Δh global a ≈ ' + UI.num(prot.dhSobre, 1) + ' mca na sobrepressão e ' +
+          UI.num(prot.dhSub, 1) + ' mca na depressão.') : h('p', { class: 'nota', style: 'margin-top:4px' },
+          'Sem RHO lançado a sobrepressão continua a do golpe sem proteção — os dispositivos lançados ' +
+          'aliviam a DEPRESSÃO nas suas zonas.')));
     } else {
       lados.push(h('div', { class: 'via' },
         h('h4', {}, 'Com proteção'),
         h('div', { class: 'aviso info' },
-          'Lance um RHO com volume adotado para o programa estimar a envoltória protegida e desenhá-la aqui, ' +
-          'lado a lado com a envoltória sem proteção.')));
+          'Lance qualquer dispositivo — RHO, ventosa, TAU ou chaminé — e o programa desenha aqui a envoltória ' +
+          'protegida estimada, lado a lado com a envoltória sem proteção. Cada dispositivo lançado atualiza a curva.')));
     }
     return UI.cartao('Envoltórias de pressão', 'Antes e depois da proteção',
       h('div', {},
         h('div', { class: 'blocos-vias' }, lados),
         h('p', { class: 'nota', style: 'margin-top:7px' },
-          'A envoltória protegida é ESTIMADA: aplica à mesma geometria o Δh que o RHO escolhido consegue ' +
-          'segurar pelo método da coluna rígida. TAU e ventosas protegem por zona (depressão) e não aparecem ' +
-          'nesta curva — o estudo de transiente pelo método das características é quem confirma tudo.')));
+          'A envoltória protegida é ESTIMADA e considera TODOS os dispositivos lançados: o RHO reduz o Δh global ' +
+          '(coluna rígida); ventosas de admissão (dupla, tríplice, quádrupla), TAU e chaminé seguram a envoltória ' +
+          'mínima em zero na sua zona de alívio (ventosa ±300 m, TAU até o fim da zona de depressão, chaminé ±150 m); ' +
+          'a chaminé também limita a envoltória máxima ao seu nível d\'água. Os dispositivos CONVERSAM: a depressão ' +
+          'coberta por ventosas/TAU sai do requisito do RHO, que pode ficar menor. O estudo de transiente pelo ' +
+          'método das características é quem confirma tudo.')));
   }
 
   /* ================================================================
@@ -284,9 +306,13 @@
     var out = [];
     var pr = st.protecao;
 
-    out.push(UI.cartao('Transitório e proteção', 'Do "não passa sem proteção" ao anteprojeto dos dispositivos', [
+    /* dados de entrada da pré-avaliação (Joukowsky/Michaud) — era o
+       rodapé da aba Adutora, agora vive aqui */
+    out.push(PDA.F.cartaoGolpeEntrada(st, ctx, res));
+
+    out.push(UI.cartao('Estudo da proteção', 'Do "não passa sem proteção" ao anteprojeto dos dispositivos', [
       UI.check(st, 'Estudar a proteção contra o transitório desta linha', 'protecao.ativo', {
-        dica: 'A pré-avaliação (aba Adutora / Resultados) calcula a linha SEM proteção. Aqui o programa calcula quanto a proteção precisa limitar o golpe, sugere onde instalar cada dispositivo, pré-dimensiona RHO, TAU, chaminé e ventosas e estima a envoltória protegida.'
+        dica: 'A pré-avaliação acima calcula a linha SEM proteção. Aqui o programa calcula quanto a proteção precisa limitar o golpe, sugere onde instalar cada dispositivo, pré-dimensiona RHO, TAU, chaminé e ventosas e estima a envoltória protegida.'
       }),
       !pr.ativo ? h('p', { class: 'nota', style: 'margin-top:9px' },
         'Com a opção desligada nada muda no restante do programa. A pré-avaliação sem proteção continua na aba Resultados.') : null
@@ -295,7 +321,7 @@
 
     if (!st.golpe.avaliar) {
       out.push(UI.cartao('Golpe de aríete desligado', null, h('div', { class: 'aviso erro' },
-        'A pré-avaliação do golpe está desligada na aba Adutora / Recalque — ligue-a para o estudo de proteção ter o Δh de partida.')));
+        'A pré-avaliação do golpe está desligada no cartão acima — ligue "Avaliar golpe de aríete" para o estudo de proteção ter o Δh de partida.')));
       return out;
     }
 

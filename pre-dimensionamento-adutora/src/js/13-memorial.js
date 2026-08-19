@@ -857,6 +857,12 @@
         (req.precisa ? ' — a proteção é NECESSÁRIA, governada pela ' + req.governante + '.'
                      : ' — a envoltória sem proteção já atende, e os dispositivos ficam a critério de projeto.'));
 
+    if (req.temAlivio && req.aliviadosSub > 0) {
+      D.p('Os dispositivos interagem no requisito: ventosas de admissão, TAU e chaminé lançados cobrem a ' +
+          'depressão em ' + req.aliviadosSub + ' ponto(s) do perfil, que saem do requisito de subpressão do ' +
+          'reservatório hidropneumático — o volume necessário do RHO reduz-se de acordo.');
+    }
+
     var disp = (st.protecao.dispositivos || []);
     if (!disp.length) {
       D.p('Nenhum dispositivo foi lançado nesta etapa.');
@@ -922,9 +928,11 @@
     var prot = PR.envoltoriaProtegida(st, ctx, res);
     if (prot && prot.env && PDA.Pf) {
       var res2 = Object.assign({}, res, { envoltoria: prot.env });
-      D.figura('Envoltória de pressões com a proteção lançada (estimada, Δh ≈ ' + n(prot.dh, 1) + ' mca)',
+      D.figura('Envoltória de pressões com a proteção lançada (estimada: ' + prot.rotulo + ')',
         PDA.Pf.grafico(st, ctx, res2),
-        'Elaborado pelo programa: a mesma envoltória, com o Δh que o RHO adotado consegue limitar pelo método da coluna rígida.');
+        'Elaborado pelo programa: a mesma envoltória, considerando todos os dispositivos lançados — o RHO ' +
+        'limita o Δh global pelo método da coluna rígida e as ventosas de admissão, TAU e chaminé seguram a ' +
+        'envoltória mínima na sua zona de alívio.');
     }
 
     D.p('Este é um estudo de anteprojeto: define os dispositivos, os pontos de instalação e a ordem de ' +

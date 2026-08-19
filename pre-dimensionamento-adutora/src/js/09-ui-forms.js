@@ -396,30 +396,37 @@
 
     if (op.adutora) {
       var tuboAtual = PDA.C.resolverTubo(conj, ctx);
-      var pnCat = tuboAtual && tuboAtual.item && tuboAtual.item.pn ? Number(tuboAtual.item.pn) * 10 : null;
       var pnInfo = PDA.C.pnInfo(conj, tuboAtual);
       var pfaCorpo = PDA.C.pfaCorpoBar(tuboAtual);
+      var pnAutoInfo = (function () {                     /* o que o programa adotaria sozinho */
+        if (tuboAtual && !tuboAtual.semDiametro && tuboAtual.item && tuboAtual.item.pn) {
+          return { mca: Number(tuboAtual.item.pn) * 10, origem: 'catalogo' };
+        }
+        var aj = PDA.C.pnAutoJunta(conj, tuboAtual);
+        return aj ? { mca: aj.mca, origem: 'junta' } : null;
+      })();
       corpo.push(UI.sub('Pressão admissível e cotas do trecho'));
       corpo.push(h('div', { class: 'grade' },
         UI.campo(st, 'PN / PFA do tubo (mca)', base + '.pnMcaOverride', {
           chave: pnInfo.mca === null,
-          editado: conj.pnMcaOverride !== null && conj.pnMcaOverride !== '' && conj.pnMcaOverride !== undefined,
-          placeholder: pnCat !== null ? UI.num(pnCat, 0) : 'informar',
+          editado: pnInfo.origem === 'informado',
+          placeholder: pnAutoInfo ? UI.num(pnAutoInfo.mca, 0) : 'informar',
           dica: 'Pressão de serviço admissível do tubo, em mca, usada para conferir a pressão em regime permanente e a sobrepressão do transitório.\n\n' +
                 pnInfo.nota +
-                (pnCat !== null ? '\n\nO campo é preenchido automaticamente quando o catálogo traz o PN; troque o valor se o seu fornecedor indicar outro.' : '') +
-                (pfaCorpo ? '\n\nA resistência do CORPO deste tubo, pela expressão da EN 545 (PFA = 20·e·σ/(DE−e), com σ = ' +
-                  PDA.C.SIGMA_ADM[tuboAtual.material] + ' MPa), é de ' + UI.num(pfaCorpo, 0) + ' bar. ' +
-                  'Na prática a pressão admissível do conjunto é limitada pela JUNTA e costuma ser bem menor — ' +
-                  'por isso o programa não adota esse número sozinho.' : '')
+                (pnAutoInfo ? '\n\nO campo é preenchido AUTOMATICAMENTE pelo material e pela junta escolhidos — troque o valor se o catálogo do seu fornecedor indicar outro.' : '') +
+                (pfaCorpo && pnInfo.origem !== 'junta' ? '\n\nReferência: a resistência do CORPO deste tubo pela EN 545 (PFA = 20·e·σ/(DE−e), σ = ' +
+                  PDA.C.SIGMA_ADM[tuboAtual.material] + ' MPa) é de ' + UI.num(pfaCorpo, 0) + ' bar — limite superior; a junta costuma governar.' : '')
         }),
-        F.seletorPFA(st, conj, base, tuboAtual, pfaCorpo),
+        F.seletorPFA(st, conj, base, tuboAtual, pfaCorpo, pnInfo),
         UI.check(st, 'Informar cotas deste trecho', base + '.usarCotas',
           { dica: 'Serve para traçar o perfil e verificar a pressão em cada nó. A cota final do ÚLTIMO trecho é a mesma "cota de chegada" da aba Bombas e níveis — o programa mantém as duas iguais automaticamente.' }),
         conj.usarCotas ? UI.campo(st, 'Cota inicial (m)', base + '.cotaIni',
           { title: 'Altitude absoluta do início do trecho' }) : null,
         conj.usarCotas ? UI.campo(st, 'Cota final (m)', base + '.cotaFim',
           { title: 'Altitude absoluta do fim do trecho' }) : null));
+      if (pnInfo.origem !== 'informado') {
+        corpo.push(h('p', { class: 'nota', style: 'margin-top:6px' }, pnInfo.nota));
+      }
     }
 
     corpo.push(UI.sub('Peças e conexões do trecho'));
@@ -432,19 +439,22 @@
     return op.arr ? UI.blocoArrastavel(caixa, op.arr, op.i) : caixa;
   };
 
-  /* Escolha rápida da pressão admissível, quando o catálogo não traz PN */
-  F.seletorPFA = function (st, conj, base, tubo, pfaCorpo) {
-    if (tubo && tubo.item && tubo.item.pn) return null;   /* já vem do catálogo */
+  /* Escolha rápida da pressão admissível — só quando o programa não tem
+     como adotar um valor sozinho (junta travada, acoplamento ranhurado,
+     catálogo sem PN): serve para informar outro PN em um clique. */
+  F.seletorPFA = function (st, conj, base, tubo, pfaCorpo, pnInfo) {
+    var temAuto = !!(tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) ||
+                  !!PDA.C.pnAutoJunta(conj, tubo);
+    if (temAuto) return null;    /* o programa já adota a classe sozinho */
     var opcoes = [{ v: '', rot: '— escolher um degrau —' }].concat(
       PDA.C.DEGRAUS_PFA_BAR.map(function (b) {
         return { v: String(b * 10), rot: 'PN ' + b + ' bar   (' + (b * 10) + ' mca)' };
       }));
     var atual = conj.pnMcaOverride === null || conj.pnMcaOverride === undefined ? '' : String(conj.pnMcaOverride);
     return h('label', { class: 'campo' },
-      h('span', { class: 'rot' }, 'Preencher com um degrau normativo',
-        UI.dica('As classes K do ferro fundido dúctil não têm uma pressão admissível única: a PFA depende da classe, do DN e do tipo de junta, e o valor que governa costuma ser o da junta, não o da parede.\n\n' +
-                'Esta lista traz os degraus usuais de pressão da EN 545 para escolha rápida — ela NÃO diz qual deles se aplica ao seu DN. Confirme no catálogo do fabricante.\n\n' +
-                'Se o tubo for flangeado, prefira os catálogos "Flangeado PN 10/16/25/40": eles já trazem o PN e preenchem o campo sozinhos.' +
+      h('span', { class: 'rot' }, 'Informar um PN usual',
+        UI.dica('Para esta combinação de material e junta o programa não adota uma PFA sozinho: em junta travada (JTI/JTE) e em acoplamento ranhurado o valor depende do DN e do fabricante.\n\n' +
+                'Esta lista traz os degraus usuais de pressão da EN 545 para escolha rápida — ela NÃO diz qual deles se aplica ao seu DN. Confirme no catálogo do fabricante.' +
                 (pfaCorpo ? '\n\nReferência: a resistência do corpo deste tubo pela EN 545 é de ' + UI.num(pfaCorpo, 0) + ' bar — um limite superior, não a PFA do conjunto.' : ''))),
       h('select', { 'data-bind': base + '.pnMcaOverride', 'data-tipo': 'num', 'data-estrutural': '1' },
         opcoes.map(function (o) {
@@ -508,10 +518,16 @@
         alertaCota ? F.blocoAviso(alertaCota) : null,
         outrosAvisos.map(function (a) { return F.blocoAviso(a); }),
 
-        PDA.Q.caixa('Como o programa entende as cotas',
-          PDA.Q.niveisCotas(st, ctx, cen),
-          'Os campos de cota pedem ALTITUDE ABSOLUTA, na mesma referência de nível do levantamento — ' +
-          'não profundidade nem altura em relação ao fundo do poço.')
+        (st.perfil && st.perfil.ativo && (st.perfil.pontos || []).length > 1 && res.envoltoria)
+          ? PDA.Q.caixa('Perfil da linha e envoltória de pressões',
+              PDA.Pf.grafico(st, ctx, res),
+              'Perfil lançado na aba Perfil da linha, com a linha piezométrica' +
+              (res.envoltoria.dh > 0 ? ' e as envoltórias do transitório SEM proteção' : '') +
+              '. O esquema simplificado de cotas continua na aba Bombas e níveis.')
+          : PDA.Q.caixa('Como o programa entende as cotas',
+              PDA.Q.niveisCotas(st, ctx, cen),
+              'Os campos de cota pedem ALTITUDE ABSOLUTA, na mesma referência de nível do levantamento — ' +
+              'não profundidade nem altura em relação ao fundo do poço.')
       ]);
     entrada.classList.add('destaque');
 
@@ -1062,11 +1078,12 @@
             arr: 'adutoras', total: st.adutoras.length
           });
         })
-      ]),
-      F.cartaoGolpeEntrada(st, ctx, res)
+      ])
     ];
   };
 
+  /* Dados de entrada da pré-avaliação do golpe. É mostrado na aba
+     Transitório e proteção (era a parte de baixo da aba Adutora). */
   F.cartaoGolpeEntrada = function (st, ctx, res) {
     var anc = PDA.H.ancoragem.filter(function (a) { return a.id === (st.golpe.ancoragem || 'juntas'); })[0];
     return UI.cartao('Transitório hidráulico — dados de entrada',
@@ -1099,7 +1116,8 @@
           'A pré-avaliação calcula o transitório da tubulação NUA: não considera tanque de alívio (TAU), chaminé ' +
           'de equilíbrio, válvula antecipadora de onda, ventosa de duplo efeito nem volante de inércia. ' +
           'Se a sobrepressão estourar a classe do tubo, o caminho usual não é engrossar a parede — é dimensionar ' +
-          'a proteção, e isso exige modelagem do transitório pelo método das características.')) : null
+          'a proteção, logo abaixo nesta aba; o dimensionamento final exige a modelagem do transitório pelo ' +
+          'método das características.')) : null
     ], UI.botaoFonte(['nbr12215']));
   };
 

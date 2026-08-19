@@ -346,6 +346,7 @@ function titulo(t) { console.log('\n' + t); }
     const st = window.PDA.App.st;
     st.adutoras[0].catalogoId = 'fd_k7';
     st.adutoras[0].itemRot = 'DN 800';
+    st.adutoras[0].junta = 'jti';        /* junta travada: sem PFA automática */
     st.adutoras[0].pnMcaOverride = null;
     window.PDA.App.render();
   });
@@ -564,6 +565,19 @@ function titulo(t) { console.log('\n' + t); }
   ok('diz que não considera dispositivo de proteção', /não considera dispositivo de proteção nenhum/.test(txtEnv));
   ok('ponto alto aparece na tabela', /ponto alto/.test(txtEnv));
 
+  /* com o perfil lançado, o Resumo mostra o perfil no lugar do esquema */
+  await page.locator('#abas button', { hasText: 'Resumo' }).click();
+  await page.waitForTimeout(400);
+  const txtRes24f = await page.locator('#conteudo').innerText();
+  ok('Resumo mostra o perfil da linha no lugar do esquema simplificado',
+     /perfil da linha e envoltória/i.test(txtRes24f) && !/como o programa entende as cotas/i.test(txtRes24f));
+  ok('gráfico do perfil desenhado no Resumo', (await page.locator('#conteudo svg.perfil').count()) >= 1);
+  /* o esquema simplificado continua na aba Bombas e níveis */
+  await page.locator('#abas button', { hasText: 'Bombas' }).click();
+  await page.waitForTimeout(350);
+  ok('esquema de cotas continua na aba Bombas e níveis',
+     /onde cada cota entra no desenho/i.test(await page.locator('#conteudo').innerText()));
+
   titulo('24g. Curva da bomba e ponto de operação');
   await page.locator('#abas button', { hasText: 'Bombas' }).click();
   await page.waitForTimeout(320);
@@ -618,6 +632,14 @@ function titulo(t) { console.log('\n' + t); }
   await page.waitForTimeout(280);
 
   titulo('24i. Casos de ancoragem do transitório');
+  /* o cartão do golpe saiu da aba Adutora: vive na aba Transitório e proteção */
+  ok('aba Adutora não tem mais o cartão do golpe',
+     (await page.locator('select[data-bind="golpe.ancoragem"]').count()) === 0 &&
+     !/Avaliar golpe de aríete/.test(await page.locator('#conteudo').innerText()));
+  await page.evaluate(() => window.PDA.App.irPara('protecao'));
+  await page.waitForTimeout(450);
+  ok('cartão do golpe presente na aba Transitório e proteção',
+     /Avaliar golpe de aríete/.test(await page.locator('#conteudo').innerText()));
   const anc = await page.locator('select[data-bind="golpe.ancoragem"]');
   ok('seletor de ancoragem presente', (await anc.count()) === 1);
   ok('quatro casos oferecidos', (await anc.locator('option').count()) === 4,
@@ -940,16 +962,29 @@ function titulo(t) { console.log('\n' + t); }
   ok('valor informado pelo usuário não é sobrescrito',
      (await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)) === 95,
      String(await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)));
-  /* classe K: seletor de degraus normativos */
+  /* classe K + junta elástica: PFA adotada automaticamente pela EN 545 */
   await page.evaluate(() => { window.PDA.App.st.adutoras[0].pnAuto = true; window.PDA.App.render(); });
   await page.selectOption('select[data-bind="adutoras.0.catalogoId"]', 'fd_k9');
   await page.waitForTimeout(400);
   await page.selectOption('select[data-bind="adutoras.0.itemRot"]', 'DN 400');
   await page.waitForTimeout(450);
-  ok('classe K sem PN deixa o campo em branco',
+  ok('classe K + junta elástica preenche pela EN 545 (K9 DN 400 → 420 mca)',
+     (await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)) === 420,
+     String(await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)));
+  ok('sem seletor de degraus quando a classe é adotada sozinha',
+     (await page.locator('select[data-bind="adutoras.0.pnMcaOverride"]').count()) === 0);
+  ok('a origem do PN é a junta',
+     (await page.evaluate(() => {
+       const P = window.PDA, ctx = P.C.contexto(P.App.st, P.App.cats);
+       return P.C.pnInfo(P.App.st.adutoras[0], P.C.resolverTubo(P.App.st.adutoras[0], ctx)).origem;
+     })) === 'junta');
+  /* junta travada: a PFA depende do fabricante → campo em branco + degraus */
+  await page.selectOption('select[data-bind="adutoras.0.junta"]', 'jti');
+  await page.waitForTimeout(450);
+  ok('junta travada deixa o campo em branco',
      (await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)) === null);
   const selDegrau = page.locator('select[data-bind="adutoras.0.pnMcaOverride"]');
-  ok('seletor de degraus aparece para as classes K', (await selDegrau.count()) === 1);
+  ok('seletor de degraus aparece para informar outro PN', (await selDegrau.count()) === 1);
   ok('degraus da EN 545 oferecidos', (await selDegrau.locator('option').count()) >= 8);
   await selDegrau.selectOption('400');
   await page.waitForTimeout(450);
@@ -963,6 +998,12 @@ function titulo(t) { console.log('\n' + t); }
        const P = window.PDA, ctx = P.C.contexto(P.App.st, P.App.cats);
        return P.C.pnInfo(P.App.st.adutoras[0], P.C.resolverTubo(P.App.st.adutoras[0], ctx)).origem;
      })) === 'informado');
+  /* voltar para a junta elástica re-adota a PFA automática */
+  await page.evaluate(() => { window.PDA.App.st.adutoras[0].pnAuto = true; window.PDA.App.render(); });
+  await page.selectOption('select[data-bind="adutoras.0.junta"]', 'jgs');
+  await page.waitForTimeout(450);
+  ok('voltar à junta elástica re-adota a PFA automática',
+     (await page.evaluate(() => window.PDA.App.st.adutoras[0].pnMcaOverride)) === 420);
 
   titulo('31. Biblioteca de projetos');
   await page.evaluate(() => localStorage.removeItem('pda.biblioteca.v1'));
@@ -1735,12 +1776,16 @@ function titulo(t) { console.log('\n' + t); }
      /ponto alto do perfil/.test(txtPr) && (await page.locator('[data-acao="protVentosaAqui"]').count()) >= 1);
   ok('botões dos quatro dispositivos', (await page.locator('[data-acao="protNovo"]').count()) === 4);
 
-  /* lança a ventosa sugerida e depois um RHO */
-  await page.locator('[data-acao="protVentosaAqui"]').first().click();
+  /* lança a ventosa sugerida NO PONTO ALTO (1500 m) e depois um RHO */
+  await page.locator('[data-acao="protVentosaAqui"][data-x="1500"]').click();
   await page.waitForTimeout(400);
   const vLancada = await page.evaluate(() => window.PDA.App.st.protecao.dispositivos[0]);
   ok('ventosa lançada com posição, função e DN sugeridos',
      vLancada.tipo === 'ventosa' && vLancada.x > 0 && vLancada.dn > 0, JSON.stringify(vLancada));
+  const txtV = await page.locator('#conteudo').innerText();
+  ok('só a ventosa já desenha a envoltória "com proteção"', /Com a proteção lançada/.test(txtV));
+  ok('o requisito mostra que os dispositivos conversam',
+     /dispositivos conversam/.test(txtV) || /coberta pelos dispositivos/.test(txtV));
   await page.locator('[data-acao="protNovo"][data-tipo="rho"]').click();
   await page.waitForTimeout(500);
   const txtRho = await page.locator('#conteudo').innerText();
@@ -1761,7 +1806,7 @@ function titulo(t) { console.log('\n' + t); }
   const txtPr2 = await page.locator('#conteudo').innerText();
   ok('mostra o Δh que o volume adotado segura', /limita o transitório a Δh/.test(txtPr2));
   ok('envoltórias lado a lado (sem e com proteção)',
-     /Sem proteção \(Δh/.test(txtPr2) && /Com o RHO lançado/.test(txtPr2));
+     /Sem proteção \(Δh/.test(txtPr2) && /Com a proteção lançada/.test(txtPr2));
   ok('dois gráficos desenhados', (await page.locator('#conteudo .blocos-vias svg').count()) >= 2);
   /* subdimensionar acusa */
   await page.evaluate(() => { window.PDA.App.st.protecao.dispositivos[1].volumeM3 = 0.5; window.PDA.App.render(); });
@@ -1876,7 +1921,7 @@ function titulo(t) { console.log('\n' + t); }
   ok('logo vai junto no papel', impr.logo);
   ok('barra de comandos e abas somem', !impr.topo && !impr.abas);
   ok('a faixa fixa é substituída por uma cópia no fluxo', !impr.fixa && impr.copiaFaixa);
-  ok('cartões preservados no papel', impr.cartoes > 1, String(impr.cartoes));
+  ok('cartões preservados no papel', impr.cartoes >= 1, String(impr.cartoes));
   ok('tabelas preservadas no papel', impr.tabelas > 1, String(impr.tabelas));
   ok('botões somem', !impr.botoes);
   ok('campos preenchidos continuam visíveis', impr.inputs);

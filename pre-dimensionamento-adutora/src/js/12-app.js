@@ -349,8 +349,8 @@
     if (/\.pnMcaOverride$/.test(bind)) {
       var conjPN = UI.get(App.st, bind.replace('.pnMcaOverride', ''));
       if (conjPN) conjPN.pnAuto = false;
-    } else if (/\.(catalogoId|itemRot)$/.test(bind)) {
-      App.autoPreencherPN(bind.replace(/\.(catalogoId|itemRot)$/, ''));
+    } else if (/\.(catalogoId|itemRot|junta)$/.test(bind)) {
+      App.autoPreencherPN(bind.replace(/\.(catalogoId|itemRot|junta)$/, ''));
     }
 
     /* cota de chegada e cota final do último trecho são o mesmo número:
@@ -690,19 +690,22 @@
     }
   };
 
-  /* Preenche o PN do trecho com o do catálogo, quando houver. Só age
-     enquanto o usuário não tiver informado um valor próprio. */
+  /* Preenche o PN do trecho: com o do catálogo quando houver, senão com a
+     PFA automática por material + junta (EN 545 / Barlow). Só age enquanto
+     o usuário não tiver informado um valor próprio. */
   App.autoPreencherPN = function (caminhoConj) {
     var conj = UI.get(App.st, caminhoConj);
     if (!conj || conj.pnAuto === false) return;
     var ctx;
     try { ctx = PDA.C.contexto(App.st, App.cats); } catch (e) { return; }
     var tubo = PDA.C.resolverTubo(conj, ctx);
-    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn && conj.itemRot) {
+    if (!tubo || tubo.semDiametro || !conj.itemRot) { conj.pnMcaOverride = null; return; }
+    if (tubo.item && tubo.item.pn) {
       conj.pnMcaOverride = Number(tubo.item.pn) * 10;
-    } else {
-      conj.pnMcaOverride = null;
+      return;
     }
+    var aj = PDA.C.pnAutoJunta(conj, tubo);
+    conj.pnMcaOverride = aj ? aj.mca : null;
   };
 
   /* Aplica o preenchimento automático a todos os trechos de adutora */

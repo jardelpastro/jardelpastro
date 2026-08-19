@@ -110,18 +110,74 @@
     return i.mca;
   };
 
-  /* Detalha de onde veio a pressão admissível adotada */
+  /* PFA adotável automaticamente a partir do MATERIAL + JUNTA do trecho.
+     - FD com junta elástica (JGS): PFA da parede pela expressão da EN 545,
+       com a espessura MÍNIMA de fundição (e − (1,3 + 0,001·DN)) e teto de
+       64 bar (limite usual da junta elástica na própria EN 545). Reproduz
+       a tabela da norma para K9 (ex.: DN 400 → 42 bar; DN ≤ 200 → 64 bar).
+     - FD travada (JTI/JTE) e flangeado sem PN: a junta governa e varia com
+       o DN e o fabricante — NÃO se adota valor automático.
+     - Aço soldado ou flangeado: Barlow/EN 545 com 87,5 % da espessura
+       (tolerância usual de laminação). Ranhurado: o acoplamento governa.
+     - PEAD: o PN do próprio tubo já vem do catálogo (item.pn).            */
+  C.pnAutoJunta = function (conj, tubo) {
+    if (!tubo || tubo.semDiametro || !tubo.item || !tubo.item.e || !tubo.item.de) return null;
+    var cat = tubo.cat;
+    if (!cat || !PDA.CAT || !PDA.CAT.juntas || !PDA.CAT.juntas[cat.familia]) return null;
+    var jid = conj && conj.junta ? conj.junta : PDA.CAT.juntaPadrao(cat);
+    var j = PDA.CAT.junta(cat, jid);
+    if (!j) return null;
+    var sig = C.SIGMA_ADM[tubo.material];
+    if (!sig) return null;
+    var e = Number(tubo.item.e), de = Number(tubo.item.de), dn = Number(tubo.item.dn) || 0;
+    if (!(e > 0) || !(de > e)) return null;
+    var fd = /^fd_/.test(tubo.material);
+    if (fd && j.id !== 'jgs') return null;             /* travada/flange: catálogo do fabricante */
+    if (!fd && j.id !== 'soldada' && j.id !== 'flg_aco') return null;
+    var eMin = fd ? e - (1.3 + 0.001 * dn) : e * 0.875;
+    if (!(eMin > 0) || !(de > eMin)) return null;
+    var pfa = 20 * eMin * sig / (de - eMin);
+    if (fd && j.id === 'jgs') pfa = Math.min(64, pfa);
+    pfa = Math.floor(pfa);
+    if (!(pfa > 0)) return null;
+    return {
+      mca: pfa * 10, bar: pfa, junta: j,
+      nota: fd
+        ? 'PFA de ' + pfa + ' bar adotada automaticamente: parede pela EN 545 com a espessura mínima de ' +
+          'fundição (σ = ' + sig + ' MPa)' + (pfa === 64 ? ', limitada aos 64 bar da junta elástica' : '') +
+          '. A junta elástica ' + j.rot.split(' — ')[0] + ' resiste a pressão igual ou superior à do corpo. ' +
+          'Anteprojeto — confirme a PFA por DN no catálogo do fabricante.'
+        : 'PFA de ' + pfa + ' bar adotada automaticamente pela expressão de Barlow/EN 545 com 87,5 % da ' +
+          'espessura (tolerância de laminação) e σ = ' + sig + ' MPa. Confirme com a especificação do tubo e da solda.'
+    };
+  };
+
+  /* Detalha de onde veio a pressão admissível adotada.
+     Prioridades: valor digitado pelo usuário > PN do catálogo > PFA
+     automática por material + junta > ausente. O valor auto-preenchido
+     pelo programa (conj.pnAuto !== false) continua contando como
+     automático — só o que o usuário digitou vira "informado". */
   C.pnInfo = function (conj, tubo) {
+    var auto = null;
+    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) {
+      auto = { mca: Number(tubo.item.pn) * 10, origem: 'catalogo',
+               nota: 'PN ' + tubo.item.pn + ' bar do catálogo "' + tubo.cat.nome + '".' };
+    } else {
+      var aj = C.pnAutoJunta(conj, tubo);
+      if (aj) auto = { mca: aj.mca, bar: aj.bar, origem: 'junta', nota: aj.nota };
+    }
     if (conj && conj.pnMcaOverride !== null && conj.pnMcaOverride !== undefined && conj.pnMcaOverride !== '') {
-      return { mca: Number(conj.pnMcaOverride), origem: 'informado',
+      var v = Number(conj.pnMcaOverride);
+      if (conj.pnAuto !== false && auto && Math.abs(v - auto.mca) < 0.5) return auto;
+      return { mca: v, origem: 'informado',
                nota: 'Valor informado no campo PN / PFA do trecho.' };
     }
-    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) {
-      return { mca: Number(tubo.item.pn) * 10, origem: 'catalogo',
-               nota: 'PN ' + tubo.item.pn + ' bar do catálogo "' + tubo.cat.nome + '".' };
-    }
+    if (auto) return auto;
+    var jSel = (tubo && tubo.cat && PDA.CAT && PDA.CAT.junta) ? PDA.CAT.junta(tubo.cat, conj && conj.junta) : null;
     return { mca: null, origem: 'ausente',
-             nota: 'O catálogo deste tubo não traz a pressão admissível. Informe-a no campo PN / PFA do trecho.' };
+             nota: jSel && jSel.ancora
+               ? 'A PFA da ' + jSel.rot.split(' — ')[0] + ' depende do DN e do fabricante — confirme no catálogo e informe no campo PN / PFA.'
+               : 'O catálogo deste tubo não traz a pressão admissível. Informe-a no campo PN / PFA do trecho.' };
   };
 
   /* Resistência do CORPO do tubo pela expressão da EN 545 / ISO 10803:

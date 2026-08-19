@@ -40,7 +40,11 @@ A aba **Resumo** é a porta de entrada: os campos com borda destacada são o
 mínimo necessário — vazão, fluido, cota de partida, cota de chegada e número de
 bombas. Logo abaixo aparecem a altura geométrica, a altura manométrica e o
 panorama de todos os trechos com material, diâmetro, perdas, extensões e
-potências. É o resumo do resumo.
+potências. É o resumo do resumo. Enquanto não há perfil, o Resumo mostra o
+esquema simplificado de cotas (reservatório → bomba → adutora → chegada); com o
+**perfil da linha lançado**, o gráfico do perfil com a piezométrica e as
+envoltórias toma o lugar dele — o esquema simplificado segue na aba Bombas e
+níveis. Os números saem com **ponto de milhar** (1.234,56) em toda a interface.
 
 O esquema desenhado nessa mesma aba mostra onde cada cota entra: todos os campos
 de cota pedem **altitude absoluta**, na mesma referência de nível do
@@ -156,6 +160,16 @@ modelo do fabricante (ARI, BERMAD, Saint-Gobain). Tudo com alerta de
 **sub/superdimensionamento**, e as **envoltórias antes/depois** lado a lado. O
 memorial ganha o capítulo de proteção. É anteprojeto: o dimensionamento final
 sai do estudo pelo método das características (Allievi, Hammer).
+
+Os **dados de entrada do golpe** (avaliar, tempo de manobra, ancoragem/ψ) vivem
+no topo desta aba — saíram da aba Adutora / Recalque. E os **dispositivos
+conversam entre si**: cada ventosa de admissão, TAU ou chaminé lançado cria uma
+**zona de alívio** (ventosa ±300 m, TAU até o fim da zona de depressão, chaminé
+±150 m) onde a envoltória mínima protegida não desce abaixo de zero; os pontos
+cobertos **saem do requisito de subpressão do RHO**, que pode ficar bem menor —
+lançar ventosas nos pontos críticos evita um RHO gigante. A chaminé ainda limita
+a envoltória máxima ao seu nível d'água. O gráfico **"Com a proteção lançada"**
+aparece e atualiza com **qualquer** dispositivo, não só com o RHO.
 
 **Tipo de junta por trecho** — ao lado do catálogo, o trecho escolhe a junta:
 no FD, JGS (elástica), JTI/JTE (travadas) ou flangeada; no PEAD, solda de topo,
@@ -356,14 +370,25 @@ Quando o catálogo traz o PN — PEAD, PVC, PVC-O, ferro fundido flangeado —, 
 campo *PN / PFA do tubo* do trecho é **preenchido sozinho** e acompanha a troca de
 diâmetro, até você digitar um valor próprio.
 
-As classes K do ferro fundido dúctil (K7, K9, K12) não têm PN único: a pressão
-admissível depende da classe, do DN e do tipo de junta, e o que costuma governar
-é a junta, não a parede. Para esses casos há um seletor com os degraus usuais de
-pressão da EN 545 (10, 12, 16, 20, 25, 30, 32, 40 bar…), que preenche o campo em
-um clique — a lista oferece os degraus, não afirma qual se aplica ao seu DN.
-A dica do campo mostra, como referência, a resistência do corpo do tubo pela
-expressão da EN 545 (`PFA = 20·e·σ/(DE−e)`), deixando claro que é um limite
-superior. Confirme sempre no catálogo do fabricante.
+Quando o catálogo não traz PN, o programa adota a classe de pressão
+**automaticamente pelo material + junta escolhidos**:
+
+- **FD classe K com junta elástica (JGS)** — PFA da parede pela expressão da
+  EN 545 com a espessura **mínima** de fundição (`e − (1,3 + 0,001·DN)`) e teto
+  de **64 bar** (limite usual da junta elástica na própria norma). Reproduz a
+  tabela da EN 545: K9 DN 400 → 42 bar; K9 até DN ~200 → 64 bar. A junta
+  elástica resiste a pressão igual ou superior à do corpo, então adotar o corpo
+  é seguro em anteprojeto — confirme no catálogo do fabricante.
+- **Aço soldado ou flangeado** — Barlow/EN 545 com 87,5 % da espessura
+  (tolerância de laminação) e σ = 138 MPa.
+- **FD com junta travada (JTI/JTE), flangeado sem PN e aço ranhurado** — a
+  junta/acoplamento governa e varia com o DN e o fabricante: **nenhum valor é
+  inventado**. O campo fica em branco e aparece o seletor *"Informar um PN
+  usual"* com os degraus da EN 545 (10, 12, 16, 20, 25, 30, 32, 40 bar…), para
+  informar outro PN em um clique.
+
+Trocar a junta do trecho recalcula o valor adotado; o que você digitar
+prevalece sempre.
 
 ## A logo
 
@@ -407,6 +432,7 @@ tubo, é dimensionar a proteção.
 
 Dimensões marcadas como **"conferir catálogo"** na base de tubos foram estimadas
 por fórmula normativa e precisam ser confirmadas com o fornecedor antes do
-detalhamento. A pressão admissível (PFA) do ferro fundido dúctil não está
-cadastrada porque depende da classe, do DN e do tipo de junta — informe-a no
-campo *PN / PFA do tubo* do trecho para habilitar a verificação de pressão.
+detalhamento. A pressão admissível adotada automaticamente pelo material + junta
+é de anteprojeto (parede pela EN 545); para junta travada (JTI/JTE) nenhum valor
+é adotado — a PFA dessas juntas varia com o DN e o fabricante e deve ser
+informada no campo *PN / PFA do tubo* do trecho.

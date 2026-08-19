@@ -366,9 +366,35 @@ titulo('13b. Pressão admissível do tubo');
 const stPN = E.clone(st4);
 stPN.adutoras[0].catalogoId = 'fd_k7';       /* catálogo sem PN cadastrado */
 stPN.adutoras[0].itemRot = 'DN 500';
+/* FD classe K com junta elástica (padrão): PFA adotada automaticamente
+   pela EN 545 (parede mínima, teto de 64 bar) */
 let resPN = C.resumo(stPN, cats);
-ok('sem PN no catálogo a verificação fica indefinida',
-   resPN.piezometrica[1].pnMca === null && resPN.golpe[0].atende === null);
+ok('classe K + junta elástica adota PFA automática (EN 545)',
+   resPN.piezometrica[1].pnMca !== null && resPN.golpe[0].atende !== null,
+   String(resPN.piezometrica[1].pnMca));
+{
+  const ctxPN = C.contexto(stPN, cats);
+  const infoJGS = C.pnInfo(stPN.adutoras[0], C.resolverTubo(stPN.adutoras[0], ctxPN));
+  ok('origem registrada como junta', infoJGS.origem === 'junta', infoJGS.origem);
+  /* K9 DN 400: e=8,1, tol 1,7 → e_min 6,4; DE 429 → 42 bar (tabela EN 545) */
+  const stK9 = E.clone(stPN);
+  stK9.adutoras[0].catalogoId = 'fd_k9'; stK9.adutoras[0].itemRot = 'DN 400';
+  const iK9 = C.pnInfo(stK9.adutoras[0], C.resolverTubo(stK9.adutoras[0], C.contexto(stK9, cats)));
+  ok('K9 DN 400 → PFA 42 bar (reproduz a EN 545)', iK9.mca === 420, String(iK9.mca));
+  /* DN pequeno: teto de 64 bar da junta elástica */
+  const stK9b = E.clone(stK9);
+  stK9b.adutoras[0].itemRot = 'DN 150';
+  const iK9b = C.pnInfo(stK9b.adutoras[0], C.resolverTubo(stK9b.adutoras[0], C.contexto(stK9b, cats)));
+  ok('K9 DN 150 limitado aos 64 bar da junta elástica', iK9b.mca === 640, String(iK9b.mca));
+  /* junta travada: a PFA da junta governa e varia com o DN → sem adoção */
+  const stJTI = E.clone(stPN);
+  stJTI.adutoras[0].junta = 'jti';
+  const iJTI = C.pnInfo(stJTI.adutoras[0], C.resolverTubo(stJTI.adutoras[0], C.contexto(stJTI, cats)));
+  ok('junta travada JTI não adota PFA automática', iJTI.mca === null && iJTI.origem === 'ausente');
+  const resJTI = C.resumo(stJTI, cats);
+  ok('com junta travada a verificação fica indefinida',
+     resJTI.piezometrica[1].pnMca === null && resJTI.golpe[0].atende === null);
+}
 stPN.adutoras[0].pnMcaOverride = 400;
 resPN = C.resumo(stPN, cats);
 ok('PN informado pelo usuário é usado', resPN.piezometrica[1].pnMca === 400);
@@ -1009,6 +1035,13 @@ prox('parênteses: (170-120)/2', UIb.parseNum('(170-120)/2'), 25, 1e-12);
 prox('potência: 2^10', UIb.parseNum('2^10'), 1024, 1e-12);
 prox('número simples continua igual', UIb.parseNum('123,45'), 123.45, 1e-12);
 prox('milhar brasileiro preservado', UIb.parseNum('1.234,56'), 1234.56, 1e-12);
+/* formatação com ponto de milhar (pt-BR) */
+ok('UI.num agrupa o milhar', UIb.num(1234567.89, 2) === '1.234.567,89', UIb.num(1234567.89, 2));
+ok('milhar sem casas decimais', UIb.num(6670, 0) === '6.670', UIb.num(6670, 0));
+ok('negativo agrupado', UIb.num(-1234, 0) === '-1.234', UIb.num(-1234, 0));
+ok('abaixo de mil não muda', UIb.num(999.5, 1) === '999,5', UIb.num(999.5, 1));
+ok('numEdit continua sem agrupar (campos editáveis)', UIb.numEdit(6670) === '6670');
+prox('round-trip parseNum(num(x))', UIb.parseNum(UIb.num(1234567.89, 2)), 1234567.89, 1e-9);
 prox('negativo simples não vira conta', UIb.parseNum('-5'), -5, 1e-12);
 ok('expressão malformada não explode', UIb.parseNum('10++') === 10 || UIb.parseNum('10++') === null);
 ok('texto malicioso não avalia', UIb.parseNum('alert(1)') === null);
@@ -1204,6 +1237,63 @@ const protP = PR.envoltoriaProtegida(stPR, ctxP, resP);
 ok('envoltória protegida existe e tem Δh menor',
    protP && protP.env && protP.dh < resP.envoltoria.dh,
    protP ? JSON.stringify({ prot: protP.dh, sem: resP.envoltoria.dh }) : 'null');
+
+titulo('40b. Os dispositivos conversam entre si');
+stPR = stProt();
+stPR.perfil.pontos[1].cota = 145;          /* crista com depressão na envoltória mínima */
+resP = C.resumo(stPR, cats);
+const reqSemDisp = PR.requisito(stPR, ctxP, resP);
+ok('sem dispositivos não há alívio', reqSemDisp.aliviadosSub === 0 && !reqSemDisp.temAlivio);
+/* ventosa de admissão na crista cria zona de alívio */
+stPR.protecao.dispositivos = [E.novoDispositivo('ventosa')];
+stPR.protecao.dispositivos[0].funcao = 'quadrupla';
+stPR.protecao.dispositivos[0].dn = 80;
+stPR.protecao.dispositivos[0].x = 1500;
+const zonasV = PR.zonasAlivio(stPR, ctxP, resP);
+ok('ventosa de admissão cria zona de alívio ±300 m',
+   zonasV.length === 1 && zonasV[0].x0 === 1200 && zonasV[0].x1 === 1800, JSON.stringify(zonasV));
+stPR.protecao.dispositivos[0].funcao = 'simples';
+ok('ventosa simples não cria zona', PR.zonasAlivio(stPR, ctxP, resP).length === 0);
+stPR.protecao.dispositivos[0].funcao = 'quadrupla';
+const reqComDisp = PR.requisito(stPR, ctxP, resP);
+ok('pontos cobertos saem do requisito de depressão', reqComDisp.aliviadosSub >= 1,
+   String(reqComDisp.aliviadosSub));
+ok('limite por depressão relaxa (ou deixa de existir)',
+   reqComDisp.dhAdmSub === null ||
+   (reqSemDisp.dhAdmSub !== null && reqComDisp.dhAdmSub >= reqSemDisp.dhAdmSub - 1e-9),
+   JSON.stringify({ sem: reqSemDisp.dhAdmSub, com: reqComDisp.dhAdmSub }));
+/* o RHO necessário diminui com a ventosa cobrindo a depressão */
+const rhoSemD = PR.rho(stPR, ctxP, resP, reqSemDisp);
+const rhoComD = PR.rho(stPR, ctxP, resP, reqComDisp);
+ok('RHO necessário fica menor ou igual com a ventosa lançada',
+   rhoComD.vTanque <= rhoSemD.vTanque + 1e-9,
+   JSON.stringify({ sem: rhoSemD.vTanque, com: rhoComD.vTanque }));
+/* envoltória protegida aparece com QUALQUER dispositivo (sem RHO) */
+const protV = PR.envoltoriaProtegida(stPR, ctxP, resP);
+ok('envoltória protegida existe só com a ventosa', !!(protV && protV.env) && !protV.temRho);
+const naZona = protV.env.pontos.filter(p => p.xEscalado >= 1200 && p.xEscalado <= 1800);
+const naZonaSem = resP.envoltoria.pontos.filter(p => p.xEscalado >= 1200 && p.xEscalado <= 1800);
+ok('sem proteção havia depressão na zona da ventosa', naZonaSem.some(p => p.pMin < 0));
+ok('na zona da ventosa a envoltória mínima não fica negativa',
+   naZona.length > 0 && naZona.every(p => p.pMin >= -1e-9),
+   JSON.stringify(naZona.map(p => p.pMin)));
+/* TAU acrescenta zona até o fim da depressão; chaminé limita a máxima */
+stPR.protecao.dispositivos.push(E.novoDispositivo('tau'));
+stPR.protecao.dispositivos[1].x = 1500;
+ok('TAU acrescenta zona de alívio', PR.zonasAlivio(stPR, ctxP, resP).length === 2);
+stPR.protecao.dispositivos.push(E.novoDispositivo('chamine'));
+stPR.protecao.dispositivos[2].x = 1500;
+stPR.protecao.dispositivos[2].altura = 8;
+const zonas3 = PR.zonasAlivio(stPR, ctxP, resP);
+ok('chaminé cria zona com teto na envoltória máxima',
+   zonas3.length === 3 && zonas3[2].headMax !== undefined, JSON.stringify(zonas3[2]));
+const prot3 = PR.envoltoriaProtegida(stPR, ctxP, resP);
+ok('rótulo lista os dispositivos lançados',
+   /ventosa/.test(prot3.rotulo) && /TAU/.test(prot3.rotulo) && /chaminé/.test(prot3.rotulo), prot3.rotulo);
+const noEntorno = prot3.env.pontos.filter(p => Math.abs(p.xEscalado - 1500) <= 150);
+ok('no entorno da chaminé a envoltória máxima respeita o nível d\'água (cota + altura)',
+   noEntorno.length > 0 && noEntorno.every(p => p.envMax <= 145 + 8 + 1e-6),
+   JSON.stringify(noEntorno.map(p => p.envMax)));
 
 titulo('41. Tipos de junta');
 const catFDj = CAT.buscar(cats.todos, 'fd_k7');

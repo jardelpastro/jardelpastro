@@ -2807,8 +2807,10 @@ html.imprimindo-doc #doc-saida { display: block; }
     /* pontos já inviáveis em REGIME PERMANENTE não são problema de
        transitório: proteção nenhuma os resolve (é diâmetro, traçado ou
        altura manométrica). Eles saem do requisito e viram alerta próprio. */
+    var zonas = PR.zonasAlivio(st, ctx, res);           /* ventosas/TAU/chaminé lançados */
     var permInviavel = [];
     var dhSobreMin = Infinity, dhSubMin = Infinity, govSobre = null, govSub = null;
+    var dhSubBrutoMin = Infinity, aliviadosSub = 0;
     env.pontos.forEach(function (p) {
       var frac = 1 - Math.min(1, Math.max(0, p.xEscalado / env.lTrechos));
       if (frac < 0.02) return;              /* na chegada o Δh é nulo por hipótese */
@@ -2819,10 +2821,19 @@ html.imprimindo-doc #doc-saida { display: block; }
         if (s < dhSobreMin) { dhSobreMin = s; govSobre = p; }
       }
       var d = (p.pPerm - pMinAlvo) / frac;
+      if (d < dhSubBrutoMin) dhSubBrutoMin = d;
+      /* ponto coberto por ventosa de admissão / TAU / chaminé: a depressão
+         ali é tratada localmente e deixa de exigir Δh do RHO */
+      var coberto = zonas.some(function (z) {
+        return (z.efeito === 'depressao' || z.efeito === 'ambos') &&
+               p.xEscalado >= z.x0 - 1e-9 && p.xEscalado <= z.x1 + 1e-9;
+      });
+      if (coberto) { aliviadosSub++; return; }
       if (d < dhSubMin) { dhSubMin = d; govSub = p; }
     });
     if (!isFinite(dhSobreMin)) dhSobreMin = null;
     if (!isFinite(dhSubMin)) dhSubMin = null;
+    if (!isFinite(dhSubBrutoMin)) dhSubBrutoMin = null;
 
     var candidatos = [dhSobreMin, dhSubMin].filter(function (v) { return v !== null; });
     var dhAlvo = candidatos.length ? Math.max(0, Math.min.apply(null, candidatos)) : null;
@@ -2831,12 +2842,57 @@ html.imprimindo-doc #doc-saida { display: block; }
       dhSemProtecao: env.dh, folga: folga, pMinAlvo: pMinAlvo,
       dhAdmSobre: dhSobreMin === null ? null : Math.max(0, dhSobreMin),
       dhAdmSub: dhSubMin === null ? null : Math.max(0, dhSubMin),
+      dhAdmSubBruto: dhSubBrutoMin === null ? null : Math.max(0, dhSubBrutoMin),
+      aliviadosSub: aliviadosSub,
+      temAlivio: zonas.length > 0,
       dhAlvo: dhAlvo,
       precisa: dhAlvo !== null && env.dh > dhAlvo + 1e-9,
       governante: (dhSobreMin !== null && (dhSubMin === null || dhSobreMin <= dhSubMin)) ? 'sobrepressão' : 'depressão',
       pontoSobre: govSobre, pontoSub: govSub,
       permInviavel: permInviavel
     };
+  };
+
+  /* ================================================================
+     Zonas de alívio de depressão dos dispositivos lançados
+     ================================================================
+     Cada dispositivo que trata a DEPRESSÃO localmente cobre uma zona da
+     linha: dentro dela o requisito de subpressão do RHO é aliviado e a
+     envoltória mínima protegida não desce abaixo de zero. Raios de
+     anteprojeto: ventosa de admissão ±300 m (metade do espaçamento usual
+     de 600 m); TAU do ponto de instalação até o fim da zona de depressão
+     que ele preenche; chaminé ±150 m, limitando também a envoltória
+     máxima ao nível d'água da própria chaminé. */
+
+  var RAIO_VENTOSA = 300, RAIO_CHAMINE = 150;
+
+  PR.zonasAlivio = function (st, ctx, res) {
+    var out = [];
+    var pr = st.protecao;
+    if (!pr || !pr.ativo || !res.envoltoria) return out;
+    (pr.dispositivos || []).forEach(function (d) {
+      var x = Number(d.x) || 0;
+      if (d.tipo === 'ventosa') {
+        if (d.funcao === 'simples') return;      /* não admite ar: não alivia depressão */
+        out.push({ x0: Math.max(0, x - RAIO_VENTOSA), x1: x + RAIO_VENTOSA,
+                   efeito: 'depressao', tipo: 'ventosa',
+                   rot: 'ventosa ' + (d.funcao || 'tripla') + ' em ' + Math.round(x) + ' m' });
+      } else if (d.tipo === 'tau') {
+        var t = PR.tau(st, ctx, res, x);
+        var fim = (t && t.alcance) ? t.alcance : x + 600;
+        out.push({ x0: x, x1: Math.max(fim, x + 50), efeito: 'depressao', tipo: 'tau',
+                   rot: 'TAU em ' + Math.round(x) + ' m' });
+      } else if (d.tipo === 'chamine') {
+        var ch = PR.chamine(st, ctx, res, x);
+        var alt = Number(d.altura) > 0 ? Number(d.altura) : (ch && !ch.erro ? ch.altura : null);
+        var z = { x0: Math.max(0, x - RAIO_CHAMINE), x1: x + RAIO_CHAMINE,
+                  efeito: 'ambos', tipo: 'chamine',
+                  rot: 'chaminé em ' + Math.round(x) + ' m' };
+        if (alt !== null && ch && !ch.erro) z.headMax = ch.cota + alt;
+        out.push(z);
+      }
+    });
+    return out;
   };
 
   /* ================================================================
@@ -2870,11 +2926,14 @@ html.imprimindo-doc #doc-saida { display: block; }
     var p0 = res.projeto.Hm + patm;                       /* absoluta no RHO em regime */
     var dhAlvo = req && req.dhAlvo !== null ? req.dhAlvo : 0;
     var p1 = p0 + Math.max(2, dhAlvo);                    /* sobe até o admissível */
+    /* depressão inteiramente coberta por ventosas/TAU/chaminé lançados:
+       o lado da expansão deixa de governar o RHO */
+    var subCoberta = !!(req && req.dhAdmSub === null && req.temAlivio);
     var pminLinha = (req && req.dhAdmSub !== null) ? req.dhAdmSub : res.projeto.Hm;
     var p2 = Math.max(2, p0 - Math.max(2, pminLinha));    /* nunca abaixo de 2 mca abs */
 
     var v0Sobre = e.KE / (GAMA * p0 * Math.log(p1 / p0));
-    var v0Sub = e.KE / (GAMA * p0 * Math.log(p0 / p2));
+    var v0Sub = subCoberta ? 0 : e.KE / (GAMA * p0 * Math.log(p0 / p2));
     var v0Ar = Math.max(v0Sobre, v0Sub) * 1.2;            /* 20 % de folga de anteprojeto */
     var vTanque = v0Ar * 2;                               /* ar ~50 % do tanque em regime */
 
@@ -2888,6 +2947,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       p0: p0, p1: p1, p2: p2, patm: patm,
       v0Sobre: v0Sobre, v0Sub: v0Sub, v0Ar: v0Ar,
       vTanque: vTanque, comercial: comercial,
+      subCoberta: subCoberta,
       governa: v0Sub > v0Sobre ? 'depressão' : 'sobrepressão'
     };
   };
@@ -3112,20 +3172,74 @@ html.imprimindo-doc #doc-saida { display: block; }
   PR.dnDaLinha = dnDaLinha;
 
   /* ================================================================
-     Envoltória com a proteção lançada (estimada pelo RHO)
-     ================================================================ */
+     Envoltória com a proteção lançada
+     ================================================================
+     Considera TODOS os dispositivos:
+       - RHO: reduz o Δh global (sobrepressão e depressão) pela coluna
+         rígida — sem RHO, vale o Δh sem proteção;
+       - ventosas de admissão, TAU e chaminé: dentro da sua zona de
+         alívio a envoltória mínima não desce abaixo de zero;
+       - chaminé: além disso, limita a envoltória máxima ao nível
+         d'água da própria chaminé na sua zona.
+     Estimativa de anteprojeto — o estudo de transiente confirma. */
 
   PR.envoltoriaProtegida = function (st, ctx, res) {
     var pr = st.protecao;
     if (!pr || !pr.ativo || !res.envoltoria) return null;
-    var rhoD = (pr.dispositivos || []).filter(function (d) { return d.tipo === 'rho' && Number(d.volumeM3) > 0; })[0];
-    if (!rhoD) return null;
-    var eff = PR.dhComRho(st, ctx, res, Number(rhoD.volumeM3));
-    if (!eff) return null;
-    /* reaproveita a máquina da envoltória com o Δh que o RHO segura */
+    var disp = pr.dispositivos || [];
+    if (!disp.length) return null;
+
+    var rhoD = disp.filter(function (d) { return d.tipo === 'rho' && Number(d.volumeM3) > 0; })[0];
+    var eff = rhoD ? PR.dhComRho(st, ctx, res, Number(rhoD.volumeM3)) : null;
+    var dhSobre = eff ? eff.dhSobre : res.envoltoria.dh;
+    var dhSub = eff ? eff.dhSub : res.envoltoria.dh;
+
+    var env = PDA.C.envoltoria(st, ctx, res.projeto, [{ dh: dhSobre }]);
+    if (!env) return null;
+    var zonas = PR.zonasAlivio(st, ctx, res);
+
+    env.pontos.forEach(function (p) {
+      var frac = 1 - Math.min(1, Math.max(0, p.xEscalado / env.lTrechos));
+      /* lado da depressão com o Δh próprio (pode diferir do da sobrepressão) */
+      p.envMin = p.hgl - dhSub * frac;
+      p.pMin = p.envMin - p.cota;
+      zonas.forEach(function (z) {
+        if (p.xEscalado < z.x0 - 1e-9 || p.xEscalado > z.x1 + 1e-9) return;
+        if ((z.efeito === 'depressao' || z.efeito === 'ambos') && p.pMin < 0) {
+          p.pMin = 0; p.envMin = p.cota;
+        }
+        if (z.efeito === 'ambos' && z.headMax !== undefined && p.envMax > z.headMax) {
+          p.envMax = z.headMax; p.pMax = p.envMax - p.cota;
+        }
+      });
+      /* reclassifica o ponto com as envoltórias ajustadas */
+      var clPerm = PDA.C.classificarPressao(p.pPerm, p.pn);
+      var clMax = PDA.C.classificarPressao(p.pMax, p.pn, { transitorio: true });
+      var clMin = PDA.C.classificarPressao(p.pMin, p.pn, { transitorio: true });
+      var pior = [clPerm, clMax, clMin].reduce(function (a, b) {
+        var ordem = { ruim: 3, atencao: 2, bom: 1, na: 0 };
+        return ordem[b.classe] > ordem[a.classe] ? b : a;
+      });
+      p.classe = pior.classe;
+      p.motivos = clPerm.motivos.concat(clMax.motivos, clMin.motivos);
+    });
+    env.criticoMax = env.pontos.reduce(function (a, b) { return b.pMax > a.pMax ? b : a; }, env.pontos[0]);
+    env.criticoMin = env.pontos.reduce(function (a, b) { return b.pMin < a.pMin ? b : a; }, env.pontos[0]);
+
+    /* rótulo do que foi considerado */
+    var nomes = [];
+    if (rhoD) nomes.push('RHO ' + Number(rhoD.volumeM3).toLocaleString('pt-BR') + ' m³');
+    var nV = disp.filter(function (d) { return d.tipo === 'ventosa' && d.funcao !== 'simples'; }).length;
+    var nT = disp.filter(function (d) { return d.tipo === 'tau'; }).length;
+    var nC = disp.filter(function (d) { return d.tipo === 'chamine'; }).length;
+    if (nV) nomes.push(nV + (nV === 1 ? ' ventosa' : ' ventosas'));
+    if (nT) nomes.push(nT + ' TAU');
+    if (nC) nomes.push(nC + (nC === 1 ? ' chaminé' : ' chaminés'));
+    if (!nomes.length) return null;          /* só ventosa simples lançada: nada a mostrar */
+
     return {
-      env: PDA.C.envoltoria(st, ctx, res.projeto, [{ dh: eff.dh }]),
-      dh: eff.dh, dhSobre: eff.dhSobre, dhSub: eff.dhSub
+      env: env, dh: Math.max(dhSobre, dhSub), dhSobre: dhSobre, dhSub: dhSub,
+      temRho: !!rhoD, zonas: zonas, rotulo: nomes.join(' + ')
     };
   };
 
@@ -3608,18 +3722,74 @@ html.imprimindo-doc #doc-saida { display: block; }
     return i.mca;
   };
 
-  /* Detalha de onde veio a pressão admissível adotada */
+  /* PFA adotável automaticamente a partir do MATERIAL + JUNTA do trecho.
+     - FD com junta elástica (JGS): PFA da parede pela expressão da EN 545,
+       com a espessura MÍNIMA de fundição (e − (1,3 + 0,001·DN)) e teto de
+       64 bar (limite usual da junta elástica na própria EN 545). Reproduz
+       a tabela da norma para K9 (ex.: DN 400 → 42 bar; DN ≤ 200 → 64 bar).
+     - FD travada (JTI/JTE) e flangeado sem PN: a junta governa e varia com
+       o DN e o fabricante — NÃO se adota valor automático.
+     - Aço soldado ou flangeado: Barlow/EN 545 com 87,5 % da espessura
+       (tolerância usual de laminação). Ranhurado: o acoplamento governa.
+     - PEAD: o PN do próprio tubo já vem do catálogo (item.pn).            */
+  C.pnAutoJunta = function (conj, tubo) {
+    if (!tubo || tubo.semDiametro || !tubo.item || !tubo.item.e || !tubo.item.de) return null;
+    var cat = tubo.cat;
+    if (!cat || !PDA.CAT || !PDA.CAT.juntas || !PDA.CAT.juntas[cat.familia]) return null;
+    var jid = conj && conj.junta ? conj.junta : PDA.CAT.juntaPadrao(cat);
+    var j = PDA.CAT.junta(cat, jid);
+    if (!j) return null;
+    var sig = C.SIGMA_ADM[tubo.material];
+    if (!sig) return null;
+    var e = Number(tubo.item.e), de = Number(tubo.item.de), dn = Number(tubo.item.dn) || 0;
+    if (!(e > 0) || !(de > e)) return null;
+    var fd = /^fd_/.test(tubo.material);
+    if (fd && j.id !== 'jgs') return null;             /* travada/flange: catálogo do fabricante */
+    if (!fd && j.id !== 'soldada' && j.id !== 'flg_aco') return null;
+    var eMin = fd ? e - (1.3 + 0.001 * dn) : e * 0.875;
+    if (!(eMin > 0) || !(de > eMin)) return null;
+    var pfa = 20 * eMin * sig / (de - eMin);
+    if (fd && j.id === 'jgs') pfa = Math.min(64, pfa);
+    pfa = Math.floor(pfa);
+    if (!(pfa > 0)) return null;
+    return {
+      mca: pfa * 10, bar: pfa, junta: j,
+      nota: fd
+        ? 'PFA de ' + pfa + ' bar adotada automaticamente: parede pela EN 545 com a espessura mínima de ' +
+          'fundição (σ = ' + sig + ' MPa)' + (pfa === 64 ? ', limitada aos 64 bar da junta elástica' : '') +
+          '. A junta elástica ' + j.rot.split(' — ')[0] + ' resiste a pressão igual ou superior à do corpo. ' +
+          'Anteprojeto — confirme a PFA por DN no catálogo do fabricante.'
+        : 'PFA de ' + pfa + ' bar adotada automaticamente pela expressão de Barlow/EN 545 com 87,5 % da ' +
+          'espessura (tolerância de laminação) e σ = ' + sig + ' MPa. Confirme com a especificação do tubo e da solda.'
+    };
+  };
+
+  /* Detalha de onde veio a pressão admissível adotada.
+     Prioridades: valor digitado pelo usuário > PN do catálogo > PFA
+     automática por material + junta > ausente. O valor auto-preenchido
+     pelo programa (conj.pnAuto !== false) continua contando como
+     automático — só o que o usuário digitou vira "informado". */
   C.pnInfo = function (conj, tubo) {
+    var auto = null;
+    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) {
+      auto = { mca: Number(tubo.item.pn) * 10, origem: 'catalogo',
+               nota: 'PN ' + tubo.item.pn + ' bar do catálogo "' + tubo.cat.nome + '".' };
+    } else {
+      var aj = C.pnAutoJunta(conj, tubo);
+      if (aj) auto = { mca: aj.mca, bar: aj.bar, origem: 'junta', nota: aj.nota };
+    }
     if (conj && conj.pnMcaOverride !== null && conj.pnMcaOverride !== undefined && conj.pnMcaOverride !== '') {
-      return { mca: Number(conj.pnMcaOverride), origem: 'informado',
+      var v = Number(conj.pnMcaOverride);
+      if (conj.pnAuto !== false && auto && Math.abs(v - auto.mca) < 0.5) return auto;
+      return { mca: v, origem: 'informado',
                nota: 'Valor informado no campo PN / PFA do trecho.' };
     }
-    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) {
-      return { mca: Number(tubo.item.pn) * 10, origem: 'catalogo',
-               nota: 'PN ' + tubo.item.pn + ' bar do catálogo "' + tubo.cat.nome + '".' };
-    }
+    if (auto) return auto;
+    var jSel = (tubo && tubo.cat && PDA.CAT && PDA.CAT.junta) ? PDA.CAT.junta(tubo.cat, conj && conj.junta) : null;
     return { mca: null, origem: 'ausente',
-             nota: 'O catálogo deste tubo não traz a pressão admissível. Informe-a no campo PN / PFA do trecho.' };
+             nota: jSel && jSel.ancora
+               ? 'A PFA da ' + jSel.rot.split(' — ')[0] + ' depende do DN e do fabricante — confirme no catálogo e informe no campo PN / PFA.'
+               : 'O catálogo deste tubo não traz a pressão admissível. Informe-a no campo PN / PFA do trecho.' };
   };
 
   /* Resistência do CORPO do tubo pela expressão da EN 545 / ISO 10803:
@@ -4776,7 +4946,13 @@ html.imprimindo-doc #doc-saida { display: block; }
     if (v === null || v === undefined || v === '' || isNaN(v)) return '—';
     if (!isFinite(v)) return '∞';
     var d = dec === undefined ? 2 : dec;
-    return Number(v).toFixed(d).replace('.', ',');
+    var s = Number(v).toFixed(d);
+    var neg = s.charAt(0) === '-';
+    if (neg) s = s.slice(1);
+    var partes = s.split('.');
+    /* ponto de milhar pt-BR: 1234567,89 → 1.234.567,89 */
+    var int = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (neg ? '-' : '') + int + (partes[1] ? ',' + partes[1] : '');
   };
 
   /* formatação com nº de casas adaptado à magnitude */
@@ -6448,30 +6624,37 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     if (op.adutora) {
       var tuboAtual = PDA.C.resolverTubo(conj, ctx);
-      var pnCat = tuboAtual && tuboAtual.item && tuboAtual.item.pn ? Number(tuboAtual.item.pn) * 10 : null;
       var pnInfo = PDA.C.pnInfo(conj, tuboAtual);
       var pfaCorpo = PDA.C.pfaCorpoBar(tuboAtual);
+      var pnAutoInfo = (function () {                     /* o que o programa adotaria sozinho */
+        if (tuboAtual && !tuboAtual.semDiametro && tuboAtual.item && tuboAtual.item.pn) {
+          return { mca: Number(tuboAtual.item.pn) * 10, origem: 'catalogo' };
+        }
+        var aj = PDA.C.pnAutoJunta(conj, tuboAtual);
+        return aj ? { mca: aj.mca, origem: 'junta' } : null;
+      })();
       corpo.push(UI.sub('Pressão admissível e cotas do trecho'));
       corpo.push(h('div', { class: 'grade' },
         UI.campo(st, 'PN / PFA do tubo (mca)', base + '.pnMcaOverride', {
           chave: pnInfo.mca === null,
-          editado: conj.pnMcaOverride !== null && conj.pnMcaOverride !== '' && conj.pnMcaOverride !== undefined,
-          placeholder: pnCat !== null ? UI.num(pnCat, 0) : 'informar',
+          editado: pnInfo.origem === 'informado',
+          placeholder: pnAutoInfo ? UI.num(pnAutoInfo.mca, 0) : 'informar',
           dica: 'Pressão de serviço admissível do tubo, em mca, usada para conferir a pressão em regime permanente e a sobrepressão do transitório.\n\n' +
                 pnInfo.nota +
-                (pnCat !== null ? '\n\nO campo é preenchido automaticamente quando o catálogo traz o PN; troque o valor se o seu fornecedor indicar outro.' : '') +
-                (pfaCorpo ? '\n\nA resistência do CORPO deste tubo, pela expressão da EN 545 (PFA = 20·e·σ/(DE−e), com σ = ' +
-                  PDA.C.SIGMA_ADM[tuboAtual.material] + ' MPa), é de ' + UI.num(pfaCorpo, 0) + ' bar. ' +
-                  'Na prática a pressão admissível do conjunto é limitada pela JUNTA e costuma ser bem menor — ' +
-                  'por isso o programa não adota esse número sozinho.' : '')
+                (pnAutoInfo ? '\n\nO campo é preenchido AUTOMATICAMENTE pelo material e pela junta escolhidos — troque o valor se o catálogo do seu fornecedor indicar outro.' : '') +
+                (pfaCorpo && pnInfo.origem !== 'junta' ? '\n\nReferência: a resistência do CORPO deste tubo pela EN 545 (PFA = 20·e·σ/(DE−e), σ = ' +
+                  PDA.C.SIGMA_ADM[tuboAtual.material] + ' MPa) é de ' + UI.num(pfaCorpo, 0) + ' bar — limite superior; a junta costuma governar.' : '')
         }),
-        F.seletorPFA(st, conj, base, tuboAtual, pfaCorpo),
+        F.seletorPFA(st, conj, base, tuboAtual, pfaCorpo, pnInfo),
         UI.check(st, 'Informar cotas deste trecho', base + '.usarCotas',
           { dica: 'Serve para traçar o perfil e verificar a pressão em cada nó. A cota final do ÚLTIMO trecho é a mesma "cota de chegada" da aba Bombas e níveis — o programa mantém as duas iguais automaticamente.' }),
         conj.usarCotas ? UI.campo(st, 'Cota inicial (m)', base + '.cotaIni',
           { title: 'Altitude absoluta do início do trecho' }) : null,
         conj.usarCotas ? UI.campo(st, 'Cota final (m)', base + '.cotaFim',
           { title: 'Altitude absoluta do fim do trecho' }) : null));
+      if (pnInfo.origem !== 'informado') {
+        corpo.push(h('p', { class: 'nota', style: 'margin-top:6px' }, pnInfo.nota));
+      }
     }
 
     corpo.push(UI.sub('Peças e conexões do trecho'));
@@ -6484,19 +6667,22 @@ html.imprimindo-doc #doc-saida { display: block; }
     return op.arr ? UI.blocoArrastavel(caixa, op.arr, op.i) : caixa;
   };
 
-  /* Escolha rápida da pressão admissível, quando o catálogo não traz PN */
-  F.seletorPFA = function (st, conj, base, tubo, pfaCorpo) {
-    if (tubo && tubo.item && tubo.item.pn) return null;   /* já vem do catálogo */
+  /* Escolha rápida da pressão admissível — só quando o programa não tem
+     como adotar um valor sozinho (junta travada, acoplamento ranhurado,
+     catálogo sem PN): serve para informar outro PN em um clique. */
+  F.seletorPFA = function (st, conj, base, tubo, pfaCorpo, pnInfo) {
+    var temAuto = !!(tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) ||
+                  !!PDA.C.pnAutoJunta(conj, tubo);
+    if (temAuto) return null;    /* o programa já adota a classe sozinho */
     var opcoes = [{ v: '', rot: '— escolher um degrau —' }].concat(
       PDA.C.DEGRAUS_PFA_BAR.map(function (b) {
         return { v: String(b * 10), rot: 'PN ' + b + ' bar   (' + (b * 10) + ' mca)' };
       }));
     var atual = conj.pnMcaOverride === null || conj.pnMcaOverride === undefined ? '' : String(conj.pnMcaOverride);
     return h('label', { class: 'campo' },
-      h('span', { class: 'rot' }, 'Preencher com um degrau normativo',
-        UI.dica('As classes K do ferro fundido dúctil não têm uma pressão admissível única: a PFA depende da classe, do DN e do tipo de junta, e o valor que governa costuma ser o da junta, não o da parede.\n\n' +
-                'Esta lista traz os degraus usuais de pressão da EN 545 para escolha rápida — ela NÃO diz qual deles se aplica ao seu DN. Confirme no catálogo do fabricante.\n\n' +
-                'Se o tubo for flangeado, prefira os catálogos "Flangeado PN 10/16/25/40": eles já trazem o PN e preenchem o campo sozinhos.' +
+      h('span', { class: 'rot' }, 'Informar um PN usual',
+        UI.dica('Para esta combinação de material e junta o programa não adota uma PFA sozinho: em junta travada (JTI/JTE) e em acoplamento ranhurado o valor depende do DN e do fabricante.\n\n' +
+                'Esta lista traz os degraus usuais de pressão da EN 545 para escolha rápida — ela NÃO diz qual deles se aplica ao seu DN. Confirme no catálogo do fabricante.' +
                 (pfaCorpo ? '\n\nReferência: a resistência do corpo deste tubo pela EN 545 é de ' + UI.num(pfaCorpo, 0) + ' bar — um limite superior, não a PFA do conjunto.' : ''))),
       h('select', { 'data-bind': base + '.pnMcaOverride', 'data-tipo': 'num', 'data-estrutural': '1' },
         opcoes.map(function (o) {
@@ -6560,10 +6746,16 @@ html.imprimindo-doc #doc-saida { display: block; }
         alertaCota ? F.blocoAviso(alertaCota) : null,
         outrosAvisos.map(function (a) { return F.blocoAviso(a); }),
 
-        PDA.Q.caixa('Como o programa entende as cotas',
-          PDA.Q.niveisCotas(st, ctx, cen),
-          'Os campos de cota pedem ALTITUDE ABSOLUTA, na mesma referência de nível do levantamento — ' +
-          'não profundidade nem altura em relação ao fundo do poço.')
+        (st.perfil && st.perfil.ativo && (st.perfil.pontos || []).length > 1 && res.envoltoria)
+          ? PDA.Q.caixa('Perfil da linha e envoltória de pressões',
+              PDA.Pf.grafico(st, ctx, res),
+              'Perfil lançado na aba Perfil da linha, com a linha piezométrica' +
+              (res.envoltoria.dh > 0 ? ' e as envoltórias do transitório SEM proteção' : '') +
+              '. O esquema simplificado de cotas continua na aba Bombas e níveis.')
+          : PDA.Q.caixa('Como o programa entende as cotas',
+              PDA.Q.niveisCotas(st, ctx, cen),
+              'Os campos de cota pedem ALTITUDE ABSOLUTA, na mesma referência de nível do levantamento — ' +
+              'não profundidade nem altura em relação ao fundo do poço.')
       ]);
     entrada.classList.add('destaque');
 
@@ -7114,11 +7306,12 @@ html.imprimindo-doc #doc-saida { display: block; }
             arr: 'adutoras', total: st.adutoras.length
           });
         })
-      ]),
-      F.cartaoGolpeEntrada(st, ctx, res)
+      ])
     ];
   };
 
+  /* Dados de entrada da pré-avaliação do golpe. É mostrado na aba
+     Transitório e proteção (era a parte de baixo da aba Adutora). */
   F.cartaoGolpeEntrada = function (st, ctx, res) {
     var anc = PDA.H.ancoragem.filter(function (a) { return a.id === (st.golpe.ancoragem || 'juntas'); })[0];
     return UI.cartao('Transitório hidráulico — dados de entrada',
@@ -7151,7 +7344,8 @@ html.imprimindo-doc #doc-saida { display: block; }
           'A pré-avaliação calcula o transitório da tubulação NUA: não considera tanque de alívio (TAU), chaminé ' +
           'de equilíbrio, válvula antecipadora de onda, ventosa de duplo efeito nem volante de inércia. ' +
           'Se a sobrepressão estourar a classe do tubo, o caminho usual não é engrossar a parede — é dimensionar ' +
-          'a proteção, e isso exige modelagem do transitório pelo método das características.')) : null
+          'a proteção, logo abaixo nesta aba; o dimensionamento final exige a modelagem do transitório pelo ' +
+          'método das características.')) : null
     ], UI.botaoFonte(['nbr12215']));
   };
 
@@ -8415,7 +8609,7 @@ html.imprimindo-doc #doc-saida { display: block; }
   function cartaoRequisito(st, ctx, res, req) {
     if (!req) {
       return UI.cartao('Requisito da proteção', null, h('div', { class: 'aviso info' },
-        'Avalie o golpe de aríete (aba Adutora) e, de preferência, lance o perfil da linha — o requisito da ' +
+        'Avalie o golpe de aríete (cartão acima) e, de preferência, lance o perfil da linha — o requisito da ' +
         'proteção sai da envoltória de pressões.'));
     }
     var corpo = [
@@ -8431,7 +8625,18 @@ html.imprimindo-doc #doc-saida { display: block; }
         req.dhAdmSobre !== null ? h('span', { class: 'chip' },
           h('b', {}, 'limite por sobrepressão: '), UI.num(req.dhAdmSobre, 1) + ' mca') : null,
         req.dhAdmSub !== null ? h('span', { class: 'chip' },
-          h('b', {}, 'limite por depressão: '), UI.num(req.dhAdmSub, 1) + ' mca') : null),
+          h('b', {}, 'limite por depressão: '), UI.num(req.dhAdmSub, 1) + ' mca') : null,
+        req.dhAdmSub === null && req.temAlivio && req.aliviadosSub > 0 ? h('span', { class: 'chip bom' },
+          h('b', {}, 'depressão: '), 'coberta pelos dispositivos lançados') : null),
+      req.temAlivio && req.aliviadosSub > 0 ? h('div', { class: 'aviso ok', style: 'margin-top:9px' },
+        h('b', {}, 'Os dispositivos conversam entre si. '),
+        'Ventosas de admissão, TAU e chaminé lançados cobrem a depressão em ' + req.aliviadosSub +
+        ' ponto(s) do perfil — esses pontos saíram do requisito de subpressão do RHO' +
+        (req.dhAdmSubBruto !== null && req.dhAdmSub !== null && req.dhAdmSub > req.dhAdmSubBruto + 0.05
+          ? ' (o limite por depressão subiu de ' + UI.num(req.dhAdmSubBruto, 1) + ' para ' +
+            UI.num(req.dhAdmSub, 1) + ' mca)'
+          : (req.dhAdmSub === null ? ' (a depressão deixou de governar o RHO)' : '')) +
+        ', e o volume necessário do RHO cai de acordo.') : null,
       req.permInviavel && req.permInviavel.length ? h('div', { class: 'aviso erro', style: 'margin-top:9px' },
         h('b', {}, 'Há ponto fora já em REGIME PERMANENTE — proteção de transitório não resolve isso. '),
         req.permInviavel.slice(0, 3).map(function (p) {
@@ -8534,7 +8739,10 @@ html.imprimindo-doc #doc-saida { display: block; }
               h('td', {}, h('b', {}, UI.num(rho.vTanque, 1) + ' m³'))))),
           UI.campo(st, 'Volume adotado (m³)', base + '.volumeM3',
             { placeholder: rho.comercial !== null ? UI.numEdit(rho.comercial) : 'escolher',
-              dica: 'Clique em um volume comercial na tabela ao lado, ou digite. O programa confere se o volume segura o Δh alvo.' })),
+              dica: 'Clique em um volume comercial na tabela ao lado, ou digite. O programa confere se o volume segura o Δh alvo.' }),
+          rho.subCoberta ? h('p', { class: 'nota', style: 'margin-top:4px' },
+            'A depressão está coberta pelas ventosas/TAU/chaminé lançados: o RHO é dimensionado só para a ' +
+            'sobrepressão — por isso o volume necessário caiu.') : null),
         h('div', { class: 'via' },
           h('h4', {}, 'Volumes comerciais', UI.dica('Série usual de vasos hidropneumáticos. ★ é o menor que atende ao requisito. A coluna Δh mostra a oscilação que cada volume seguraria nesta linha.')),
           UI.tabela([{ rot: 'Vaso', esq: true }, 'Δh que segura (mca)', 'Situação'], linhas))),
@@ -8638,22 +8846,30 @@ html.imprimindo-doc #doc-saida { display: block; }
     if (prot && prot.env) {
       var res2 = Object.assign({}, res, { envoltoria: prot.env });
       lados.push(h('div', { class: 'via' },
-        h('h4', {}, 'Com o RHO lançado (Δh ≈ ' + UI.num(prot.dh, 1) + ' mca) — estimada'),
-        PDA.Pf.grafico(st, ctx, res2)));
+        h('h4', {}, 'Com a proteção lançada (' + prot.rotulo + ') — estimada'),
+        PDA.Pf.grafico(st, ctx, res2),
+        prot.temRho ? h('p', { class: 'nota', style: 'margin-top:4px' },
+          'O RHO limita o Δh global a ≈ ' + UI.num(prot.dhSobre, 1) + ' mca na sobrepressão e ' +
+          UI.num(prot.dhSub, 1) + ' mca na depressão.') : h('p', { class: 'nota', style: 'margin-top:4px' },
+          'Sem RHO lançado a sobrepressão continua a do golpe sem proteção — os dispositivos lançados ' +
+          'aliviam a DEPRESSÃO nas suas zonas.')));
     } else {
       lados.push(h('div', { class: 'via' },
         h('h4', {}, 'Com proteção'),
         h('div', { class: 'aviso info' },
-          'Lance um RHO com volume adotado para o programa estimar a envoltória protegida e desenhá-la aqui, ' +
-          'lado a lado com a envoltória sem proteção.')));
+          'Lance qualquer dispositivo — RHO, ventosa, TAU ou chaminé — e o programa desenha aqui a envoltória ' +
+          'protegida estimada, lado a lado com a envoltória sem proteção. Cada dispositivo lançado atualiza a curva.')));
     }
     return UI.cartao('Envoltórias de pressão', 'Antes e depois da proteção',
       h('div', {},
         h('div', { class: 'blocos-vias' }, lados),
         h('p', { class: 'nota', style: 'margin-top:7px' },
-          'A envoltória protegida é ESTIMADA: aplica à mesma geometria o Δh que o RHO escolhido consegue ' +
-          'segurar pelo método da coluna rígida. TAU e ventosas protegem por zona (depressão) e não aparecem ' +
-          'nesta curva — o estudo de transiente pelo método das características é quem confirma tudo.')));
+          'A envoltória protegida é ESTIMADA e considera TODOS os dispositivos lançados: o RHO reduz o Δh global ' +
+          '(coluna rígida); ventosas de admissão (dupla, tríplice, quádrupla), TAU e chaminé seguram a envoltória ' +
+          'mínima em zero na sua zona de alívio (ventosa ±300 m, TAU até o fim da zona de depressão, chaminé ±150 m); ' +
+          'a chaminé também limita a envoltória máxima ao seu nível d\'água. Os dispositivos CONVERSAM: a depressão ' +
+          'coberta por ventosas/TAU sai do requisito do RHO, que pode ficar menor. O estudo de transiente pelo ' +
+          'método das características é quem confirma tudo.')));
   }
 
   /* ================================================================
@@ -8664,9 +8880,13 @@ html.imprimindo-doc #doc-saida { display: block; }
     var out = [];
     var pr = st.protecao;
 
-    out.push(UI.cartao('Transitório e proteção', 'Do "não passa sem proteção" ao anteprojeto dos dispositivos', [
+    /* dados de entrada da pré-avaliação (Joukowsky/Michaud) — era o
+       rodapé da aba Adutora, agora vive aqui */
+    out.push(PDA.F.cartaoGolpeEntrada(st, ctx, res));
+
+    out.push(UI.cartao('Estudo da proteção', 'Do "não passa sem proteção" ao anteprojeto dos dispositivos', [
       UI.check(st, 'Estudar a proteção contra o transitório desta linha', 'protecao.ativo', {
-        dica: 'A pré-avaliação (aba Adutora / Resultados) calcula a linha SEM proteção. Aqui o programa calcula quanto a proteção precisa limitar o golpe, sugere onde instalar cada dispositivo, pré-dimensiona RHO, TAU, chaminé e ventosas e estima a envoltória protegida.'
+        dica: 'A pré-avaliação acima calcula a linha SEM proteção. Aqui o programa calcula quanto a proteção precisa limitar o golpe, sugere onde instalar cada dispositivo, pré-dimensiona RHO, TAU, chaminé e ventosas e estima a envoltória protegida.'
       }),
       !pr.ativo ? h('p', { class: 'nota', style: 'margin-top:9px' },
         'Com a opção desligada nada muda no restante do programa. A pré-avaliação sem proteção continua na aba Resultados.') : null
@@ -8675,7 +8895,7 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     if (!st.golpe.avaliar) {
       out.push(UI.cartao('Golpe de aríete desligado', null, h('div', { class: 'aviso erro' },
-        'A pré-avaliação do golpe está desligada na aba Adutora / Recalque — ligue-a para o estudo de proteção ter o Δh de partida.')));
+        'A pré-avaliação do golpe está desligada no cartão acima — ligue "Avaliar golpe de aríete" para o estudo de proteção ter o Δh de partida.')));
       return out;
     }
 
@@ -9156,7 +9376,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     return UI.cartao('Transitório hidráulico — pré-avaliação',
       'Sobrepressão estimada e conferência da classe de pressão', [
       UI.tabela([{ rot: 'Trecho', esq: true }, { rot: 'Material', esq: true }, 'E (GPa)',
-                 { rot: 'ψ', dica: 'Coeficiente de ancoragem longitudinal, do caso escolhido na aba Adutora. ψ = 1 para tubo com juntas de dilatação; 1 − ν/2 ancorado só a montante; 1 − ν² ancorado em todo o comprimento (o caso mais desfavorável).' },
+                 { rot: 'ψ', dica: 'Coeficiente de ancoragem longitudinal, do caso escolhido na aba Transitório e proteção. ψ = 1 para tubo com juntas de dilatação; 1 − ν/2 ancorado só a montante; 1 − ν² ancorado em todo o comprimento (o caso mais desfavorável).' },
                  'e (mm)', 'v (m/s)',
                  { rot: 'Celeridade (m/s)', dica: 'a = 1/√[ρ(1/K + ψD/(eE))], com K = 2,19 GPa para a água. Quanto mais rígido o tubo, maior a celeridade e maior a sobrepressão.' },
                  { rot: 'tc = 2L/a (s)', dica: 'Tempo crítico: o tempo que a onda leva para ir até a extremidade e voltar. Se a manobra for mais rápida que isso, vale a sobrepressão integral de Joukowsky.' },
@@ -10269,8 +10489,8 @@ html.imprimindo-doc #doc-saida { display: block; }
     if (/\.pnMcaOverride$/.test(bind)) {
       var conjPN = UI.get(App.st, bind.replace('.pnMcaOverride', ''));
       if (conjPN) conjPN.pnAuto = false;
-    } else if (/\.(catalogoId|itemRot)$/.test(bind)) {
-      App.autoPreencherPN(bind.replace(/\.(catalogoId|itemRot)$/, ''));
+    } else if (/\.(catalogoId|itemRot|junta)$/.test(bind)) {
+      App.autoPreencherPN(bind.replace(/\.(catalogoId|itemRot|junta)$/, ''));
     }
 
     /* cota de chegada e cota final do último trecho são o mesmo número:
@@ -10610,19 +10830,22 @@ html.imprimindo-doc #doc-saida { display: block; }
     }
   };
 
-  /* Preenche o PN do trecho com o do catálogo, quando houver. Só age
-     enquanto o usuário não tiver informado um valor próprio. */
+  /* Preenche o PN do trecho: com o do catálogo quando houver, senão com a
+     PFA automática por material + junta (EN 545 / Barlow). Só age enquanto
+     o usuário não tiver informado um valor próprio. */
   App.autoPreencherPN = function (caminhoConj) {
     var conj = UI.get(App.st, caminhoConj);
     if (!conj || conj.pnAuto === false) return;
     var ctx;
     try { ctx = PDA.C.contexto(App.st, App.cats); } catch (e) { return; }
     var tubo = PDA.C.resolverTubo(conj, ctx);
-    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn && conj.itemRot) {
+    if (!tubo || tubo.semDiametro || !conj.itemRot) { conj.pnMcaOverride = null; return; }
+    if (tubo.item && tubo.item.pn) {
       conj.pnMcaOverride = Number(tubo.item.pn) * 10;
-    } else {
-      conj.pnMcaOverride = null;
+      return;
     }
+    var aj = PDA.C.pnAutoJunta(conj, tubo);
+    conj.pnMcaOverride = aj ? aj.mca : null;
   };
 
   /* Aplica o preenchimento automático a todos os trechos de adutora */
@@ -12107,6 +12330,12 @@ html.imprimindo-doc #doc-saida { display: block; }
         (req.precisa ? ' — a proteção é NECESSÁRIA, governada pela ' + req.governante + '.'
                      : ' — a envoltória sem proteção já atende, e os dispositivos ficam a critério de projeto.'));
 
+    if (req.temAlivio && req.aliviadosSub > 0) {
+      D.p('Os dispositivos interagem no requisito: ventosas de admissão, TAU e chaminé lançados cobrem a ' +
+          'depressão em ' + req.aliviadosSub + ' ponto(s) do perfil, que saem do requisito de subpressão do ' +
+          'reservatório hidropneumático — o volume necessário do RHO reduz-se de acordo.');
+    }
+
     var disp = (st.protecao.dispositivos || []);
     if (!disp.length) {
       D.p('Nenhum dispositivo foi lançado nesta etapa.');
@@ -12172,9 +12401,11 @@ html.imprimindo-doc #doc-saida { display: block; }
     var prot = PR.envoltoriaProtegida(st, ctx, res);
     if (prot && prot.env && PDA.Pf) {
       var res2 = Object.assign({}, res, { envoltoria: prot.env });
-      D.figura('Envoltória de pressões com a proteção lançada (estimada, Δh ≈ ' + n(prot.dh, 1) + ' mca)',
+      D.figura('Envoltória de pressões com a proteção lançada (estimada: ' + prot.rotulo + ')',
         PDA.Pf.grafico(st, ctx, res2),
-        'Elaborado pelo programa: a mesma envoltória, com o Δh que o RHO adotado consegue limitar pelo método da coluna rígida.');
+        'Elaborado pelo programa: a mesma envoltória, considerando todos os dispositivos lançados — o RHO ' +
+        'limita o Δh global pelo método da coluna rígida e as ventosas de admissão, TAU e chaminé seguram a ' +
+        'envoltória mínima na sua zona de alívio.');
     }
 
     D.p('Este é um estudo de anteprojeto: define os dispositivos, os pontos de instalação e a ordem de ' +
