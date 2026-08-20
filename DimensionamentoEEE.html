@@ -2483,6 +2483,111 @@ html.imprimindo-doc #doc-saida { display: block; }
     'prevalece o maior valor entre esse mínimo e o NA mínimo exigido pelo fabricante para a refrigeração ' +
     'do motor.';
 
+  /* ================================================================
+     Conformidade normativa — limiares de verificação
+     Valores levantados na NBR 12208/12209 e nos manuais SANEPAR/SABESP;
+     os de origem em manual de concessionária ou prática estão indicados
+     e podem ser editados por projeto.
+     ================================================================ */
+
+  DE.conf = {
+    qGradeMecanizadaLs: 100,   /* NBR 12209:2011 — exceto a grade grossa, limpeza mecanizada
+                                  quando a QMH de fim de plano >= 100 L/s */
+    qDesarMecanizadoLs: 250,   /* NBR 12209:2011 — remoção de areia mecanizada quando Q >= 250 L/s */
+    qMedidorLs: 2.5,           /* SANEPAR MPS 11.1 — medidor eletromagnético no recalque quando Q > 2,5 L/s */
+    qCompactaLs: 5,            /* SANEPAR MPS 11.1 — até 5 L/s avaliar EEE compacta padronizada */
+    pesoIcamentoKg: 25,        /* SANEPAR MPS 11.1 — peça > 25 kgf exige estrutura de içamento */
+    autonomiaExtravMinH: 2     /* prática (SABESP/GRAPROHAB): acumulação >= 2 h sobre a Q média
+                                  quando não há extravasor licenciado */
+  };
+
+  DE.fonteConf = 'ABNT NBR 12209:2011: exceto a grade grossa, a grade de barras deve ser de limpeza ' +
+    'mecanizada quando a vazão máxima afluente de FIM DE PLANO for igual ou superior a 100 L/s — e, sendo ' +
+    'mecanizada, são exigidas no mínimo 2 unidades, cada uma com capacidade para a vazão total, podendo uma ' +
+    'delas ser grade de limpeza manual usada como reserva/by-pass. A remoção de areia do desarenador deve ser ' +
+    'mecanizada quando a vazão de dimensionamento for igual ou superior a 250 L/s.\n\n' +
+    'ABNT NBR 12208: mínimo de 2 conjuntos motobomba, com a unidade de maior capacidade fora de operação as ' +
+    'restantes devem atender a vazão máxima; extravasão somente com anuência prévia do órgão ambiental; na falta ' +
+    'de extravasor licenciado, prever fonte de energia de emergência (gerador fixo, tomada para gerador móvel ou ' +
+    'segunda alimentação) ou volume de acumulação.\n\n' +
+    'SANEPAR MPS 11.1: medidor eletromagnético no recalque quando Q > 2,5 L/s; EEE compacta até 5 L/s; câmaras ' +
+    'de sucção independentes por bomba (submersível em poço úmido), comunicadas por válvulas; equipamento com ' +
+    'mais de 25 kgf exige estrutura de içamento; duplo gradeamento no canal principal (1ª grade 20–30 mm, ' +
+    '2ª 15–20 mm) e canal reserva com grade de 20 mm.\n\n' +
+    'SABESP (NTS 020 e prática): em unidades maiores, arranjo usual de 2 canais mecanizados operando + 1 canal ' +
+    'de by-pass com grade manual, isoláveis por stop-logs.';
+
+  /* ================================================================
+     Resíduos: caçambas, taxas e acesso
+     ================================================================ */
+
+  DE.cacambasRollOn = [10, 15, 20, 25, 30];
+  DE.residuos = {
+    fatorEnchimentoAreia: 0.65,   /* areia limita por PESO: encher só até ~65 % */
+    densGradeado: 800,            /* kg/m³ — gradeado desaguado (600 a 950) */
+    densAreia: 1550,              /* kg/m³ — areia úmida (1400 a 1700) */
+    cargaPoliguindasteKg: 5000,   /* convencional; reforçado ~10 t */
+    autonomiaDiasPadrao: 7,       /* retirada semanal — máximo sanitário prático */
+    autonomiaDiasMin: 3
+  };
+  DE.fonteResiduos = 'Volumes comerciais de caçambas estacionárias (poliguindaste): 3, 4, 5, 7 e 10 m³; ' +
+    'roll-on/roll-off: 10 a 30 m³ (catálogos nacionais). Massa específica: gradeado desaguado 600–950 kg/m³; ' +
+    'areia úmida 1.400–1.700 kg/m³ — a caçamba de areia limita pelo PESO (poliguindaste convencional ~5 t): ' +
+    'adotar enchimento máximo de ~65 %. Autonomia usual de projeto: 7 dias na vazão média (retirada semanal), ' +
+    'nunca menos de 3 dias; prever 1 caçamba reserva (N+1). Acesso do caminhão poliguindaste: faixa >= 3,5 m ' +
+    '(recomendado 4,0 m), gabarito vertical livre >= 4,5 m na baia, raio de giro externo ~10,7 m, reta de ' +
+    'aproximação de ré ~10 m e piso de concreto na baia, com contenção e ralo do percolado retornando ao poço ' +
+    '(SANEPAR MPS 11.2). Caçamba fechada com tampa, estanque, com dreno DN 50 (NBR 14728 e prática).';
+
+  /* ================================================================
+     Monovia, talha, trole e guias
+     ================================================================ */
+
+  DE.talhasEletricas = [125, 250, 500, 1000, 2000, 3000, 5000];
+  DE.monovia = {
+    coefImpacto: { manual: 1.10, eletrica: 1.25 },   /* NBR 8400 / CMAA 74 */
+    folgaSelecaoTalha: 1.25,                          /* capacidade >= carga içada × 1,25 */
+    alturaVigaMinM: 3.0,
+    headroomM: 0.6,
+    eletricaSe: { cargaKg: 500, elevacaoM: 6 },
+    troleEletricoSe: { cargaKg: 2000, percursoM: 8 },
+    ponteRolanteSe: { cargaKg: 5000, carga2dKg: 3000, vaoM: 8 },
+    /* perfis W (Gerdau, ASTM A572 Gr50) indicativos por capacidade × vão,
+       viga biapoiada, flecha L/600 — VERIFICAÇÃO ESTRUTURAL OBRIGATÓRIA */
+    perfis: {
+      500:  { 3: 'W150×13,0', 4: 'W150×18,0', 5: 'W200×19,3', 6: 'W200×26,6' },
+      1000: { 3: 'W150×18,0', 4: 'W200×19,3', 5: 'W250×25,3', 6: 'W250×32,7' },
+      2000: { 3: 'W200×26,6', 4: 'W250×32,7', 5: 'W310×32,7', 6: 'W310×38,7' },
+      3000: { 3: 'W250×32,7', 4: 'W310×38,7', 5: 'W310×44,5', 6: 'W310×52,0' },
+      5000: { 3: 'W310×44,5', 4: 'W310×52,0', 5: 'W360×57,8', 6: 'W360×64,0' }
+    }
+  };
+  DE.fonteMonovia = 'Talhas de corrente comerciais: manuais de 250 a 5.000 kg (elevação padrão 3 m); ' +
+    'elétricas de 125 a 6.300 kg, elevações 3/6/9/12 m. Seleção: capacidade >= carga içada × 1,25, ' +
+    'arredondada para a capacidade comercial acima; preferir talha ELÉTRICA quando a carga passa de 500 kg, ' +
+    'a elevação passa de 6 m ou o uso é frequente. Viga de monovia: carga de cálculo = (capacidade + peso da ' +
+    'talha/trole) × coeficiente de impacto (1,10 manual; 1,25 elétrica — ABNT NBR 8400 / CMAA 74), flecha ' +
+    'limite L/600; perfis W indicativos do artigo "Monovias com Perfis Estruturais Gerdau" (ABCEM ed. 82 — ' +
+    'exemplo 5 t × 4 m → W310×52,0). DIMENSIONAMENTO INDICATIVO: a verificação estrutural (NBR 8800, flambagem ' +
+    'lateral, flexão da mesa inferior sob o trole, apoios) é obrigatória. Trole: manual de empurrar até ' +
+    '~2.000 kg e percurso <= 6 m; de engrenagem até 5.000 kg; elétrico para carga >= 2.000 kg ou percurso ' +
+    '> 8 m. Ponte rolante quando a carga passa de ~5 t (ou ~3 t com posicionamento em duas direções); turco ' +
+    'giratório (davit) de 250–1.000 kg é alternativa em EEE pequenas. SANEPAR MPS 11.1: equipamento com mais ' +
+    'de 25 kgf exige estrutura de içamento (talha removível após o uso).';
+
+  /* tubo-guia duplo de bombas submersíveis, por peso da bomba */
+  DE.tubosGuia = [
+    { pesoMaxKg: 80,    rot: '2 × Ø 3/4″ a 1″' },
+    { pesoMaxKg: 250,   rot: '2 × Ø 1.1/4″ a 2″' },
+    { pesoMaxKg: 800,   rot: '2 × Ø 2″ a 3″' },
+    { pesoMaxKg: 99999, rot: '2 × Ø 3″' }
+  ];
+  DE.fonteGuias = 'Sistema de acoplamento automático com pedestal e tubo-guia duplo (padrão Flygt/Sulzer/' +
+    'KSB/Ebara): 2 × 3/4″–1″ até ~80 kg; 2 × 1.1/4″–2″ até ~250 kg; 2 × 2″–3″ até ~800 kg; 2 × 3″ acima. ' +
+    'Aço galvanizado a fogo ou inox AISI 304/316; suporte intermediário a cada ~3,5 m em poços profundos; ' +
+    'espaçamento entre tubos e furação da garra conforme o fabricante da bomba. Guias do cesto: perfil U de ' +
+    '2″ a 4″ (ou cantoneiras L 50×50×5 / L 75×75×6) em inox 304, folga de 5–10 mm por lado.';
+
   PDA.DE = DE;
 })(window.PDA = window.PDA || {});
 
@@ -2602,6 +2707,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       /* ------- estação elevatória de esgoto ------- */
       eee: {
         ativo: true,
+        concessionaria: 'nenhuma',   /* 'nenhuma' | 'sanepar' | 'sabesp' — liga verificações extras */
         vazoes: {
           modo: 'qmh', unid: 'L/s', qmhFim: 100,
           k1: 1.2, k2: 1.5, kMin: 0.5, fracInicio: 50, fracMeio: 75,
@@ -2614,7 +2720,20 @@ html.imprimindo-doc #doc-saida { display: block; }
           }
         },
         chegada: { cotaTerreno: null, cotaGI: null, dnAfluenteMm: 400, degrauEntradaM: 0.05 },
-        canal: { larguraM: 0.6, alturaM: null, bordaLivreM: 0.3 },
+        canal: { larguraM: 0.6, alturaM: null, bordaLivreM: 0.3, nCanais: 1, nReserva: 0, comportas: true },
+        bypass: {
+          canal: 'auto',            /* 'auto' | 'sim' | 'nao' — canal de by-pass do gradeamento */
+          reservaGrade: 'manual',   /* grade do canal reserva: 'manual' | 'mecanizada' */
+          extravasor: 'nao',        /* 'nao' | 'sim' — extravasor / by-pass geral da estação */
+          cotaExtravasorM: null, destinoExtravasor: '', anuenciaAmbiental: false,
+          energia: 'nenhuma'        /* 'nenhuma' | 'gerador_fixo' | 'tomada_gerador' | 'dupla_alimentacao' */
+        },
+        residuos: {
+          cacambaTipo: 'auto',      /* 'auto' | 'estacionaria' | 'rollon' */
+          cacambaM3: null, cacambaReserva: true,
+          monovia: { usar: true, vaoM: 4, percursoM: null, alturaVigaM: null, profPocoM: null,
+                     cargaBombaKg: null, cargaExtraKg: null, talhaTipo: 'auto' }
+        },
         grade: {
           arranjo: 'grades',
           niveis: [
@@ -2632,6 +2751,24 @@ html.imprimindo-doc #doc-saida { display: block; }
                    barraMm: 6.35, altUtilM: 0.35, pesoCestoKg: null }
         },
         parshall: { usar: true, escolhida: '', zAuto: true, zM: null },
+        /* séries desenhadas no perfil hidráulico: quais vazões de quais
+           fases aparecem, e com que cor */
+        perfilCfg: {
+          series: [
+            { fase: 'inicio', tipo: 'min',  ativo: true,  cor: '#B07D10' },
+            { fase: 'inicio', tipo: 'med',  ativo: false, cor: '#C89A3A' },
+            { fase: 'inicio', tipo: 'maxd', ativo: false, cor: '#8C6D1F' },
+            { fase: 'inicio', tipo: 'maxh', ativo: false, cor: '#6E5A1E' },
+            { fase: 'meio',   tipo: 'min',  ativo: false, cor: '#B06410' },
+            { fase: 'meio',   tipo: 'med',  ativo: false, cor: '#7C4DBE' },
+            { fase: 'meio',   tipo: 'maxd', ativo: false, cor: '#9B59B6' },
+            { fase: 'meio',   tipo: 'maxh', ativo: false, cor: '#5B3E8C' },
+            { fase: 'fim',    tipo: 'min',  ativo: false, cor: '#C0392B' },
+            { fase: 'fim',    tipo: 'med',  ativo: true,  cor: '#2563B0' },
+            { fase: 'fim',    tipo: 'maxd', ativo: false, cor: '#1E8449' },
+            { fase: 'fim',    tipo: 'maxh', ativo: true,  cor: '#0E6F66' }
+          ]
+        },
         desarenador: {
           usar: true, tipo: 'canal', nUnidades: 2, reservaLimpeza: true,
           vAlvo: 0.30, largM: null, compM: null, profCanaleta: 0.30, tesAlvo: null,
@@ -2645,7 +2782,8 @@ html.imprimindo-doc #doc-saida { display: block; }
           alturaUtilM: null, naMaxOverride: null, degrauEntradaM: 0.10,
           dnBocaMm: 200, altMotorM: null, submergOverrideM: null,
           cotaFundoOverride: null, cotaLajeOverride: null,
-          bordaLivreM: 0.5, aplicarCotas: true
+          bordaLivreM: 0.5, aplicarCotas: true,
+          passagemSolidosMm: null   /* passagem de sólidos da bomba (catálogo) — cruza com a grade */
         }
       },
       calculo: {
@@ -3944,6 +4082,25 @@ html.imprimindo-doc #doc-saida { display: block; }
      largura b. Kirschmer usa a velocidade de APROXIMAÇÃO v0.
      ================================================================ */
 
+  /* canais de gradeamento em paralelo: total, reserva e em operação */
+  CE.canais = function (st) {
+    var n = Math.max(1, Math.round(Number(st.eee.canal.nCanais) || 1));
+    var res = Math.max(0, Math.min(n - 1, Math.round(Number(st.eee.canal.nReserva) || 0)));
+    return { n: n, reserva: res, oper: n - res };
+  };
+
+  /* vazões por canal em operação (grades e canal trabalham com Q/n) */
+  CE.vazPorCanal = function (vaz, nOper) {
+    if (!(nOper > 1)) return vaz;
+    return {
+      fases: vaz.fases, ativas: vaz.ativas, unid: vaz.unid,
+      k1: vaz.k1, k2: vaz.k2, k3: vaz.k3,
+      qDim: vaz.qDim / nOper, qMedFim: vaz.qMedFim / nOper,
+      qMinRef: vaz.qMinRef / nOper, qMedRef: vaz.qMedRef / nOper,
+      qmhInicio: vaz.qmhInicio / nOper
+    };
+  };
+
   CE.calcGrade = function (nivel, b, laminas, vaz) {
     var barra = DE.barraPorId(nivel.barraId);
     var t = pos(nivel.espessuraMm) || barra.tMm;              /* espessura da barra */
@@ -4243,6 +4400,29 @@ html.imprimindo-doc #doc-saida { display: block; }
      e o fundo do canal desce em degraus que compensam essas perdas.
      ================================================================ */
 
+  /* Séries de vazão do perfil: além das três de referência (mín/méd/QMH do
+     horizonte), o usuário escolhe quais vazões de quais fases quer ver
+     desenhadas, cada uma com a sua cor. */
+  CE.seriesPerfil = function (st, vaz) {
+    var cfg = (st.eee.perfilCfg && st.eee.perfilCfg.series) || [];
+    var rotF = { inicio: 'início', meio: 'meio', fim: 'fim' };
+    var rotT = { min: 'Qmín', med: 'Qméd', maxd: 'Qmáx,d', maxh: 'QMH' };
+    var out = [];
+    cfg.forEach(function (s) {
+      if (!s.ativo) return;
+      var c = vaz.fases[s.fase] && vaz.fases[s.fase][s.tipo];
+      if (!c || !(c.v > 0)) return;
+      out.push({
+        key: s.fase + '_' + s.tipo, fase: s.fase, tipo: s.tipo,
+        rot: rotT[s.tipo] + ' — ' + rotF[s.fase] + ' de plano',
+        rotCurto: rotT[s.tipo] + ' ' + rotF[s.fase],
+        Q: c.v, est: c.est, cor: s.cor || '#0E6F66',
+        traco: s.fase === 'fim' ? '' : (s.fase === 'meio' ? '7 4' : '3 3')
+      });
+    });
+    return out;
+  };
+
   CE.perfilEntrada = function (st, vaz, grades, parshall, desarenador) {
     var ch = st.eee.chegada;
     var canal = st.eee.canal;
@@ -4253,14 +4433,28 @@ html.imprimindo-doc #doc-saida { display: block; }
     var pontos = [];   /* de montante para jusante */
     var z = desarenador.z || 0;
 
+    /* conjunto de vazões acompanhadas: as três de referência do horizonte
+       (usadas nas verificações) mais as séries escolhidas para o desenho */
+    var series = CE.seriesPerfil(st, vaz);
+    var qq = { min: vaz.qMinRef, med: vaz.qMedFim, max: vaz.qDim };
+    series.forEach(function (s) { qq[s.key] = s.Q; });
+    var chaves = Object.keys(qq);
+
+    /* canais em paralelo: cada canal em operação conduz Q/n; a Parshall e o
+       desarenador continuam recebendo a vazão total */
+    var nOperC = CE.canais(st).oper;
+
     /* lâminas na seção do desarenador / Parshall */
-    var lamJus = usarParshall
-      ? { min: desarenador.lamina.min, med: desarenador.lamina.med, max: desarenador.lamina.max }
-      : (function () {
-          /* sem Parshall: admite escoamento com a velocidade-alvo do canal */
-          var v = 0.6;
-          return { min: vaz.qMinRef / (b * v), med: vaz.qMedFim / (b * v), max: vaz.qDim / (b * v) };
-        })();
+    var lamJus = {};
+    if (usarParshall) {
+      var calhaSel = parshall.escolhida.calha;
+      chaves.forEach(function (k) {
+        lamJus[k] = Math.max(0.005, DE.parshallHa(calhaSel, qq[k]) - z);
+      });
+    } else {
+      /* sem Parshall: admite escoamento com a velocidade-alvo do canal */
+      chaves.forEach(function (k) { lamJus[k] = qq[k] / nOperC / (b * 0.6); });
+    }
 
     /* monta a cadeia de montante p/ jusante: chegada -> grades -> desarenador -> parshall -> poço */
     var seq = [];
@@ -4280,37 +4474,36 @@ html.imprimindo-doc #doc-saida { display: block; }
        lâmina irrealmente rasa: cada degrau vira uma queda livre e a seção de
        montante passa a escoar na PROFUNDIDADE CRÍTICA — que é o piso físico
        imposto a cada ponto: y >= yc = ((Q/b)²/g)^(1/3). */
-    var qq = { min: vaz.qMinRef, med: vaz.qMedFim, max: vaz.qDim };
     function yCritica(Q) { return Math.pow((Q / b) * (Q / b) / 9.80665, 1 / 3); }
-    var lam = { min: lamJus.min, med: lamJus.med, max: lamJus.max };
+    var lam = {};
+    chaves.forEach(function (k) { lam[k] = lamJus[k]; });
     var fundoRel = 0;   /* cota relativa do fundo do desarenador (referência local) */
     for (var i = seq.length - 1; i >= 0; i--) {
       var p = seq[i];
       /* piso físico: profundidade crítica (no desarenador a lâmina é a
          imposta pela Parshall, Ha − z, e não se aplica o piso do canal) */
       if (p.id !== 'desarenador') {
-        ['min', 'med', 'max'].forEach(function (k) {
-          var yc = yCritica(qq[k]);
+        chaves.forEach(function (k) {
+          var yc = yCritica(qq[k] / nOperC);
           if (!(lam[k] > yc)) lam[k] = yc;
         });
       }
-      p.lamina = { min: lam.min, med: lam.med, max: lam.max };
+      p.lamina = {};
+      chaves.forEach(function (k) { p.lamina[k] = lam[k]; });
       p.fundoRel = fundoRel;
       if (p.grade) {
         /* a perda adotada refere-se à QMH; nas demais vazões escala com Q² */
         var hf = p.grade.hf.adotada;
-        lam = {
-          min: lam.min + hf * Math.pow(qq.min / qq.max, 2),
-          med: lam.med + hf * Math.pow(qq.med / qq.max, 2),
-          max: lam.max + hf
-        };
+        chaves.forEach(function (k) {
+          lam[k] = lam[k] + hf * Math.pow(qq[k] / qq.max, 2);
+        });
       }
       /* subindo para o trecho de montante, o fundo sobe o degrau lançado após aquele trecho */
       if (i > 0) {
         fundoRel += seq[i - 1].degrauApos;
-        lam = { min: Math.max(0.005, lam.min - seq[i - 1].degrauApos),
-                med: Math.max(0.005, lam.med - seq[i - 1].degrauApos),
-                max: Math.max(0.005, lam.max - seq[i - 1].degrauApos) };
+        chaves.forEach(function (k) {
+          lam[k] = Math.max(0.005, lam[k] - seq[i - 1].degrauApos);
+        });
       }
     }
 
@@ -4321,18 +4514,17 @@ html.imprimindo-doc #doc-saida { display: block; }
     seq.forEach(function (p) {
       p.fundo = temCota ? p.fundoRel + deltaAbs : null;
       p.na = {};
-      ['min', 'med', 'max'].forEach(function (k) {
+      chaves.forEach(function (k) {
         p.na[k] = temCota ? p.fundo + p.lamina[k] : null;
       });
       /* no desarenador a seção é a do próprio desarenador (largura b e nº de
-         unidades dele); nos demais pontos, a do canal */
-      var bSec = b, nSec = 1;
-      if (p.id === 'desarenador' && desarenador.b > 0) { bSec = desarenador.b; nSec = desarenador.nOper || 1; }
-      p.v = {
-        min: vaz.qMinRef / (nSec * bSec * p.lamina.min),
-        med: vaz.qMedFim / (nSec * bSec * p.lamina.med),
-        max: vaz.qDim / (nSec * bSec * p.lamina.max)
-      };
+         unidades dele); nos demais pontos, a de UM canal em operação */
+      var bSec = b, nSec = nOperC;
+      if (p.id === 'desarenador') { bSec = desarenador.b > 0 ? desarenador.b : b; nSec = desarenador.nOper || 1; }
+      p.v = {};
+      chaves.forEach(function (k) {
+        p.v[k] = qq[k] / (nSec * bSec * p.lamina[k]);
+      });
       pontos.push(p);
     });
 
@@ -4348,7 +4540,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     }
 
     return {
-      b: b, pontos: pontos, seq: seq, temCota: temCota,
+      b: b, pontos: pontos, seq: seq, temCota: temCota, series: series, qq: qq,
       fundoChegada: temCota ? fundoChegada : null,
       fundoDesarenador: fundoDesar, saida: saida,
       altCanal: pos(canal.alturaM) ||
@@ -4373,8 +4565,10 @@ html.imprimindo-doc #doc-saida { display: block; }
     var Tsistema = Tmotor / nAltern;                    /* com rodízio, o sistema pode ciclar mais rápido */
     var volMinCiclo = Tsistema * qBomba / 4;            /* V = T·Q/4 */
 
-    /* volume máximo por detenção (sobre a menor vazão do horizonte) */
-    var volMaxDetencao = (crit.detencaoMaxMin * 60) * (vaz.qMinRef || vaz.qMedFim || 0);
+    /* volume máximo por detenção — NBR 12208 / MPS SANEPAR: tempo de detenção
+       sobre a vazão MÉDIA de início de plano, limitado a 30 min */
+    var qDetencao = vaz.qMedRef || vaz.qMedFim || 0;
+    var volMaxDetencao = (crit.detencaoMaxMin * 60) * qDetencao;
 
     /* geometria */
     var camaras = p.camaras === 'porBomba' ? nInst : 1;
@@ -4434,7 +4628,8 @@ html.imprimindo-doc #doc-saida { display: block; }
       subidaIni: minutos(volUtil, vaz.qmhInicio),
       subidaFim: minutos(volUtil, vaz.qDim),
       descida: (nOp * qBomba - vaz.qMedFim) > 0 ? volUtil / (nOp * qBomba - vaz.qMedFim) / 60 : Infinity,
-      detencaoIni: minutos(volUtil, vaz.qMinRef),
+      detencaoNorma: minutos(volUtil, qDetencao),         /* Qméd de início de plano — critério da norma */
+      detencaoIni: minutos(volUtil, vaz.qMinRef),          /* Qmín do horizonte — informativo, mais severo */
       detencaoFim: minutos(volUtil, vaz.fases.fim.min.v || vaz.qMinRef),
       cicloMin: qBomba > 0 ? 4 * (volUtil / camaras) / qBomba / 60 : Infinity
     };
@@ -4443,9 +4638,10 @@ html.imprimindo-doc #doc-saida { display: block; }
     function chk(ok, atencao, txt) { checks.push({ ok: ok, atencao: !ok && atencao, txt: txt }); }
     chk(volUtil >= volMinTotal - 1e-9, volUtil >= volMinTotal * 0.95,
       'volume útil ' + volUtil.toFixed(2).replace('.', ',') + ' m³ ≥ mínimo de ciclo ' + volMinTotal.toFixed(2).replace('.', ',') + ' m³');
-    chk(volMaxDetencao <= 0 || tempos.detencaoIni <= crit.detencaoMaxMin + 1e-9, tempos.detencaoIni <= crit.detencaoMaxMin * 1.5,
-      'detenção na menor vazão = ' + (isFinite(tempos.detencaoIni) ? tempos.detencaoIni.toFixed(1).replace('.', ',') : '—') +
-      ' min (limite ' + crit.detencaoMaxMin + ' min — septicidade)');
+    chk(volMaxDetencao <= 0 || tempos.detencaoNorma <= crit.detencaoMaxMin + 1e-9, tempos.detencaoNorma <= crit.detencaoMaxMin * 1.5,
+      'detenção na Q média de início de plano = ' + (isFinite(tempos.detencaoNorma) ? tempos.detencaoNorma.toFixed(1).replace('.', ',') : '—') +
+      ' min (limite ' + crit.detencaoMaxMin + ' min — NBR 12208 / MPS SANEPAR; na Qmín do horizonte: ' +
+      (isFinite(tempos.detencaoIni) ? tempos.detencaoIni.toFixed(1).replace('.', ',') : '—') + ' min)');
     chk(tempos.cicloMin * 60 >= Tsistema - 1, tempos.cicloMin * 60 >= Tsistema * 0.9,
       'ciclo mínimo = ' + (isFinite(tempos.cicloMin) ? tempos.cicloMin.toFixed(1).replace('.', ',') : '—') +
       ' min × admissível ' + (Tsistema / 60).toFixed(1).replace('.', ',') + ' min (' + partidas + ' partidas/h' +
@@ -4472,6 +4668,325 @@ html.imprimindo-doc #doc-saida { display: block; }
   };
 
   /* ================================================================
+     Conformidade normativa: mecanização, canais, by-pass, extravasor,
+     energia de emergência, reserva de bombas e exigências de
+     concessionária (SANEPAR / SABESP)
+     ================================================================ */
+
+  CE.calcConformidade = function (st, vaz, grades, cesto, desar, poco) {
+    var conf = DE.conf;
+    var canais = CE.canais(st);
+    var bp = st.eee.bypass || {};
+    var conc = st.eee.concessionaria || 'nenhuma';
+    var qDimLs = vaz.qDim * 1000;
+    var checks = [];
+    function chk(ok, atencao, txt) { checks.push({ ok: ok, atencao: !ok && atencao, txt: txt }); }
+    function nota(txt) { checks.push({ ok: true, nota: true, txt: txt }); }
+    function fmt2(v, d) { return Number(v).toFixed(d === undefined ? 1 : d).replace('.', ','); }
+
+    var usaGrades = st.eee.grade.arranjo === 'grades';
+    var niveisAtivos = usaGrades ? grades : [];
+    var temMecanizada = niveisAtivos.some(function (g) { return g.mec; });
+    var mediaFinaManual = niveisAtivos.filter(function (g) { return !g.mec && g.nivel.id !== 'grossa'; });
+
+    /* ---- mecanização obrigatória (NBR 12209: >= 100 L/s, exceto grade grossa) ---- */
+    if (usaGrades && qDimLs >= conf.qGradeMecanizadaLs && mediaFinaManual.length) {
+      chk(false, false,
+        'QMH de fim de plano = ' + fmt2(qDimLs) + ' L/s ≥ ' + conf.qGradeMecanizadaLs +
+        ' L/s: a NBR 12209 exige limpeza MECANIZADA nas grades média e fina (a grade grossa é isenta) — ' +
+        mediaFinaManual.map(function (g) { return ({ media: 'grade média', fina: 'grade fina' })[g.nivel.id]; }).join(' e ') +
+        ' está(ão) como manual(is)');
+    } else if (usaGrades && qDimLs >= conf.qGradeMecanizadaLs * 0.8 && mediaFinaManual.length) {
+      chk(false, true,
+        'QMH de fim de plano = ' + fmt2(qDimLs) + ' L/s se aproxima do limiar de mecanização da NBR 12209 (' +
+        conf.qGradeMecanizadaLs + ' L/s) — avalie já prever grades mecanizadas');
+    } else if (usaGrades) {
+      chk(true, false, qDimLs >= conf.qGradeMecanizadaLs
+        ? 'Mecanização: QMH de fim de plano = ' + fmt2(qDimLs) + ' L/s ≥ ' + conf.qGradeMecanizadaLs +
+          ' L/s e as grades média/fina são mecanizadas — atende à NBR 12209'
+        : 'Mecanização: QMH de fim de plano = ' + fmt2(qDimLs) + ' L/s abaixo do limiar de ' +
+          conf.qGradeMecanizadaLs + ' L/s da NBR 12209 — limpeza manual admitida');
+    }
+    if (st.eee.grade.arranjo === 'cesto' && qDimLs >= conf.qGradeMecanizadaLs) {
+      chk(false, false, 'QMH de ' + fmt2(qDimLs) + ' L/s é alta demais para cesto de retenção — adotar canal ' +
+        'com grades (mecanizadas acima de ' + conf.qGradeMecanizadaLs + ' L/s, NBR 12209)');
+    }
+
+    /* ---- canais, reserva e by-pass do gradeamento ---- */
+    var temBypassCanal = bp.canal === 'sim';
+    var bypassNecessario = false, bypassMotivo = '';
+    if (usaGrades) {
+      if (temMecanizada) {
+        /* NBR 12209: mínimo 2 unidades, cada uma para a vazão total; uma pode ser manual (reserva/by-pass) */
+        var atende = (canais.n >= 2 && canais.reserva >= 1) || temBypassCanal;
+        bypassNecessario = !(canais.n >= 2 && canais.reserva >= 1);
+        bypassMotivo = 'gradeamento mecanizado sem canal reserva';
+        chk(atende, false,
+          'Gradeamento mecanizado: a NBR 12209 exige no mínimo 2 unidades (canal reserva isolável por ' +
+          'comportas — a reserva pode ter grade MANUAL) ou canal de by-pass com grade manual. Arranjo atual: ' +
+          canais.oper + ' operando + ' + canais.reserva + ' reserva' + (temBypassCanal ? ' + canal de by-pass' : ', sem by-pass'));
+        if (canais.reserva >= 1) {
+          var resMec = bp.reservaGrade === 'mecanizada';
+          nota('Canal reserva com grade ' + (resMec ? 'MECANIZADA (padrão em grandes estações — SABESP usa 2 ' +
+            'mecanizadas + 1 manual de by-pass)' : 'MANUAL (admitido pela NBR 12209; espaçamento igual ou ' +
+            'imediatamente superior ao da mecanizada)'));
+        }
+      } else {
+        var isolavel = canais.n >= 2 || temBypassCanal;
+        chk(isolavel, true,
+          'Grades manuais em canal único ' + (temBypassCanal ? 'com' : 'sem') + ' by-pass: ' +
+          (isolavel ? 'há como isolar o canal para manutenção'
+                    : 'não há como limpar/manter o canal sem represar ou verter esgoto — prever canal de ' +
+                      'by-pass com grade manual ou um segundo canal'));
+        bypassNecessario = canais.n < 2;
+        bypassMotivo = 'canal único de gradeamento';
+      }
+      if (canais.n >= 2 && canais.reserva === 0) {
+        chk(false, true, canais.n + ' canais, todos operando: sem canal reserva, a manutenção de um canal ' +
+          'sobrecarrega os demais — confira as velocidades com Q/' + (canais.n - 1) + ' por canal');
+      }
+      if (!st.eee.canal.comportas) {
+        chk(false, temBypassCanal || canais.n >= 2,
+          'Sem comportas/stop-logs de isolamento: nenhum canal pode ser retirado de operação para limpeza ou manutenção');
+      }
+    }
+    var infoBypass = { necessario: bypassNecessario, motivo: bypassMotivo, previsto: temBypassCanal };
+
+    /* ---- reserva de bombas (NBR 12208) ---- */
+    var nInst = Math.max(1, Math.round(Number(st.bombas.instaladas) || 1));
+    var nOp = Math.max(1, Math.min(nInst, Math.round(Number(st.bombas.operando) || 1)));
+    chk(nInst >= 2, false, 'NBR 12208: mínimo 2 conjuntos motobomba (instalados: ' + nInst + ')');
+    chk(nInst > nOp, false,
+      'NBR 12208: com a unidade de maior capacidade fora de operação, as restantes devem atender a vazão ' +
+      'máxima — instalados ' + nInst + ' e ' + nOp + ' necessários em operação ' +
+      (nInst > nOp ? '(reserva de ' + (nInst - nOp) + ' conjunto(s))' : '(SEM reserva)'));
+
+    /* ---- extravasor e energia de emergência (NBR 12208) ---- */
+    var temExtravasor = bp.extravasor === 'sim';
+    var temEnergia = bp.energia && bp.energia !== 'nenhuma';
+    chk(temExtravasor || temEnergia, false,
+      'NBR 12208 — contingência contra extravasamento/paralisação: prever extravasor licenciado, fonte de ' +
+      'energia de emergência (gerador fixo, tomada para gerador móvel ou 2ª alimentação) ou volume de ' +
+      'acumulação. Atual: ' + (temExtravasor ? 'extravasor' : 'sem extravasor') + ' · ' +
+      ({ nenhuma: 'sem energia de emergência', gerador_fixo: 'gerador fixo',
+         tomada_gerador: 'tomada para gerador móvel', dupla_alimentacao: '2ª alimentação' })[bp.energia || 'nenhuma']);
+    if (temExtravasor) {
+      chk(!!bp.anuenciaAmbiental, true,
+        'Extravasor previsto: a extravasão exige ANUÊNCIA PRÉVIA do órgão ambiental (NBR 12208) — ' +
+        (bp.anuenciaAmbiental ? 'anuência registrada no projeto' : 'anuência ainda não registrada'));
+    }
+
+    /* tempo de acumulação até o extravasor (ou até a chegada), na Q média de fim de plano */
+    var extrav = null;
+    if (poco && poco.temCota && poco.naMax !== null && poco.areaUtil > 0) {
+      var cotaLimite = num(bp.cotaExtravasorM);
+      var rotLimite = 'cota do extravasor';
+      if (cotaLimite === null) {
+        cotaLimite = num(st.eee.chegada.cotaGI);
+        rotLimite = 'GI da tubulação de chegada (início do remanso na rede)';
+      }
+      if (cotaLimite !== null && cotaLimite > poco.naMax) {
+        var volAcum = poco.areaUtil * (cotaLimite - poco.naMax);
+        extrav = {
+          cotaLimite: cotaLimite, rotLimite: rotLimite, volAcum: volAcum,
+          tMedMin: vaz.qMedFim > 0 ? volAcum / vaz.qMedFim / 60 : Infinity,
+          tMaxMin: vaz.qDim > 0 ? volAcum / vaz.qDim / 60 : Infinity
+        };
+        if (temExtravasor && bp.anuenciaAmbiental) {
+          /* com extravasor licenciado, a acumulação curta é aceitável: o excedente verte pelo extravasor */
+          nota('Acumulação com bombas paradas: ' + fmt2(extrav.tMedMin, 0) + ' min na Q média até a ' + rotLimite +
+            ' (' + fmt2(volAcum, 1) + ' m³) — depois disso o excedente verte pelo extravasor licenciado');
+        } else {
+          /* sem extravasor licenciado: acumulação curta é grave, a menos que haja
+             energia de emergência para religar as bombas */
+          var alvoMin = conf.autonomiaExtravMinH * 60;
+          chk(extrav.tMedMin >= alvoMin, temEnergia || extrav.tMedMin >= alvoMin / 4,
+            'Acumulação com bombas paradas: ' + fmt2(extrav.tMedMin, 0) + ' min na Q média até a ' + rotLimite +
+            ' (' + fmt2(volAcum, 1) + ' m³) — sem extravasor licenciado, a prática usual pede ≥ ' +
+            (conf.autonomiaExtravMinH * 60) + ' min' +
+            (temEnergia ? ' (atenuado: há energia de emergência prevista)' : ' ou fonte de energia de emergência'));
+        }
+      }
+    }
+
+    /* ---- exigências de concessionária ---- */
+    if (conc === 'sanepar') {
+      if (st.bombas.tipo === 'submersivel') {
+        chk(st.eee.poco.camaras === 'porBomba', true,
+          'SANEPAR MPS 11.1: bombas submersíveis em poço úmido exigem câmaras de sucção INDEPENDENTES por ' +
+          'bomba, comunicadas por válvulas — arranjo atual: ' +
+          (st.eee.poco.camaras === 'porBomba' ? 'uma câmara por bomba' : 'câmara única'));
+      }
+      if (qDimLs > conf.qMedidorLs) {
+        var temMedidor = CE.temPeca(st, 'medidor_vazao');
+        chk(temMedidor, true, 'SANEPAR MPS 11.1: Q > ' + fmt2(conf.qMedidorLs) + ' L/s exige medidor ' +
+          'eletromagnético na linha de recalque — ' + (temMedidor ? 'medidor lançado nas peças' :
+          'nenhuma peça "Medidor de vazão" lançada nos barriletes/linha'));
+      }
+      if (qDimLs <= conf.qCompactaLs) {
+        nota('SANEPAR: vazão até ' + fmt2(conf.qCompactaLs) + ' L/s — avaliar EEE compacta padronizada');
+      }
+      if (usaGrades && niveisAtivos.length >= 2) {
+        var g1 = niveisAtivos[niveisAtivos.length - 2], g2 = niveisAtivos[niveisAtivos.length - 1];
+        var padrao = g1.aMm >= 20 && g1.aMm <= 30 && g2.aMm >= 15 && g2.aMm <= 20;
+        chk(padrao, true, 'SANEPAR MPS 11.1 — duplo gradeamento padrão: 1ª grade de 20–30 mm e 2ª de ' +
+          '15–20 mm (adotado: ' + fmt2(g1.aMm, 0) + ' e ' + fmt2(g2.aMm, 0) + ' mm); canal reserva com grade de 20 mm');
+      }
+      nota('SANEPAR: prever manômetros em caixa de aço inox e estudo de transitórios da linha de recalque ' +
+        '(MPS módulo 9.11) — a pré-avaliação de transiente deste programa não substitui o estudo');
+    }
+    if (conc === 'sabesp') {
+      if (temMecanizada && !(canais.oper >= 2 && (canais.reserva >= 1 || temBypassCanal))) {
+        chk(false, true, 'SABESP (prática NTS): em unidades maiores o arranjo usual é 2 canais mecanizados ' +
+          'operando + 1 canal de by-pass com grade manual, isoláveis por stop-logs — arranjo atual: ' +
+          canais.oper + ' operando + ' + canais.reserva + ' reserva' + (temBypassCanal ? ' + by-pass' : ''));
+      }
+      nota('SABESP: conferir a NTS 020 (elevatórias — elaboração de projetos) e os desenhos-padrão de canais, ' +
+        'grades e caixa de areia');
+    }
+
+    /* ---- passagem de sólidos da bomba × espaçamento da grade ---- */
+    var passagemMm = pos(st.eee.poco.passagemSolidosMm);
+    if (passagemMm && usaGrades && niveisAtivos.length) {
+      var menorEspac = Math.min.apply(null, niveisAtivos.map(function (g) { return g.aMm; }));
+      chk(menorEspac <= passagemMm, false,
+        'A grade mais fina (' + fmt2(menorEspac, 0) + ' mm) deve reter o que a bomba não engole — passagem ' +
+        'de sólidos da bomba: ' + fmt2(passagemMm, 0) + ' mm');
+    }
+
+    return {
+      checks: checks, bypass: infoBypass, extravasor: extrav,
+      temMecanizada: temMecanizada, canais: canais, concessionaria: conc,
+      ok: checks.every(function (c) { return c.ok; })
+    };
+  };
+
+  /* procura uma peça (por id) em qualquer trecho lançado */
+  CE.temPeca = function (st, pecaId) {
+    var achou = false;
+    function varre(conj) {
+      if (!conj || conj.ativo === false) return;
+      (conj.pecas || []).forEach(function (p) { if (p.pecaId === pecaId) achou = true; });
+    }
+    varre(st.succaoIndividual); varre(st.barrileteIndividual);
+    (st.succaoComum && st.succaoComum.ativo ? st.succaoComum.trechos : []).forEach(varre);
+    (st.barrileteComum && st.barrileteComum.ativo ? st.barrileteComum.trechos : []).forEach(varre);
+    (st.adutoras || []).forEach(varre);
+    return achou;
+  };
+
+  /* ================================================================
+     Resíduos (caçambas) e movimentação de cargas (monovia, talha,
+     trole, tubos-guia)
+     ================================================================ */
+
+  CE.calcResiduos = function (st, vaz, desar, cesto, poco) {
+    var rs = st.eee.residuos || {};
+    var R = DE.residuos;
+    var dias = pos(st.eee.desarenador.diasAcumulo) || R.autonomiaDiasPadrao;
+    var checks = [];
+    function chk(ok, atencao, txt) { checks.push({ ok: ok, atencao: !ok && atencao, txt: txt }); }
+    function fN(v, d) { return Number(v).toFixed(d === undefined ? 0 : d).replace('.', ','); }
+
+    /* volumes no período (fim de plano) */
+    var volGrad = desar.solidos.fim.gradeadoDia * dias;
+    var volAreia = st.eee.desarenador.usar !== false ? desar.solidos.fim.areiaDia * dias : 0;
+
+    /* caçamba: tamanho e quantidade */
+    var tipo = rs.cacambaTipo || 'auto';
+    var capLista = DE.cacambas.concat([10]);
+    if (tipo === 'rollon' || (tipo === 'auto' && (volGrad > 10 || volAreia > 8))) {
+      capLista = DE.cacambasRollOn; tipo = 'rollon';
+    } else tipo = 'estacionaria';
+    var cap = pos(rs.cacambaM3);
+    if (!cap) {
+      cap = capLista[capLista.length - 1];
+      for (var i = 0; i < capLista.length; i++) {
+        if (capLista[i] >= Math.max(volGrad, volAreia / R.fatorEnchimentoAreia, 3)) { cap = capLista[i]; break; }
+      }
+    }
+    var nGrad = volGrad > 0 ? Math.ceil(volGrad / cap) : 0;
+    var nAreia = volAreia > 0 ? Math.ceil(volAreia / (cap * R.fatorEnchimentoAreia)) : 0;
+    var nOperTotal = nGrad + nAreia;
+    var nTotal = nOperTotal + (rs.cacambaReserva !== false && nOperTotal > 0 ? 1 : 0);
+
+    var pesoAreiaCheia = cap * R.fatorEnchimentoAreia * R.densAreia;
+    if (nAreia > 0 && tipo === 'estacionaria') {
+      chk(pesoAreiaCheia <= R.cargaPoliguindasteKg, pesoAreiaCheia <= R.cargaPoliguindasteKg * 2,
+        'caçamba de areia de ' + fN(cap, 0) + ' m³ com ' + Math.round(R.fatorEnchimentoAreia * 100) +
+        ' % de enchimento pesa ~' + fN(pesoAreiaCheia, 0) + ' kg (poliguindaste convencional: ' +
+        fN(R.cargaPoliguindasteKg, 0) + ' kg)');
+    }
+    chk(dias >= R.autonomiaDiasMin && dias <= R.autonomiaDiasPadrao, dias <= 15,
+      'autonomia de ' + dias + ' dia(s) entre retiradas (usual: até ' + R.autonomiaDiasPadrao +
+      ' dias — odor e vetores; mínimo ' + R.autonomiaDiasMin + ')');
+
+    /* ---- monovia / talha ---- */
+    var mv = rs.monovia || {};
+    var cargaCesto = cesto ? cesto.cargaTotal : 0;
+    var cargaBomba = pos(mv.cargaBombaKg) || 0;
+    var cargaExtra = pos(mv.cargaExtraKg) || 0;
+    var carga = Math.max(cargaCesto, cargaBomba, cargaExtra);
+    var mon = null;
+    if (mv.usar !== false && carga > 0) {
+      var alvo = carga * DE.monovia.folgaSelecaoTalha;
+      var capTalha = DE.talhas[DE.talhas.length - 1];
+      for (var j = 0; j < DE.talhas.length; j++) if (DE.talhas[j] >= alvo) { capTalha = DE.talhas[j]; break; }
+
+      var profPoco = poco && poco.altTotal !== null ? poco.altTotal : (pos(mv.profPocoM) || 5);
+      var altViga = pos(mv.alturaVigaM) || Math.max(DE.monovia.alturaVigaMinM, 3.0);
+      var elevNec = profPoco + altViga + 1.0;
+      var elevacao = [3, 6, 9, 12].filter(function (e) { return e >= elevNec; })[0] || 12;
+
+      var talhaTipo = mv.talhaTipo && mv.talhaTipo !== 'auto' ? mv.talhaTipo
+        : ((capTalha > DE.monovia.eletricaSe.cargaKg || elevacao > DE.monovia.eletricaSe.elevacaoM) ? 'eletrica' : 'manual');
+
+      var vaoM = pos(mv.vaoM) || 4;
+      var vaoTab = [3, 4, 5, 6].filter(function (v) { return v >= vaoM; })[0] || 6;
+      var capTab = [500, 1000, 2000, 3000, 5000].filter(function (c) { return c >= capTalha; })[0] || 5000;
+      var perfil = DE.monovia.perfis[capTab] ? DE.monovia.perfis[capTab][vaoTab] : null;
+
+      var percurso = pos(mv.percursoM) || vaoM;
+      var trole = (capTalha >= DE.monovia.troleEletricoSe.cargaKg || percurso > DE.monovia.troleEletricoSe.percursoM)
+        ? 'elétrico' : (capTalha > 2000 ? 'manual de engrenagem' : 'manual de empurrar');
+
+      var ponteRolante = carga > DE.monovia.ponteRolanteSe.cargaKg ||
+                         vaoM > DE.monovia.ponteRolanteSe.vaoM;
+
+      mon = {
+        carga: carga, origemCarga: carga === cargaCesto ? 'cesto cheio' : (carga === cargaBomba ? 'conjunto motobomba' : 'carga informada'),
+        capTalha: capTalha, talhaTipo: talhaTipo, elevacao: elevacao, elevNec: elevNec,
+        vaoM: vaoM, perfil: perfil, capTab: capTab, vaoTab: vaoTab,
+        trole: trole, ponteRolante: ponteRolante,
+        tuboGuia: null
+      };
+      if (cargaBomba > 0 && st.bombas.tipo === 'submersivel') {
+        for (var k = 0; k < DE.tubosGuia.length; k++) {
+          if (cargaBomba <= DE.tubosGuia[k].pesoMaxKg) { mon.tuboGuia = DE.tubosGuia[k].rot; break; }
+        }
+      }
+      chk(true, false, 'talha de ' + fN(capTalha, 0) + ' kg (' + talhaTipo + ') para carga de ' +
+        fN(carga, 0) + ' kg × 1,25 · elevação ' + elevacao + ' m · viga ' + (perfil || '—') +
+        ' (vão ' + fN(vaoM, 1) + ' m) — INDICATIVO, verificação estrutural obrigatória');
+      if (ponteRolante) {
+        chk(false, true, 'carga/vão sugerem PONTE ROLANTE (ou pórtico) em vez de monovia simples — carga ' +
+          fN(carga, 0) + ' kg, vão ' + fN(vaoM, 1) + ' m');
+      }
+    } else if (mv.usar === false && (cargaCesto > DE.conf.pesoIcamentoKg || cargaBomba > DE.conf.pesoIcamentoKg)) {
+      chk(false, false, 'peça mais pesada com ' + fN(Math.max(cargaCesto, cargaBomba), 0) +
+        ' kg sem estrutura de içamento — SANEPAR MPS 11.1 exige içamento acima de ' + DE.conf.pesoIcamentoKg + ' kgf');
+    }
+
+    return {
+      dias: dias, volGradPeriodo: volGrad, volAreiaPeriodo: volAreia,
+      tipo: tipo, cap: cap, nGradeado: nGrad, nAreia: nAreia, nReserva: nTotal - nOperTotal, nTotal: nTotal,
+      pesoAreiaCheia: nAreia > 0 ? pesoAreiaCheia : null,
+      monovia: mon, checks: checks,
+      ok: checks.every(function (c) { return c.ok; })
+    };
+  };
+
+  /* ================================================================
      Cálculo completo e sincronização com a linha de recalque
      ================================================================ */
 
@@ -4480,6 +4995,8 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     var vaz = CE.vazoes(st);
     var b = pos(st.eee.canal.larguraM) || 0.6;
+    var canais = CE.canais(st);
+    var vazCanal = CE.vazPorCanal(vaz, canais.oper);   /* cada canal em operação leva Q/n */
 
     var parshall = CE.varrerParshall(st, vaz);
     var desar = CE.calcDesarenador(st, vaz, parshall);
@@ -4491,7 +5008,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       var lamBase = desar.lamina || { min: 0.1, med: 0.2, max: 0.3 };
       st.eee.grade.niveis.forEach(function (nv) {
         if (!nv.ativo) return;
-        grades.push(CE.calcGrade(nv, b, { min: lamBase.min, med: lamBase.med, max: lamBase.max, altCanal: pos(st.eee.canal.alturaM) || 0 }, vaz));
+        grades.push(CE.calcGrade(nv, b, { min: lamBase.min, med: lamBase.med, max: lamBase.max, altCanal: pos(st.eee.canal.alturaM) || 0 }, vazCanal));
       });
     }
 
@@ -4503,7 +5020,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       perfil.pontos.forEach(function (p) {
         if (!p.grade) return;
         refinadas.push(CE.calcGrade(p.grade.nivel, b,
-          { min: p.lamina.min, med: p.lamina.med, max: p.lamina.max, altCanal: perfil.altCanal }, vaz));
+          { min: p.lamina.min, med: p.lamina.med, max: p.lamina.max, altCanal: perfil.altCanal }, vazCanal));
       });
       if (refinadas.length === grades.length) {
         grades = refinadas;
@@ -4513,18 +5030,22 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     var cesto = st.eee.grade.arranjo === 'cesto' ? CE.calcCesto(st, vaz) : null;
     var poco = CE.calcPoco(st, vaz, perfil);
+    var conformidade = CE.calcConformidade(st, vaz, grades, cesto, desar, poco);
+    var residuos = CE.calcResiduos(st, vaz, desar, cesto, poco);
 
     /* avisos consolidados */
     var avisos = [];
     function varre(fonte, rot) {
       (fonte || []).forEach(function (c) {
-        if (!c.ok) avisos.push({ grave: !c.atencao, txt: rot + ': ' + c.txt });
+        if (!c.ok && !c.nota) avisos.push({ grave: !c.atencao, txt: rot + ': ' + c.txt });
       });
     }
     grades.forEach(function (gr) { varre(gr.checks, ({ grossa: 'Grade grossa', media: 'Grade média', fina: 'Grade fina' })[gr.nivel.id] || 'Grade'); });
     if (cesto) varre(cesto.checks, 'Cesto');
     varre(desar.checks, 'Desarenador');
     varre(poco.checks, 'Poço de sucção');
+    varre(conformidade.checks, 'Conformidade');
+    varre(residuos.checks, 'Resíduos e içamento');
     if (parshall.escolhida && parshall.escolhida.classe === 'ruim') {
       avisos.push({ grave: true, txt: 'Calha Parshall: a garganta escolhida não cobre a faixa de vazões do projeto.' });
     } else if (parshall.escolhida && parshall.escolhida.classe === 'atencao') {
@@ -4536,7 +5057,8 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     return {
       vaz: vaz, grades: grades, cesto: cesto, parshall: parshall,
-      desarenador: desar, perfil: perfil, poco: poco, avisos: avisos
+      desarenador: desar, perfil: perfil, poco: poco,
+      conformidade: conformidade, residuos: residuos, avisos: avisos
     };
   };
 
@@ -7274,14 +7796,27 @@ html.imprimindo-doc #doc-saida { display: block; }
       ]));
 
     /* --- arranjo --- */
-    raiz.appendChild(UI.cartao('Arranjo do gradeamento', 'grades em série ou cesto removível',
-      h('div', { class: 'grade' },
+    var canais = CE.canais(st);
+    raiz.appendChild(UI.cartao('Arranjo do gradeamento', 'grades em série ou cesto removível · canais em paralelo',
+      [h('div', { class: 'grade' },
         UI.select(st, 'Tipo de retenção de sólidos', 'eee.grade.arranjo', [
           { v: 'grades', rot: 'Grades no canal (grossa / média / fina, manual ou mecanizada)' },
           { v: 'cesto', rot: 'Cesto com içamento (gradeamento grosso simplificado)' }
         ], { chave: true, dica: DE.cesto.nota + '\n\nEm estações maiores, o usual é o canal com grades em série (e canal de contorno para manutenção). ' }),
+        st.eee.grade.arranjo === 'grades' ? UI.campo(st, 'Canais de gradeamento (total)', 'eee.canal.nCanais',
+          { sufixo: 'ud', chave: true,
+            dica: 'Canais em paralelo, todos com o mesmo conjunto de grades. Cada canal em operação conduz Q/n. Arranjos usuais: 1 (pequenas EEEs, com canal de by-pass), 2 (um opera, um reserva) e 3 (dois operam, um reserva — usual quando o gradeamento é mecanizado e a vazão é grande).' }) : null,
+        st.eee.grade.arranjo === 'grades' ? UI.campo(st, 'Canais de reserva', 'eee.canal.nReserva',
+          { sufixo: 'ud',
+            dica: 'Canais mantidos fora de operação (isolados por comportas/stop-logs) para manutenção e para receber a vazão quando um canal operante sai de serviço. A reserva pode ter grade manual mesmo quando as operantes são mecanizadas — verifique o alerta de conformidade abaixo.' }) : null,
+        st.eee.grade.arranjo === 'grades' ? UI.check(st, 'Comportas / stop-logs de isolamento em cada canal', 'eee.canal.comportas',
+          { dica: 'Cada canal precisa poder ser isolado a montante e a jusante para limpeza e manutenção sem paralisar a estação.' }) : null,
         h('div', { style: 'display:flex;align-items:flex-end;padding-bottom:2px' },
-          UI.botaoFonte(['nbr12209', 'jordao', 'nts_sabesp', 'mps_sanepar'], DE.fonteGrade)))));
+          UI.botaoFonte(['nbr12209', 'jordao', 'nts_sabesp', 'mps_sanepar'], DE.fonteGrade))),
+       st.eee.grade.arranjo === 'grades' && canais.n > 1 ? h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
+         chip('Arranjo', canais.oper + ' operando + ' + canais.reserva + ' reserva', canais.n + ' canais', 'forte'),
+         chip('Vazão por canal (QMH)', ls(r ? r.vaz.qDim / canais.oper : 0) + ' L/s'),
+         chip('Largura de cada canal', n(st.eee.canal.larguraM || 0.6, 2) + ' m')) : null]));
 
     if (gr.arranjo === 'grades') {
       gr.niveis.forEach(function (nv, i) {
@@ -7290,6 +7825,9 @@ html.imprimindo-doc #doc-saida { display: block; }
     } else if (r && r.cesto) {
       raiz.appendChild(FE.cartaoCesto(st, r));
     }
+
+    /* --- by-pass e conformidade --- */
+    if (r) raiz.appendChild(FE.cartaoConformidade(st, r));
 
     /* perfil de níveis resumido fica na aba do poço; aqui, as lâminas por ponto */
     if (r && gr.arranjo === 'grades') {
@@ -7309,6 +7847,58 @@ html.imprimindo-doc #doc-saida { display: block; }
     }
 
     return raiz;
+  };
+
+  /* by-pass do gradeamento + verificações normativas consolidadas */
+  FE.cartaoConformidade = function (st, r) {
+    var cf = r.conformidade;
+    var bp = st.eee.bypass;
+    var linhas = cf.checks.map(function (c) {
+      var cl = c.nota ? 'na' : (c.ok ? 'bom' : (c.atencao ? 'atencao' : 'ruim'));
+      return h('tr', { class: c.nota ? '' : cl },
+        h('td', { class: 'esq' }, c.txt),
+        h('td', {}, c.nota ? h('span', { class: 'tag cinza' }, 'Nota') : UI.tagClasse(cl)));
+    });
+
+    return UI.cartao('By-pass e conformidade normativa',
+      'NBR 12208 / NBR 12209 · exigências de concessionária',
+      [h('div', { class: 'grade' },
+        UI.select(st, 'Canal de by-pass do gradeamento', 'eee.bypass.canal', [
+          { v: 'auto', rot: cf.bypass.necessario ? 'Decidir depois (o programa indica: NECESSÁRIO)' : 'Decidir depois (o programa indica: dispensável)' },
+          { v: 'sim', rot: 'Sim — canal de by-pass com grade de limpeza manual' },
+          { v: 'nao', rot: 'Não haverá canal de by-pass' }
+        ], { chave: true,
+             dica: 'O canal de by-pass contorna o gradeamento quando um canal precisa sair de operação. ' +
+                   'QUANDO PODE: sempre — é a contingência recomendada. QUANDO É OBRIGATÓRIO (NBR 12209): ' +
+                   'quando o gradeamento é MECANIZADO e não há canal reserva isolável — a norma exige no mínimo ' +
+                   '2 unidades, cada uma com capacidade para a vazão total, e admite que uma delas seja grade de ' +
+                   'limpeza MANUAL usada como reserva/by-pass. O canal de by-pass nunca deve lançar esgoto sem ' +
+                   'gradear: leva grade manual com espaçamento igual ou imediatamente superior ao da grade principal.' }),
+        cf.canais.reserva >= 1 ? UI.select(st, 'Grade do canal reserva', 'eee.bypass.reservaGrade', [
+          { v: 'manual', rot: 'Manual (admitido pela NBR 12209)' },
+          { v: 'mecanizada', rot: 'Mecanizada (padrão SABESP em grandes unidades)' }
+        ], { dica: 'A NBR 12209 admite que a unidade reserva seja de limpeza manual — o rastelo mecânico da ' +
+                   'reserva ficaria meses parado. Em estações grandes a SABESP costuma usar 2 canais mecanizados ' +
+                   'operando + 1 canal de by-pass com grade manual. Adote mecanizada na reserva quando a operação ' +
+                   'prevê rodízio dos canais (todas trabalham alternadamente).' }) : null,
+        UI.select(st, 'Padrão de concessionária', 'eee.concessionaria', [
+          { v: 'nenhuma', rot: 'Nenhum (só ABNT)' },
+          { v: 'sanepar', rot: 'SANEPAR — MPS 11.1' },
+          { v: 'sabesp', rot: 'SABESP — NTS' }
+        ], { dica: 'Liga verificações adicionais do manual da concessionária: SANEPAR (câmaras independentes ' +
+                   'por bomba, medidor eletromagnético acima de 2,5 L/s, duplo gradeamento 20–30 + 15–20 mm, ' +
+                   'içamento acima de 25 kgf) ou SABESP (arranjo 2+1 mecanizado, NTS 020).' }),
+        UI.campo(st, 'Passagem de sólidos da bomba (mm)', 'eee.poco.passagemSolidosMm',
+          { dica: 'Esfera livre que o rotor engole (catálogo da bomba). O espaçamento da grade mais fina deve ' +
+                  'ser MENOR OU IGUAL a este valor — senão a grade deixa passar o que a bomba não engole.' }),
+        h('div', { style: 'display:flex;align-items:flex-end;padding-bottom:2px' },
+          UI.botaoFonte(['nbr12209', 'nbr12208', 'mps_sanepar', 'nts_sabesp'], DE.fonteConf))),
+       cf.bypass.necessario && bp.canal !== 'sim'
+         ? h('div', { class: 'aviso erro', style: 'margin-top:8px' },
+             h('b', {}, 'Canal de by-pass necessário'),
+             'Motivo: ' + cf.bypass.motivo + '. Preveja o canal de by-pass com grade manual ou acrescente um canal reserva isolável.')
+         : null,
+       UI.tabela([{ rot: 'Verificação normativa', esq: true }, 'Situação'], linhas)]);
   };
 
   FE.cartaoNivelGrade = function (st, r, nv, i) {
@@ -7526,10 +8116,38 @@ html.imprimindo-doc #doc-saida { display: block; }
           h('td', {}, n(s.areiaDia, 3)), h('td', {}, n(s.areiaDia * d.diasAcumulo, 2)),
           h('td', {}, n(s.gradeadoDia, 3)), h('td', {}, n(s.gradeadoDia * d.diasAcumulo, 2)));
       })));
+    /* caçambas */
+    var rs = r.residuos;
+    corpo.push(UI.sub('Caçambas de resíduos'));
+    corpo.push(h('div', { class: 'grade' },
+      UI.select(st, 'Tipo de caçamba', 'eee.residuos.cacambaTipo', [
+        { v: 'auto', rot: 'Escolher automaticamente' },
+        { v: 'estacionaria', rot: 'Estacionária (poliguindaste) — 3 a 10 m³' },
+        { v: 'rollon', rot: 'Roll-on / roll-off — 10 a 30 m³' }
+      ], { dica: DE.fonteResiduos }),
+      UI.campo(st, 'Volume da caçamba (m³)', 'eee.residuos.cacambaM3',
+        { placeholder: n(rs.cap, 0), editado: !!st.eee.residuos.cacambaM3,
+          dica: 'Em branco: o menor volume comercial que acumula o período. Estacionárias: ' +
+                DE.cacambas.concat([10]).join(' · ') + ' m³; roll-on: ' + DE.cacambasRollOn.join(' · ') + ' m³.' }),
+      UI.check(st, 'Prever 1 caçamba reserva (N + 1)', 'eee.residuos.cacambaReserva',
+        { dica: 'Uma caçamba vazia no pátio para a troca imediata no dia da coleta.' })));
+    corpo.push(h('div', { class: 'faixa-resumo', style: 'margin:8px 0' },
+      chip('Caçamba adotada', n(rs.cap, 0) + ' m³ — ' + (rs.tipo === 'rollon' ? 'roll-on' : 'estacionária'),
+        rs.dias + ' dias de acúmulo', 'forte'),
+      chip('P/ material gradeado', rs.nGradeado + ' ud', n(rs.volGradPeriodo, 2) + ' m³ no período'),
+      st.eee.desarenador.usar !== false ? chip('P/ areia', rs.nAreia + ' ud',
+        n(rs.volAreiaPeriodo, 2) + ' m³ · enchimento ' + Math.round(DE.residuos.fatorEnchimentoAreia * 100) + ' %') : null,
+      chip('Reserva', rs.nReserva + ' ud'),
+      chip('Total de caçambas', rs.nTotal + ' ud', null, 'forte'),
+      rs.pesoAreiaCheia ? chip('Peso da caçamba de areia', n(rs.pesoAreiaCheia, 0) + ' kg',
+        'poliguindaste ~' + n(DE.residuos.cargaPoliguindasteKg, 0) + ' kg',
+        rs.pesoAreiaCheia > DE.residuos.cargaPoliguindasteKg ? 'alerta' : null) : null));
+    corpo.push(tabChecks(rs.checks));
     corpo.push(h('p', { class: 'nota' },
-      'Caçamba sugerida para ' + d.diasAcumulo + ' dias (areia + gradeado, fim de plano): ' +
-      (d.cacamba ? n(d.cacamba, 0) + ' m³' : 'acima de ' + DE.cacambas[DE.cacambas.length - 1] + ' m³ — dividir a remoção') + '. ',
-      UI.botaoFonte(['nbr12209', 'jordao', 'metcalf'], DE.fonteDesarenador)));
+      'Baia da caçamba: piso de concreto com contenção e ralo (percolado de volta ao poço), caçamba fechada e ' +
+      'estanque com dreno DN 50, faixa de acesso ≥ 3,5 m, gabarito vertical livre ≥ 4,5 m e reta de aproximação ' +
+      'de ré ~10 m para o poliguindaste. ',
+      UI.botaoFonte(['nbr12209', 'jordao', 'metcalf', 'mps_sanepar'], DE.fonteDesarenador + '\n\n' + DE.fonteResiduos)));
 
     raiz.appendChild(UI.cartao('Desarenador', 'remoção de areia a montante do poço', corpo));
     return raiz;
@@ -7615,6 +8233,12 @@ html.imprimindo-doc #doc-saida { display: block; }
          chip('Cota do fundo', p.cotaFundo !== null ? n(p.cotaFundo, 3) + ' m' : '—'),
          chip('Profundidade total', p.altTotal !== null ? n(p.altTotal, 2) + ' m' : '—', 'laje ao fundo'))]));
 
+    /* extravasor e energia de emergência */
+    raiz.appendChild(FE.cartaoExtravasor(st, r));
+
+    /* movimentação de cargas e resíduos */
+    raiz.appendChild(FE.cartaoMovimentacao(st, r));
+
     /* perfil hidráulico */
     var corpoPerfil = [];
     if (r.perfil.temCota) {
@@ -7661,6 +8285,183 @@ html.imprimindo-doc #doc-saida { display: block; }
   };
 
   /* ================================================================
+     Aba: Perfil hidráulico da entrada
+     ================================================================ */
+
+  FE.abaPerfilEEE = function (st, ctx, res) {
+    var r = res && res.eee ? res.eee : eee(st);
+    var raiz = h('div', {});
+    if (!r) return raiz;
+    var vz = st.eee.vazoes;
+    var fU = PDA.U.vazao[vz.unid].f;
+    var rotF = { inicio: 'Início de plano', meio: 'Meio de plano', fim: 'Fim de plano' };
+    var rotT = { min: 'Q mínima', med: 'Q média', maxd: 'Q máx. diária', maxh: 'Q máx. horária' };
+
+    /* --- escolha das séries --- */
+    var porFase = { inicio: [], meio: [], fim: [] };
+    (st.eee.perfilCfg.series || []).forEach(function (s, i) { if (porFase[s.fase]) porFase[s.fase].push({ s: s, i: i }); });
+
+    var colunas = CE.FASES.map(function (f) {
+      return h('div', {},
+        UI.sub(rotF[f.id]),
+        porFase[f.id].map(function (par) {
+          var s = par.s, i = par.i;
+          var c = r.vaz.fases[s.fase] && r.vaz.fases[s.fase][s.tipo];
+          var qTxt = c && c.v !== null ? UI.num(c.v / fU, 1) + ' ' + vz.unid + (c.est ? ' (est.)' : '') : '—';
+          return h('div', { class: 'linha', style: 'align-items:center;gap:8px;margin:3px 0' },
+            h('input', { type: 'checkbox', checked: !!s.ativo,
+                         'data-bind': 'eee.perfilCfg.series.' + i + '.ativo', 'data-tipo': 'bool' }),
+            h('input', { type: 'color', value: s.cor || '#0E6F66', title: 'Cor da linha no desenho',
+                         style: 'width:30px;height:22px;padding:1px;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer',
+                         'data-bind': 'eee.perfilCfg.series.' + i + '.cor', 'data-tipo': 'texto' }),
+            h('span', { style: 'min-width:104px' }, rotT[s.tipo]),
+            h('span', { class: 'nota' }, qTxt));
+        }));
+    });
+
+    raiz.appendChild(UI.cartao('Vazões exibidas no perfil',
+      'escolha quais vazões de quais fases aparecem, e a cor de cada uma',
+      [h('div', { class: 'grade g2', style: 'grid-template-columns:repeat(auto-fit,minmax(230px,1fr))' }, colunas),
+       h('p', { class: 'nota', style: 'margin-top:6px' },
+         'As linhas de fim de plano saem contínuas; meio de plano tracejadas longas; início de plano tracejadas curtas. ' +
+         'As três vazões de referência do dimensionamento (Qmín do horizonte, Qméd e QMH de fim de plano) continuam ' +
+         'regendo as verificações independentemente do que estiver exibido.')]));
+
+    /* --- desenho --- */
+    var corpo = [];
+    if (r.perfil.temCota) {
+      corpo.push(FE.svgPerfilEntrada(r));
+      corpo.push(h('p', { class: 'nota' },
+        'Perfil da chegada ao poço de sucção, com o fundo em degraus, as grades, a Calha Parshall e os níveis do poço. ' +
+        'Cada linha é o NA da vazão escolhida acima; a lâmina d\'água sombreada corresponde à maior vazão exibida.'));
+    } else {
+      corpo.push(h('div', { class: 'aviso info' },
+        h('b', {}, 'Perfil sem amarração de cota'),
+        'Informe a cota da geratriz inferior da tubulação de chegada (aba "Chegada e gradeamento") para o perfil ' +
+        'sair em cotas absolutas.',
+        h('div', { class: 'linha naoimprime', style: 'margin-top:8px' },
+          h('button', { class: 'btn mini', type: 'button', 'data-acao': 'irAba', 'data-aba': 'gradeamento' }, 'Ir para Chegada e gradeamento'))));
+    }
+    raiz.appendChild(UI.cartao('Perfil hidráulico da entrada', 'da chegada ao poço de sucção', corpo));
+
+    /* --- tabela de NA por série --- */
+    if (r.perfil.temCota && r.perfil.series.length) {
+      var cabs = [{ rot: 'Ponto', esq: true }, 'Cota do fundo (m)'].concat(
+        r.perfil.series.map(function (s) { return { rot: 'NA ' + s.rotCurto + ' (m)', title: UI.num(s.Q * 1000, 1) + ' L/s' }; }));
+      var linhas = r.perfil.pontos.map(function (p) {
+        return h('tr', {},
+          h('td', { class: 'esq' }, p.rot),
+          h('td', {}, n(p.fundo, 3)),
+          r.perfil.series.map(function (s) { return h('td', {}, n(p.na[s.key], 3)); }));
+      });
+      if (r.poco.naMax !== null) {
+        linhas.push(h('tr', {},
+          h('td', { class: 'esq' }, 'Poço de sucção (NA mín a NA máx)'),
+          h('td', {}, n(r.poco.cotaFundo, 3)),
+          r.perfil.series.map(function () { return h('td', {}, n(r.poco.naMin, 3) + ' – ' + n(r.poco.naMax, 3)); })));
+      }
+      raiz.appendChild(UI.cartao('Cotas do NA por vazão exibida', 'lâmina d\'água em cada ponto',
+        [UI.tabela(cabs, linhas),
+         h('p', { class: 'nota' }, 'Lâmina = NA − cota do fundo do ponto.')]));
+    }
+
+    return raiz;
+  };
+
+  /* extravasor / by-pass geral da estação e energia de emergência */
+  FE.cartaoExtravasor = function (st, r) {
+    var cf = r.conformidade;
+    var ex = cf.extravasor;
+    return UI.cartao('Extravasor e energia de emergência',
+      'contingência contra paralisação — NBR 12208',
+      [h('div', { class: 'grade' },
+        UI.select(st, 'Extravasor / by-pass geral da estação', 'eee.bypass.extravasor', [
+          { v: 'nao', rot: 'Não haverá extravasor' },
+          { v: 'sim', rot: 'Sim — tubulação de extravasão' }
+        ], { chave: true,
+             dica: 'O extravasor descarrega o esgoto por gravidade quando as bombas param (falta de energia, ' +
+                   'manutenção). QUANDO PODE: somente com ANUÊNCIA PRÉVIA do órgão ambiental (NBR 12208), com a ' +
+                   'cota protegendo a estação contra afogamento e dispositivo contra retorno. QUANDO É A SAÍDA ' +
+                   'USUAL: onde o lançamento eventual é admissível e licenciado. Onde é vedado, a contingência ' +
+                   'vira energia de emergência e/ou volume de acumulação (prática: ≥ 2 h na vazão média).' }),
+        st.eee.bypass.extravasor === 'sim' ? UI.campo(st, 'Cota da soleira do extravasor (m)', 'eee.bypass.cotaExtravasorM',
+          { dica: 'Acima do NA máximo operacional e abaixo da cota que afogaria a estação ou a rede afluente. ' +
+                  'Em branco: o tempo de acumulação é medido até a GI da tubulação de chegada.' }) : null,
+        st.eee.bypass.extravasor === 'sim' ? UI.campo(st, 'Destino do extravasor', 'eee.bypass.destinoExtravasor',
+          { tipo: 'texto', dica: 'Galeria, curso d\'água… — registrar o destino e as condicionantes da licença.' }) : null,
+        st.eee.bypass.extravasor === 'sim' ? UI.check(st, 'Anuência do órgão ambiental registrada', 'eee.bypass.anuenciaAmbiental',
+          { dica: 'NBR 12208: a extravasão exige anuência prévia do órgão ambiental (IAT no PR, CETESB em SP…).' }) : null,
+        UI.select(st, 'Energia de emergência', 'eee.bypass.energia', [
+          { v: 'nenhuma', rot: 'Nenhuma' },
+          { v: 'tomada_gerador', rot: 'Tomada externa + chave para gerador móvel' },
+          { v: 'gerador_fixo', rot: 'Grupo gerador fixo (partida automática)' },
+          { v: 'dupla_alimentacao', rot: 'Segunda alimentação elétrica independente' }
+        ], { chave: true,
+             dica: 'NBR 12208: na falta de extravasor licenciado (ou volume de acumulação), prever fonte de ' +
+                   'energia de emergência. Prática: tomada para gerador móvel nas EEEs menores; gerador fixo com ' +
+                   'partida automática nas de porte médio/grande ou onde o extravasamento é inadmissível.' })),
+       ex ? h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
+         PDA.F.chip('Volume de acumulação', n(ex.volAcum, 1) + ' m³', 'do NA máx até a ' + ex.rotLimite, 'forte'),
+         PDA.F.chip('Tempo até extravasar (Qméd)', isFinite(ex.tMedMin) ? n(ex.tMedMin, 0) + ' min' : '—',
+           'prática: ≥ ' + (DE.conf.autonomiaExtravMinH * 60) + ' min', ex.tMedMin < DE.conf.autonomiaExtravMinH * 60 ? 'alerta' : null),
+         PDA.F.chip('Tempo até extravasar (QMH)', isFinite(ex.tMaxMin) ? n(ex.tMaxMin, 0) + ' min' : '—'))
+         : h('p', { class: 'nota', style: 'margin-top:8px' },
+             'Informe as cotas (chegada e poço) para o programa medir o volume de acumulação e o tempo até extravasar.'),
+       h('p', { class: 'nota' },
+         'Prever boia adicional no nível de extravasamento com alarme e acionamento automático da bomba reserva (MPS SANEPAR). ',
+         UI.botaoFonte(['nbr12208', 'mps_sanepar', 'nts_sabesp'], DE.fonteConf))]);
+  };
+
+  /* monovia/talha, tubos-guia e caçambas */
+  FE.cartaoMovimentacao = function (st, r) {
+    var rs = r.residuos;
+    var mv = rs.monovia;
+    var corpo = [];
+
+    corpo.push(h('div', { class: 'grade' },
+      UI.check(st, 'Prever monovia com talha', 'eee.residuos.monovia.usar',
+        { dica: 'Estrutura de içamento para retirar bombas submersíveis, cesto de sólidos e comportas. ' +
+                'SANEPAR MPS 11.1: obrigatória para qualquer peça acima de 25 kgf; a talha pode ser removível. ' +
+                'Alternativas em EEE pequenas: turco giratório (davit) de 250–1.000 kg ou pórtico móvel.' }),
+      UI.campo(st, 'Peso do conjunto motobomba (kg)', 'eee.residuos.monovia.cargaBombaKg',
+        { chave: true, dica: 'Peso da bomba submersível com motor (catálogo). Define a talha, a viga da monovia e o tubo-guia.' }),
+      UI.campo(st, 'Outra carga a içar (kg)', 'eee.residuos.monovia.cargaExtraKg',
+        { dica: 'Comporta, válvula, contrapeso… quando for mais pesada que a bomba e o cesto.' }),
+      UI.campo(st, 'Vão da viga (m)', 'eee.residuos.monovia.vaoM',
+        { dica: 'Distância entre apoios da viga da monovia (tabela indicativa para 3, 4, 5 e 6 m).' }),
+      UI.campo(st, 'Percurso do trole (m)', 'eee.residuos.monovia.percursoM',
+        { placeholder: mv ? UI.numEdit(mv.vaoM) : '', dica: 'Do eixo do poço até a baia da caçamba/caminhão.' }),
+      UI.select(st, 'Talha', 'eee.residuos.monovia.talhaTipo', [
+        { v: 'auto', rot: 'Escolher automaticamente' },
+        { v: 'manual', rot: 'Manual de corrente' },
+        { v: 'eletrica', rot: 'Elétrica de corrente' }
+      ], { dica: 'Automático: elétrica quando a capacidade passa de 500 kg ou a elevação passa de 6 m (ergonomia e NR-17); manual nas demais.' })));
+
+    if (mv) {
+      corpo.push(h('div', { class: 'faixa-resumo', style: 'margin:8px 0' },
+        chip('Carga de içamento', n(mv.carga, 0) + ' kg', mv.origemCarga, 'forte'),
+        chip('Talha', n(mv.capTalha, 0) + ' kg — ' + (mv.talhaTipo === 'eletrica' ? 'elétrica' : 'manual'),
+          'carga × 1,25, capacidade comercial'),
+        chip('Elevação da talha', mv.elevacao + ' m', 'necessária ' + n(mv.elevNec, 1) + ' m'),
+        chip('Viga da monovia', mv.perfil || '—', 'vão ' + n(mv.vaoM, 1) + ' m — INDICATIVO', 'forte'),
+        chip('Trole', mv.trole),
+        mv.tuboGuia ? chip('Tubo-guia da bomba', mv.tuboGuia, 'duplo, inox 304/316 ou galv. a fogo') : null));
+      if (mv.ponteRolante) {
+        corpo.push(h('div', { class: 'aviso' },
+          h('b', {}, 'Considerar ponte rolante'),
+          'A carga e/ou o vão sugerem ponte rolante ou pórtico em vez de monovia simples.'));
+      }
+      corpo.push(h('p', { class: 'nota' },
+        'A viga indicada é dimensionamento INDICATIVO (perfil W Gerdau, flecha L/600, carga com impacto) — a verificação ' +
+        'estrutural pela NBR 8800 é obrigatória, inclusive flambagem lateral e flexão da mesa sob o trole. ' +
+        'Guias do cesto: perfil U 2″–4″ ou cantoneiras em inox 304, folga de 5–10 mm por lado. ',
+        UI.botaoFonte(['metcalf', 'mps_sanepar'], DE.fonteMonovia + '\n\n' + DE.fonteGuias)));
+    }
+
+    return UI.cartao('Movimentação de cargas', 'monovia, talha, trole e tubos-guia', corpo);
+  };
+
+  /* ================================================================
      Desenho do perfil hidráulico da entrada
      ================================================================ */
 
@@ -7672,86 +8473,135 @@ html.imprimindo-doc #doc-saida { display: block; }
       if (txt !== undefined && txt !== null) e.textContent = txt;
       return e;
     }
-    var W = 860, HH = 340;
-    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + HH, class: 'esquema', preserveAspectRatio: 'xMidYMid meet' });
+    var W = 980, HH = 430;
+    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + HH, class: 'esquema', style: 'max-width:980px' });
     var p = r.poco, perfil = r.perfil;
     if (!perfil.temCota || p.naMax === null || p.cotaFundo === null) return svg;
 
+    /* séries a desenhar: as escolhidas; sem nenhuma, as três de referência */
+    var series = perfil.series.length ? perfil.series.slice() : [
+      { key: 'max', rotCurto: 'QMH fim', Q: perfil.qq.max, cor: '#0E6F66', traco: '' },
+      { key: 'med', rotCurto: 'Qméd fim', Q: perfil.qq.med, cor: '#2563B0', traco: '7 4' },
+      { key: 'min', rotCurto: 'Qmín', Q: perfil.qq.min, cor: '#B07D10', traco: '3 3' }
+    ];
+    series.sort(function (a, b) { return b.Q - a.Q; });   /* maior vazão primeiro (é a sombreada) */
+
     /* faixa vertical */
     var cotas = [];
-    perfil.pontos.forEach(function (pt) { cotas.push(pt.fundo); cotas.push(pt.na.max); });
+    perfil.pontos.forEach(function (pt) {
+      cotas.push(pt.fundo);
+      series.forEach(function (s) { if (pt.na[s.key] !== null && pt.na[s.key] !== undefined) cotas.push(pt.na[s.key]); });
+    });
     if (perfil.saida) { cotas.push(perfil.saida.crista); cotas.push(perfil.saida.fundoJusante); }
     cotas.push(p.naMax, p.naMin, p.cotaFundo);
     if (p.cotaLaje !== null) cotas.push(p.cotaLaje);
     var cMin = Math.min.apply(null, cotas), cMax = Math.max.apply(null, cotas);
     var amp = Math.max(cMax - cMin, 0.5);
-    var mT = 26, mB = 30, mE = 64, mD = 20;
+    var mT = 30, mB = 46, mE = 74, mD = 26;
     function py(c) { return mT + (cMax - c) / amp * (HH - mT - mB); }
+
+    /* régua de cotas na margem esquerda */
+    var g = sv('g');
+    var passo = amp > 8 ? 2 : (amp > 4 ? 1 : (amp > 1.6 ? 0.5 : 0.2));
+    for (var cc = Math.ceil(cMin / passo) * passo; cc <= cMax + 1e-9; cc += passo) {
+      var yy = py(cc);
+      g.appendChild(sv('line', { x1: mE - 6, x2: mE - 2, y1: yy, y2: yy, stroke: 'var(--texto-3)', 'stroke-width': 1 }));
+      g.appendChild(sv('text', { x: mE - 9, y: yy + 3, 'text-anchor': 'end' }, UI.num(cc, passo < 1 ? 1 : 0)));
+    }
+    g.appendChild(sv('line', { x1: mE - 2, x2: mE - 2, y1: py(cMax), y2: py(cMin), stroke: 'var(--texto-3)', 'stroke-width': 1 }));
 
     /* segmentos horizontais: pontos do canal + parshall + poço */
     var nSeg = perfil.pontos.length;
-    var wParshall = 70, wPoco = 170, gap = 4;
+    var wParshall = perfil.saida ? 80 : 0, wPoco = 190, gap = 4;
     var wCanal = (W - mE - mD - wParshall - wPoco - gap * 2) / Math.max(1, nSeg);
-    var x = mE;
-    var g = sv('g');
 
-    /* NA máximo / médio / mínimo ao longo do canal */
-    ['max', 'med', 'min'].forEach(function (k, ki) {
-      var d = '', xx = mE;
+    function xIni(i) { return mE + i * wCanal; }
+
+    /* lâmina d'água sombreada da maior vazão exibida */
+    var sTopo = series[0];
+    var dAgua = '', x0;
+    perfil.pontos.forEach(function (pt, i) {
+      x0 = xIni(i);
+      dAgua += (i === 0 ? 'M' : 'L') + x0 + ' ' + py(pt.na[sTopo.key]) + ' L' + (x0 + wCanal) + ' ' + py(pt.na[sTopo.key]) + ' ';
+    });
+    for (var i2 = perfil.pontos.length - 1; i2 >= 0; i2--) {
+      var pt2 = perfil.pontos[i2];
+      x0 = xIni(i2);
+      dAgua += 'L' + (x0 + wCanal) + ' ' + py(pt2.fundo) + ' L' + x0 + ' ' + py(pt2.fundo) + ' ';
+    }
+    g.appendChild(sv('path', { class: 'agua', d: dAgua + 'Z' }));
+
+    /* linhas de NA por série */
+    series.forEach(function (s) {
+      var d = '';
       perfil.pontos.forEach(function (pt, i) {
-        var y = py(pt.na[k]);
-        d += (i === 0 ? 'M' : 'L') + xx + ' ' + y + ' L' + (xx + wCanal) + ' ' + y + ' ';
-        xx += wCanal;
+        var y = py(pt.na[s.key]);
+        d += (i === 0 ? 'M' : 'L') + xIni(i) + ' ' + y + ' L' + (xIni(i) + wCanal) + ' ' + y + ' ';
       });
-      g.appendChild(sv('path', { class: 'agua-l', d: d,
-        'stroke-dasharray': ki === 0 ? null : (ki === 1 ? '5 3' : '2 2'), opacity: ki === 0 ? 1 : 0.7 }));
+      g.appendChild(sv('path', { d: d, fill: 'none', stroke: s.cor, 'stroke-width': 2,
+        'stroke-dasharray': s.traco || null, 'stroke-linejoin': 'round' }));
     });
 
     /* fundo do canal (degraus) + grades */
-    var dF = '', x2 = mE;
+    var dF = '';
     perfil.pontos.forEach(function (pt, i) {
       var y = py(pt.fundo);
-      dF += (i === 0 ? 'M' : 'L') + x2 + ' ' + y + ' L' + (x2 + wCanal) + ' ' + y + ' ';
+      var x = xIni(i);
+      dF += (i === 0 ? 'M' : 'L') + x + ' ' + y + ' L' + (x + wCanal) + ' ' + y + ' ';
       if (pt.grade) {
-        var yTopo = py(pt.na.max) - 14;
-        g.appendChild(sv('line', { class: 'estrutura', x1: x2 + wCanal * 0.55, y1: y,
-          x2: x2 + wCanal * 0.35, y2: yTopo, 'stroke-width': 2.4 }));
+        var yTopo = py(pt.na[sTopo.key]) - 16;
+        g.appendChild(sv('line', { class: 'estrutura', x1: x + wCanal * 0.58, y1: y,
+          x2: x + wCanal * 0.38, y2: yTopo, 'stroke-width': 3 }));
+        g.appendChild(sv('line', { class: 'estrutura', x1: x + wCanal * 0.58 + 5, y1: y,
+          x2: x + wCanal * 0.38 + 5, y2: yTopo, 'stroke-width': 1 }));
       }
-      g.appendChild(sv('text', { x: x2 + wCanal / 2, y: HH - 8, 'text-anchor': 'middle' },
+      g.appendChild(sv('text', { x: x + wCanal / 2, y: HH - 26, 'text-anchor': 'middle' },
         pt.rot.replace(/\s*\(.*\)/, '')));
-      x2 += wCanal;
+      g.appendChild(sv('text', { x: x + wCanal / 2, y: HH - 14, 'text-anchor': 'middle', class: 'cota-t' },
+        'fundo ' + UI.num(pt.fundo, 2)));
     });
-    g.appendChild(sv('path', { class: 'estrutura', d: dF }));
+    g.appendChild(sv('path', { class: 'estrutura', d: dF, 'stroke-width': 2 }));
 
     /* Parshall */
-    var xP = x2 + gap;
+    var xP = xIni(nSeg) + gap;
     if (perfil.saida) {
       var yCr = py(perfil.saida.crista), yJus = py(perfil.saida.fundoJusante);
       var yFundoDes = py(perfil.pontos[perfil.pontos.length - 1].fundo);
-      g.appendChild(sv('path', { class: 'estrutura',
+      g.appendChild(sv('path', { class: 'estrutura', 'stroke-width': 2,
         d: 'M' + xP + ' ' + yFundoDes + ' L' + (xP + wParshall * 0.3) + ' ' + yCr +
            ' L' + (xP + wParshall * 0.62) + ' ' + yCr + ' L' + (xP + wParshall * 0.8) + ' ' + yJus +
            ' L' + (xP + wParshall) + ' ' + yJus }));
-      g.appendChild(sv('text', { x: xP + wParshall / 2, y: HH - 8, 'text-anchor': 'middle' }, 'Parshall'));
+      g.appendChild(sv('text', { x: xP + wParshall / 2, y: HH - 26, 'text-anchor': 'middle' }, 'Parshall'));
+      g.appendChild(sv('text', { x: xP + wParshall / 2, y: HH - 14, 'text-anchor': 'middle', class: 'cota-t' },
+        'crista ' + UI.num(perfil.saida.crista, 2)));
     }
 
     /* poço */
     var xPo = xP + wParshall + gap;
     var yNAx = py(p.naMax), yNAn = py(p.naMin), yF = py(p.cotaFundo);
-    g.appendChild(sv('rect', { class: 'agua', x: xPo + 6, y: yNAx, width: wPoco - 12, height: Math.max(2, yF - yNAx) }));
-    g.appendChild(sv('path', { class: 'estrutura',
-      d: 'M' + xPo + ' ' + (py(p.cotaLaje !== null ? p.cotaLaje : cMax)) + ' L' + xPo + ' ' + yF +
-         ' L' + (xPo + wPoco) + ' ' + yF + ' L' + (xPo + wPoco) + ' ' + (py(p.cotaLaje !== null ? p.cotaLaje : cMax)) }));
+    var yLaje = py(p.cotaLaje !== null ? p.cotaLaje : cMax);
+    g.appendChild(sv('rect', { class: 'agua', x: xPo + 3, y: yNAx, width: wPoco - 6, height: Math.max(2, yF - yNAx) }));
+    g.appendChild(sv('path', { class: 'estrutura', 'stroke-width': 2,
+      d: 'M' + xPo + ' ' + yLaje + ' L' + xPo + ' ' + yF + ' L' + (xPo + wPoco) + ' ' + yF +
+         ' L' + (xPo + wPoco) + ' ' + yLaje }));
     g.appendChild(sv('line', { class: 'agua-l', x1: xPo, x2: xPo + wPoco, y1: yNAx, y2: yNAx }));
     g.appendChild(sv('line', { class: 'agua-l', 'stroke-dasharray': '4 3', x1: xPo, x2: xPo + wPoco, y1: yNAn, y2: yNAn }));
-    g.appendChild(sv('text', { x: xPo + wPoco / 2, y: HH - 8, 'text-anchor': 'middle' }, 'Poço de sucção'));
-    g.appendChild(sv('text', { class: 'cota-t', x: xPo + wPoco - 4, y: yNAx - 3, 'text-anchor': 'end' }, 'NA máx ' + UI.num(p.naMax, 2)));
-    g.appendChild(sv('text', { class: 'cota-t', x: xPo + wPoco - 4, y: yNAn - 3, 'text-anchor': 'end' }, 'NA mín ' + UI.num(p.naMin, 2)));
-    g.appendChild(sv('text', { class: 'cota-t', x: xPo + wPoco - 4, y: yF - 3, 'text-anchor': 'end' }, 'fundo ' + UI.num(p.cotaFundo, 2)));
+    g.appendChild(sv('text', { x: xPo + wPoco / 2, y: HH - 26, 'text-anchor': 'middle' }, 'Poço de sucção'));
+    g.appendChild(sv('text', { class: 'cota-t', x: xPo + wPoco - 5, y: yNAx - 4, 'text-anchor': 'end' }, 'NA máx ' + UI.num(p.naMax, 2)));
+    g.appendChild(sv('text', { class: 'cota-t', x: xPo + wPoco - 5, y: yNAn + 11, 'text-anchor': 'end' }, 'NA mín ' + UI.num(p.naMin, 2)));
+    g.appendChild(sv('text', { class: 'cota-t', x: xPo + wPoco - 5, y: yF - 4, 'text-anchor': 'end' }, 'fundo ' + UI.num(p.cotaFundo, 2)));
 
-    /* cota da chegada */
-    g.appendChild(sv('text', { class: 'cota-t', x: mE - 2, y: py(perfil.pontos[0].fundo) - 4, 'text-anchor': 'start' },
-      'GI ' + UI.num(perfil.pontos[0].fundo + (Number(0) || 0), 2)));
+    /* legenda das séries, no canto superior esquerdo (área livre do desenho) */
+    var lx = mE + 16, ly = mT + 6;
+    g.appendChild(sv('rect', { x: lx - 8, y: ly - 12, width: 196, height: series.length * 15 + 14,
+      fill: 'var(--surface)', stroke: 'var(--border)', rx: 4, opacity: 0.92 }));
+    series.forEach(function (s, i) {
+      var yy = ly + i * 15;
+      g.appendChild(sv('line', { x1: lx, x2: lx + 24, y1: yy, y2: yy, stroke: s.cor, 'stroke-width': 2.4,
+        'stroke-dasharray': s.traco || null }));
+      g.appendChild(sv('text', { x: lx + 30, y: yy + 3 },
+        (s.rotCurto || s.key) + ' — ' + UI.num(s.Q * 1000, 1) + ' L/s'));
+    });
 
     svg.appendChild(g);
     return svg;
@@ -8315,6 +9165,24 @@ html.imprimindo-doc #doc-saida { display: block; }
       p.rotForma + (p.camaras > 1 ? ' · ' + p.camaras + ' câmaras' : '') +
       ' · V útil = ' + UI.num(p.volUtil, 1) + ' m³ (mín. ' + UI.num(p.volMinTotal, 1) + ' m³)' +
       (p.naMax !== null ? ' · NA ' + UI.num(p.naMin, 2) + ' a ' + UI.num(p.naMax, 2) + ' m' : ''));
+    if (r.conformidade) {
+      var cf = r.conformidade;
+      var reprova = cf.checks.filter(function (c) { return !c.ok && !c.atencao && !c.nota; }).length;
+      var atencaoN = cf.checks.filter(function (c) { return !c.ok && c.atencao; }).length;
+      linha('Conformidade normativa (NBR 12208/12209' +
+        (cf.concessionaria !== 'nenhuma' ? ' + ' + (cf.concessionaria === 'sanepar' ? 'SANEPAR' : 'SABESP') : '') + ')',
+        reprova === 0 ? (atencaoN === 0 ? true : null) : false,
+        cf.canais.n + ' canal(is) de gradeamento (' + cf.canais.oper + '+' + cf.canais.reserva + ')' +
+        (st.eee.bypass.canal === 'sim' ? ' + by-pass' : '') +
+        ' · ' + reprova + ' não conformidade(s) · ' + atencaoN + ' atenção(ões)');
+    }
+    if (r.residuos) {
+      var rsx = r.residuos;
+      linha('Resíduos e movimentação', rsx.ok ? true : (rsx.checks.every(function (c) { return c.ok || c.atencao; }) ? null : false),
+        rsx.nTotal + ' caçamba(s) de ' + UI.num(rsx.cap, 0) + ' m³' +
+        (rsx.monovia ? ' · talha ' + UI.num(rsx.monovia.capTalha, 0) + ' kg (' +
+          (rsx.monovia.talhaTipo === 'eletrica' ? 'elétrica' : 'manual') + ') · viga ' + (rsx.monovia.perfil || '—') : ''));
+    }
 
     return UI.cartao('Estação elevatória — tratamento preliminar e poço',
       'síntese das unidades a montante das bombas',
@@ -9426,12 +10294,13 @@ html.imprimindo-doc #doc-saida { display: block; }
     { id: 'gradeamento', rot: 'Chegada e gradeamento' },
     { id: 'areia', rot: 'Parshall e desarenador' },
     { id: 'poco', rot: 'Poço de sucção' },
+    { id: 'perfilEEE', rot: 'Perfil hidráulico' },
     { sep: true },
     { id: 'bombas', rot: 'Bombas e níveis' },
     { id: 'succao', rot: 'Sucção' },
     { id: 'barrilete', rot: 'Barriletes' },
     { id: 'adutoras', rot: 'Linha de recalque' },
-    { id: 'perfil', rot: 'Perfil da linha' },
+    { id: 'perfil', rot: 'Perfil da LR' },
     { sep: true },
     { id: 'resultados', rot: 'Resultados' },
     { sep: true },
@@ -9530,7 +10399,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     var fixo = document.getElementById('fixo');
     var interno = fixo.firstChild;
     UI.limpar(interno);
-    var comFaixa = ['vazoes', 'gradeamento', 'areia', 'poco', 'bombas', 'succao', 'barrilete', 'adutoras', 'perfil', 'resultados'].indexOf(App.aba) >= 0;
+    var comFaixa = ['vazoes', 'gradeamento', 'areia', 'poco', 'perfilEEE', 'bombas', 'succao', 'barrilete', 'adutoras', 'perfil', 'resultados'].indexOf(App.aba) >= 0;
     fixo.classList.toggle('ativa', comFaixa);
     if (comFaixa) {
       interno.appendChild(PDA.Res.faixa(st, ctx, res));
@@ -9546,6 +10415,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       case 'gradeamento': conteudo = PDA.FE.abaGradeamento(st, ctx, res); break;
       case 'areia':      conteudo = PDA.FE.abaAreia(st, ctx, res); break;
       case 'poco':       conteudo = PDA.FE.abaPoco(st, ctx, res); break;
+      case 'perfilEEE':  conteudo = PDA.FE.abaPerfilEEE(st, ctx, res); break;
       case 'bombas':     conteudo = PDA.F.abaBombas(st, ctx, res); break;
       case 'succao':     conteudo = PDA.F.abaSuccao(st, ctx); break;
       case 'barrilete':  conteudo = PDA.F.abaBarrilete(st, ctx); break;
@@ -10394,6 +11264,9 @@ html.imprimindo-doc #doc-saida { display: block; }
     st.eee.poco.partidasHora = 10;
     st.eee.poco.dnBocaMm = 200;
     st.eee.poco.altMotorM = 0.75;          /* NA mínimo do fabricante (submersível) */
+    st.eee.poco.passagemSolidosMm = 90;    /* Sulzer XFP 206J: 90 × 110 mm */
+    st.eee.residuos.monovia.cargaBombaKg = 690;
+    st.eee.bypass.energia = 'tomada_gerador';
 
     /* barrilete e linha de recalque, como na planilha LRE03 */
     st.barrileteIndividual.ativo = true;
@@ -10657,9 +11530,10 @@ html.imprimindo-doc #doc-saida { display: block; }
         UI.sub('Sequência de trabalho'),
         h('ol', {},
           h('li', {}, h('b', {}, 'Vazões'), ' — comece aqui. Informe o quadro completo de vazões (mínima, média, máxima diária e máxima horária de início, meio e fim de plano) ou apenas a QMH de fim de plano: o programa estima o resto pelos coeficientes K1, K2 e K3, e qualquer valor estimado pode ser sobrescrito. A QMH de fim de plano vira a vazão da linha de recalque automaticamente.'),
-          h('li', {}, h('b', {}, 'Chegada e gradeamento'), ' — cota da geratriz inferior do coletor afluente (a amarra de todo o perfil hidráulico), canal de entrada e o gradeamento: grades grossa/média/fina, manuais ou mecanizadas, ou um cesto com içamento nas estações pequenas.'),
-          h('li', {}, h('b', {}, 'Parshall e desarenador'), ' — a tabela de gargantas mostra todas as calhas com as cores dos critérios e a estrela na sugestão; clique numa linha para fixar a preferida. O desarenador pode ser canal com rebaixo z, caixa quadrada, aerado ou vórtice.'),
-          h('li', {}, h('b', {}, 'Poço de sucção'), ' — partidas por hora, rodízio, câmara única ou uma câmara por bomba, volume útil, NA máximo e mínimo, submergência e o perfil hidráulico completo da entrada. Os níveis alimentam sozinhos a aba Bombas e níveis.'),
+          h('li', {}, h('b', {}, 'Chegada e gradeamento'), ' — cota da geratriz inferior do coletor afluente (a amarra de todo o perfil hidráulico), canal de entrada em 1, 2 ou 3+ canais paralelos (com reserva), e o gradeamento: grades grossa/média/fina, manuais ou mecanizadas, ou um cesto com içamento nas estações pequenas. O cartão de conformidade avisa quando a NBR 12209 obriga a mecanização (QMH ≥ 100 L/s) e quando o canal de by-pass com grade manual é necessário.'),
+          h('li', {}, h('b', {}, 'Parshall e desarenador'), ' — a tabela de gargantas mostra todas as calhas com as cores dos critérios e a estrela na sugestão; clique numa linha para fixar a preferida. O desarenador pode ser canal com rebaixo z, caixa quadrada, aerado ou vórtice; as caçambas de gradeado e areia saem dimensionadas (tamanho, quantidade e reserva).'),
+          h('li', {}, h('b', {}, 'Poço de sucção'), ' — partidas por hora, rodízio, câmara única ou uma câmara por bomba, volume útil, NA máximo e mínimo, submergência, extravasor/energia de emergência e a movimentação de cargas (monovia, talha, viga e tubos-guia). Os níveis alimentam sozinhos a aba Bombas e níveis.'),
+          h('li', {}, h('b', {}, 'Perfil hidráulico'), ' — o desenho do perfil da entrada com as vazões que você escolher (de qualquer fase de plano), cada uma com a sua cor, e a tabela de NA por ponto.'),
           h('li', {}, h('b', {}, 'Projeto'), ' — identificação da obra e condições do fluido (temperatura, altitude). Traz também a lista de conferência do preenchimento.'),
           h('li', {}, h('b', {}, 'Bombas e níveis'), ' — quantos conjuntos, quantos operam, rendimentos, o desenho das cotas, o NPSH disponível e, se quiser, a curva da bomba para achar o ponto de operação real.'),
           h('li', {}, h('b', {}, 'Sucção e Barriletes'), ' — as peças de cada trecho. O barrilete comum aceita um trecho por etapa de reunião das bombas, e a vazão de cada um acompanha quantas bombas ele coleta.'),
@@ -11874,9 +12748,43 @@ html.imprimindo-doc #doc-saida { display: block; }
         'Taxas de ' + n((st.eee.desarenador.taxaAreiaLm3 || 0.03) * 1000, 0) + ' L de areia e ' +
         n((st.eee.desarenador.taxaGradeadoLm3 || 0.05) * 1000, 0) + ' L de material gradeado por 1.000 m³ (' +
         MEM.cit('jordao') + ').');
-      D.nota('Recipiente de remoção sugerido para ' + d.diasAcumulo + ' dias: ' +
-        (d.cacamba ? 'caçamba de ' + n(d.cacamba, 0) + ' m³.' : 'acima das caçambas usuais — prever remoção mais frequente.'));
+      var rs = res.eee.residuos;
+      D.p('Para a remoção dos resíduos adotam-se caçambas ' +
+          (rs.tipo === 'rollon' ? 'roll-on/roll-off' : 'estacionárias (poliguindaste)') + ' de ' + n(rs.cap, 0) +
+          ' m³, no total de ' + rs.nTotal + ' unidade(s): ' + rs.nGradeado + ' para material gradeado' +
+          (rs.nAreia > 0 ? ', ' + rs.nAreia + ' para areia (enchimento limitado a ' +
+            Math.round(PDA.DE.residuos.fatorEnchimentoAreia * 100) + ' % pelo peso' +
+            (rs.pesoAreiaCheia ? ' — ' + n(rs.pesoAreiaCheia, 0) + ' kg por caçamba' : '') + ')' : '') +
+          (rs.nReserva > 0 ? ' e ' + rs.nReserva + ' de reserva para a troca no dia da coleta' : '') +
+          ', com autonomia de ' + rs.dias + ' dias na condição de fim de plano. A baia das caçambas deve ter piso ' +
+          'de concreto com contenção e ralo (percolado retornando ao poço), caçambas fechadas e estanques com ' +
+          'dreno, faixa de acesso do caminhão de no mínimo 3,5 m e gabarito vertical livre de 4,5 m ' +
+          D.usar('jordao') + '.');
     }
+
+    /* ---- canais, by-pass e conformidade ---- */
+    var cf = res.eee.conformidade;
+    D.secao('Canais, by-pass e conformidade normativa');
+    var canaisTxt = cf.canais.n === 1 ? 'canal único de gradeamento'
+      : cf.canais.n + ' canais de gradeamento em paralelo (' + cf.canais.oper + ' em operação e ' +
+        cf.canais.reserva + ' de reserva), isoláveis por comportas';
+    D.p('O tratamento preliminar foi concebido com ' + canaisTxt +
+        (st.eee.bypass.canal === 'sim' ? ', além de canal de by-pass com grade de limpeza manual' : '') + '. ' +
+        (cf.temMecanizada
+          ? 'Havendo gradeamento mecanizado, a NBR 12209 exige no mínimo duas unidades — cada uma com capacidade ' +
+            'para a vazão total afluente — admitindo que uma delas seja grade de limpeza manual usada como ' +
+            'reserva/by-pass ' + D.usar('nbr12209') + '.'
+          : 'A NBR 12209 exige limpeza mecanizada das grades média e fina quando a vazão máxima afluente de fim ' +
+            'de plano atinge ' + PDA.DE.conf.qGradeMecanizadaLs + ' L/s — neste projeto, ' +
+            n(res.eee.vaz.qDim * 1000, 1) + ' L/s ' + D.usar('nbr12209') + '.'));
+    D.tabela('Verificações de conformidade normativa',
+      [{ rot: 'Verificação', esq: true }, 'Situação'],
+      cf.checks.map(function (c) {
+        return h('tr', {}, h('td', { class: 'esq' }, c.txt),
+          h('td', {}, c.nota ? 'Nota' : (c.ok ? 'Atende' : (c.atencao ? 'Atenção' : 'NÃO ATENDE'))));
+      }),
+      'NBR 12208, NBR 12209' + (cf.concessionaria !== 'nenhuma' ? ' e ' +
+        (cf.concessionaria === 'sanepar' ? 'MPS SANEPAR 11.1' : 'NTS SABESP') : '') + '.');
   };
 
   MEM.capituloPoco = function (D, st, ctx, res) {
@@ -11964,6 +12872,51 @@ html.imprimindo-doc #doc-saida { display: block; }
             h('td', {}, p.naMax !== null ? n(p.naMax, 3) : '—'))
         ].filter(Boolean)),
         'Calculado pelo programa.');
+    }
+
+    /* ---- contingência: extravasor e energia ---- */
+    var bp = st.eee.bypass || {};
+    var ex = r.conformidade.extravasor;
+    D.secao('Contingência operacional — extravasor e energia');
+    D.p('Contra a paralisação do bombeamento (falta de energia ou manutenção), a NBR 12208 exige ao menos uma ' +
+        'destas providências: extravasor com anuência prévia do órgão ambiental, fonte de energia de emergência ' +
+        '(grupo gerador fixo, tomada externa para gerador móvel ou segunda alimentação independente) ou volume ' +
+        'de acumulação compatível com o tempo de resposta da operação ' + D.usar('nbr12208') + '. ' +
+        'Neste projeto: ' +
+        (bp.extravasor === 'sim'
+          ? 'previu-se extravasor' + (bp.destinoExtravasor ? ' com lançamento em ' + bp.destinoExtravasor : '') +
+            (bp.anuenciaAmbiental ? ', com anuência ambiental registrada' : ' — a anuência ambiental está PENDENTE') + '; '
+          : 'não há extravasor; ') +
+        ({ nenhuma: 'não foi prevista fonte de energia de emergência.',
+           tomada_gerador: 'previu-se tomada externa com chave de transferência para gerador móvel.',
+           gerador_fixo: 'previu-se grupo gerador fixo com partida automática.',
+           dupla_alimentacao: 'previu-se segunda alimentação elétrica independente.' })[bp.energia || 'nenhuma']);
+    if (ex) {
+      D.p('Com as bombas paradas, o volume entre o NA máximo e a ' + ex.rotLimite + ' é de ' + n(ex.volAcum, 1) +
+          ' m³, o que dá ' + (isFinite(ex.tMedMin) ? n(ex.tMedMin, 0) : '—') + ' min de acumulação na vazão média ' +
+          'de fim de plano (' + (isFinite(ex.tMaxMin) ? n(ex.tMaxMin, 0) : '—') + ' min na QMH) antes do ' +
+          'extravasamento/remanso — prática usual mínima de ' + (PDA.DE.conf.autonomiaExtravMinH * 60) +
+          ' min quando não há extravasor licenciado.');
+    }
+    D.nota('Prever boia adicional no nível de extravasamento, com alarme e acionamento automático do conjunto ' +
+      'reserva (MPS SANEPAR 11.1).');
+
+    /* ---- movimentação de cargas ---- */
+    var mv = r.residuos.monovia;
+    if (mv) {
+      D.secao('Movimentação de cargas');
+      D.p('Para retirada dos conjuntos motobomba' + (r.cesto ? ', do cesto de sólidos' : '') +
+          ' e das comportas, previu-se monovia com talha ' + (mv.talhaTipo === 'eletrica' ? 'elétrica' : 'manual') +
+          ' de ' + n(mv.capTalha, 0) + ' kg (carga de içamento de ' + n(mv.carga, 0) + ' kg — ' + mv.origemCarga +
+          ' — com folga de 25 %), elevação de ' + mv.elevacao + ' m e trole ' + mv.trole + '. A viga indicada é o ' +
+          'perfil ' + (mv.perfil || 'a definir') + ' para vão de ' + n(mv.vaoM, 1) + ' m — dimensionamento ' +
+          'INDICATIVO (flecha L/600, carga com coeficiente de impacto), a confirmar por verificação estrutural ' +
+          'conforme a NBR 8800 ' + D.usar('metcalf') + '.' +
+          (mv.tuboGuia ? ' As bombas submersíveis descem por tubo-guia duplo ' + mv.tuboGuia +
+            ', em aço inox ou galvanizado a fogo, com acoplamento automático no pedestal.' : ''));
+      if (mv.ponteRolante) {
+        D.nota('A carga e o vão sugerem ponte rolante ou pórtico em lugar de monovia simples.');
+      }
     }
   };
 
