@@ -161,15 +161,26 @@ modelo do fabricante (ARI, BERMAD, Saint-Gobain). Tudo com alerta de
 memorial ganha o capítulo de proteção. É anteprojeto: o dimensionamento final
 sai do estudo pelo método das características (Allievi, Hammer).
 
-Os **dados de entrada do golpe** (avaliar, tempo de manobra, ancoragem/ψ) vivem
-no topo desta aba — saíram da aba Adutora / Recalque. E os **dispositivos
-conversam entre si**: cada ventosa de admissão, TAU ou chaminé lançado cria uma
-**zona de alívio** (ventosa ±300 m, TAU até o fim da zona de depressão, chaminé
-±150 m) onde a envoltória mínima protegida não desce abaixo de zero; os pontos
-cobertos **saem do requisito de subpressão do RHO**, que pode ficar bem menor —
-lançar ventosas nos pontos críticos evita um RHO gigante. A chaminé ainda limita
-a envoltória máxima ao seu nível d'água. O gráfico **"Com a proteção lançada"**
-aparece e atualiza com **qualquer** dispositivo, não só com o RHO.
+A pré-avaliação do golpe **roda sempre** — o antigo cartão com o liga/desliga
+saiu do programa; os dados da manobra (tempo, ancoragem/ψ) vivem no cartão de
+topo desta aba, junto do liga/desliga do **estudo** de proteção. E os
+**dispositivos conversam entre si**: cada ventosa de admissão, TAU ou chaminé
+lançado cria uma **zona de alívio** (ventosa ±300 m; TAU e chaminé até o fim da
+zona de depressão de jusante; chaminé também ±150 m limitando a envoltória
+máxima ao seu nível d'água) onde a envoltória mínima protegida não desce abaixo
+de zero; os pontos cobertos **saem do requisito de subpressão do RHO**, que pode
+ficar bem menor — lançar ventosas nos pontos críticos evita um RHO gigante. O
+gráfico **"Com a proteção lançada"** aparece e atualiza com **qualquer**
+dispositivo, insere pontos nas bordas de cada zona para o efeito ficar visível
+mesmo em perfil esparso, e lista as zonas embaixo.
+
+O **TAU** é dimensionado pela **cavidade de separação** estimada por coluna
+rígida (Stephenson, discharge tanks): rompida a coluna, o trecho de jusante
+desacelera sob a carga disponível em regime — `s = v²·Lj/(2·g·ΔH)`, cavidade
+`= A·s`, tanque = 1,5 × a cavidade. A versão anterior mandava encher o tubo
+inteiro da zona de depressão, o que superdimensionava em uma ordem de grandeza.
+A energia da coluna usada no RHO também passou a somar trecho a trecho, com a
+velocidade de cada um.
 
 **Tipo de junta por trecho** — ao lado do catálogo, o trecho escolhe a junta:
 no FD, JGS (elástica), JTI/JTE (travadas) ou flangeada; no PEAD, solda de topo,

@@ -1082,45 +1082,6 @@
     ];
   };
 
-  /* Dados de entrada da pré-avaliação do golpe. É mostrado na aba
-     Transitório e proteção (era a parte de baixo da aba Adutora). */
-  F.cartaoGolpeEntrada = function (st, ctx, res) {
-    var anc = PDA.H.ancoragem.filter(function (a) { return a.id === (st.golpe.ancoragem || 'juntas'); })[0];
-    return UI.cartao('Transitório hidráulico — dados de entrada',
-      'Pré-avaliação para conferir a classe de pressão do tubo', [
-      UI.check(st, 'Avaliar golpe de aríete', 'golpe.avaliar', {
-        dica: 'Cálculo preliminar por Joukowsky (manobra rápida) e Michaud/Allievi (manobra lenta), para verificar se a classe de pressão do tubo tem folga.'
-      }),
-      st.golpe.avaliar ? h('div', {},
-        PDA.Q.caixa('O que a pré-avaliação calcula', PDA.Q.golpe(),
-          'O programa calcula a celeridade da onda no tubo escolhido, compara o tempo de manobra informado com o ' +
-          'tempo crítico 2L/a para saber se a manobra é rápida ou lenta, e obtém a sobrepressão Δh. ' +
-          'A pressão de conferência é a altura manométrica somada a Δh. Com o perfil da linha lançado na aba ' +
-          'Perfil, o programa traça as duas envoltórias ponto a ponto e acusa também a subpressão.'),
-        h('div', { class: 'grade' },
-          UI.campo(st, 'Tempo de manobra / parada', 'golpe.tempoManobra', { sufixo: 's',
-            dica: 'Tempo de fechamento da válvula ou de parada do conjunto. Se for menor que o tempo crítico 2L/a, a manobra é rápida e vale a sobrepressão integral de Joukowsky. Se for maior, aplica-se a fórmula de manobra lenta (Michaud/Allievi), que dá um valor menor.' }),
-          UI.select(st, 'Ancoragem longitudinal do tubo', 'golpe.ancoragem',
-            PDA.H.ancoragem.map(function (a) { return { v: a.id, rot: a.rot }; }),
-            { dica: PDA.H.ancoragem.map(function (a) { return a.rot + '\n' + a.nota; }).join('\n\n') + '\n\n' +
-                    PDA.H.fontes.filter(function (f) { return f.id === 'ancoragem'; })[0].txt }),
-          st.golpe.ancoragem === 'manual'
-            ? UI.campo(st, 'Coeficiente ψ', 'golpe.psi',
-                { dica: 'ψ multiplica o termo D/(eE) na celeridade. Valores maiores reduzem a celeridade.' })
-            : h('div', { class: 'chip' }, h('span', { class: 'rot' }, 'ψ resultante'),
-                h('span', { class: 'val' },
-                  res.golpe && res.golpe.length ? UI.num(res.golpe[0].psi, 3) : '—'),
-                h('span', { class: 'nota' }, anc ? anc.rot : ''))),
-        h('div', { class: 'aviso' },
-          h('b', {}, 'Tubulação sem dispositivos de proteção'),
-          'A pré-avaliação calcula o transitório da tubulação NUA: não considera tanque de alívio (TAU), chaminé ' +
-          'de equilíbrio, válvula antecipadora de onda, ventosa de duplo efeito nem volante de inércia. ' +
-          'Se a sobrepressão estourar a classe do tubo, o caminho usual não é engrossar a parede — é dimensionar ' +
-          'a proteção, logo abaixo nesta aba; o dimensionamento final exige a modelagem do transitório pelo ' +
-          'método das características.')) : null
-    ], UI.botaoFonte(['nbr12215']));
-  };
-
   /* ================================================================
      ABA: Parâmetros de cálculo
      ================================================================ */

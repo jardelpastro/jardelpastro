@@ -35,8 +35,8 @@
   function cartaoRequisito(st, ctx, res, req) {
     if (!req) {
       return UI.cartao('Requisito da proteção', null, h('div', { class: 'aviso info' },
-        'Avalie o golpe de aríete (cartão acima) e, de preferência, lance o perfil da linha — o requisito da ' +
-        'proteção sai da envoltória de pressões.'));
+        'Preencha a adutora (diâmetro e extensão) e, de preferência, lance o perfil da linha — o requisito da ' +
+        'proteção sai da envoltória de pressões da pré-avaliação.'));
     }
     var corpo = [
       h('div', { class: 'grade' },
@@ -191,13 +191,23 @@
         UI.campo(st, 'Posição na linha (m)', base + '.x',
           { dica: 'Distância da elevatória até o TAU, medida ao longo da linha. O usual é logo a jusante do ponto alto crítico.' }),
         UI.campo(st, 'Volume adotado (m³)', base + '.volumeM3', {})),
-      tau && !tau.erro ? h('table', { class: 'tab-apoio', style: 'max-width:560px' }, h('tbody', {},
-        h('tr', {}, h('td', { class: 'esq' }, 'Volume da zona de depressão a jusante'),
-          h('td', {}, tau.volumeZona ? UI.num(tau.volumeZona, 1) + ' m³' : '—')),
-        h('tr', { class: 'total' }, h('td', { class: 'esq' }, 'Volume necessário (com 50 % de folga)'),
+      tau && !tau.erro && tau.cavidade !== undefined ? h('table', { class: 'tab-apoio', style: 'max-width:560px' }, h('tbody', {},
+        h('tr', {}, h('td', { class: 'esq' }, 'Coluna de jusante (Lj, v)'),
+          h('td', {}, UI.num(tau.LJus, 0) + ' m · ' + UI.num(tau.vJus, 2) + ' m/s')),
+        h('tr', {}, h('td', { class: 'esq' }, 'Carga que retém a coluna (ΔH)'),
+          h('td', {}, UI.num(tau.dH, 1) + ' mca')),
+        h('tr', {}, h('td', { class: 'esq' }, 'Cavidade de separação estimada',
+          UI.dica('Coluna rígida (STEPHENSON, discharge tanks): rompida a coluna no ponto, o trecho de jusante segue com a velocidade de regime e percorre s = v²·Lj/(2·g·ΔH) até parar; a cavidade é A·s. Antes, o programa mandava encher o TUBO INTEIRO da zona de depressão (' +
+            (tau.volumeZona ? UI.num(tau.volumeZona, 0) + ' m³ neste caso' : '—') + ') — um exagero; a cavidade é o que realmente abre.')),
+          h('td', {}, UI.num(tau.cavidade, 1) + ' m³')),
+        h('tr', { class: 'total' }, h('td', { class: 'esq' }, 'Volume necessário (1,5 × a cavidade)'),
           h('td', {}, h('b', {}, tau.volume ? UI.num(tau.volume, 1) + ' m³' : '—'))),
-        tau.alcance ? h('tr', {}, h('td', { class: 'esq' }, 'Zona protegida até'),
-          h('td', {}, UI.num(tau.alcance, 0) + ' m')) : null)) : null);
+        tau.alcance ? h('tr', {}, h('td', { class: 'esq' }, 'Zona de depressão protegida até'),
+          h('td', {}, UI.num(tau.alcance, 0) + ' m')) : null)) : null,
+      tau && tau.desce ? h('div', { class: 'aviso', style: 'margin-top:6px' },
+        'O ponto está ACIMA do nível de chegada: o trecho de jusante tende a escoar por gravidade e a ' +
+        'desaceleração vem, em parte, só do atrito. A cavidade real pode ser maior — confirme este TAU ' +
+        'no estudo de transiente.') : null);
   }
 
   function corpoChamine(st, ctx, res, req, d, i, aval) {
@@ -278,7 +288,12 @@
           'O RHO limita o Δh global a ≈ ' + UI.num(prot.dhSobre, 1) + ' mca na sobrepressão e ' +
           UI.num(prot.dhSub, 1) + ' mca na depressão.') : h('p', { class: 'nota', style: 'margin-top:4px' },
           'Sem RHO lançado a sobrepressão continua a do golpe sem proteção — os dispositivos lançados ' +
-          'aliviam a DEPRESSÃO nas suas zonas.')));
+          'aliviam a DEPRESSÃO nas suas zonas.'),
+        prot.zonas && prot.zonas.length ? h('p', { class: 'nota', style: 'margin-top:4px' },
+          h('b', {}, 'Zonas de alívio no gráfico: '),
+          prot.zonas.map(function (z) {
+            return z.rot + ' (' + UI.num(Math.max(0, z.x0), 0) + '–' + UI.num(z.x1, 0) + ' m)';
+          }).join('; ') + '.') : null));
     } else {
       lados.push(h('div', { class: 'via' },
         h('h4', {}, 'Com proteção'),
@@ -302,28 +317,47 @@
      Aba
      ================================================================ */
 
+  /* Dados de entrada da pré-avaliação do golpe + liga/desliga do estudo,
+     em um único cartão de topo. A pré-avaliação roda sempre — o que se
+     liga é o ESTUDO de proteção (requisito, dispositivos, envoltórias). */
+  function cartaoTopo(st, ctx, res) {
+    var anc = PDA.H.ancoragem.filter(function (a) { return a.id === (st.golpe.ancoragem || 'juntas'); })[0];
+    return UI.cartao('Transitório e proteção',
+      'Pré-avaliação do golpe de aríete e anteprojeto dos dispositivos de proteção', [
+      PDA.Q.caixa('O que a pré-avaliação calcula', PDA.Q.golpe(),
+        'O programa calcula a celeridade da onda no tubo escolhido, compara o tempo de manobra informado com o ' +
+        'tempo crítico 2L/a para saber se a manobra é rápida ou lenta, e obtém a sobrepressão Δh. ' +
+        'Com o perfil da linha lançado, traça as duas envoltórias ponto a ponto e acusa também a subpressão. ' +
+        'O resultado sai na aba Resultados e alimenta o estudo de proteção abaixo.', false),
+      h('div', { class: 'grade', style: 'margin-top:10px' },
+        UI.campo(st, 'Tempo de manobra / parada', 'golpe.tempoManobra', { sufixo: 's',
+          dica: 'Tempo de fechamento da válvula ou de parada do conjunto. Se for menor que o tempo crítico 2L/a, a manobra é rápida e vale a sobrepressão integral de Joukowsky. Se for maior, aplica-se a fórmula de manobra lenta (Michaud/Allievi), que dá um valor menor.' }),
+        UI.select(st, 'Ancoragem longitudinal do tubo', 'golpe.ancoragem',
+          PDA.H.ancoragem.map(function (a) { return { v: a.id, rot: a.rot }; }),
+          { dica: PDA.H.ancoragem.map(function (a) { return a.rot + '\n' + a.nota; }).join('\n\n') + '\n\n' +
+                  PDA.H.fontes.filter(function (f) { return f.id === 'ancoragem'; })[0].txt }),
+        st.golpe.ancoragem === 'manual'
+          ? UI.campo(st, 'Coeficiente ψ', 'golpe.psi',
+              { dica: 'ψ multiplica o termo D/(eE) na celeridade. Valores maiores reduzem a celeridade.' })
+          : h('div', { class: 'chip' }, h('span', { class: 'rot' }, 'ψ resultante'),
+              h('span', { class: 'val' },
+                res.golpe && res.golpe.length ? UI.num(res.golpe[0].psi, 3) : '—'),
+              h('span', { class: 'nota' }, anc ? anc.rot : ''))),
+      h('div', { style: 'margin-top:11px' },
+        UI.check(st, 'Estudar a proteção contra o transitório desta linha', 'protecao.ativo', {
+          dica: 'A pré-avaliação acima calcula a linha SEM proteção. Ligando o estudo, o programa calcula quanto a proteção precisa limitar o golpe, sugere onde instalar cada dispositivo, pré-dimensiona RHO, TAU, chaminé e ventosas e estima a envoltória protegida.'
+        })),
+      !st.protecao.ativo ? h('p', { class: 'nota', style: 'margin-top:9px' },
+        'Com o estudo desligado nada muda no restante do programa. A pré-avaliação sem proteção continua na aba Resultados.') : null
+    ], UI.botaoFonte(['nbr12215']));
+  }
+
   UP.aba = function (st, ctx, res) {
     var out = [];
     var pr = st.protecao;
 
-    /* dados de entrada da pré-avaliação (Joukowsky/Michaud) — era o
-       rodapé da aba Adutora, agora vive aqui */
-    out.push(PDA.F.cartaoGolpeEntrada(st, ctx, res));
-
-    out.push(UI.cartao('Estudo da proteção', 'Do "não passa sem proteção" ao anteprojeto dos dispositivos', [
-      UI.check(st, 'Estudar a proteção contra o transitório desta linha', 'protecao.ativo', {
-        dica: 'A pré-avaliação acima calcula a linha SEM proteção. Aqui o programa calcula quanto a proteção precisa limitar o golpe, sugere onde instalar cada dispositivo, pré-dimensiona RHO, TAU, chaminé e ventosas e estima a envoltória protegida.'
-      }),
-      !pr.ativo ? h('p', { class: 'nota', style: 'margin-top:9px' },
-        'Com a opção desligada nada muda no restante do programa. A pré-avaliação sem proteção continua na aba Resultados.') : null
-    ]));
+    out.push(cartaoTopo(st, ctx, res));
     if (!pr.ativo) return out;
-
-    if (!st.golpe.avaliar) {
-      out.push(UI.cartao('Golpe de aríete desligado', null, h('div', { class: 'aviso erro' },
-        'A pré-avaliação do golpe está desligada no cartão acima — ligue "Avaliar golpe de aríete" para o estudo de proteção ter o Δh de partida.')));
-      return out;
-    }
 
     var req = PR.requisito(st, ctx, res);
     out.push(cartaoRequisito(st, ctx, res, req));

@@ -348,6 +348,11 @@
       st.economia.custoB = p.economia.custoB;
     }
 
+    /* A pré-avaliação do golpe deixou de ser opcional: o cartão com o
+       liga/desliga saiu do programa e o cálculo roda sempre que houver
+       dados. Projetos antigos gravados com a opção desligada ligam-na. */
+    if (st.golpe) st.golpe.avaliar = true;
+
     st.versao = E.VERSAO;
     return st;
   };

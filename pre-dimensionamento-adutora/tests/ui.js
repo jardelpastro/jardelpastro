@@ -635,11 +635,13 @@ function titulo(t) { console.log('\n' + t); }
   /* o cartão do golpe saiu da aba Adutora: vive na aba Transitório e proteção */
   ok('aba Adutora não tem mais o cartão do golpe',
      (await page.locator('select[data-bind="golpe.ancoragem"]').count()) === 0 &&
-     !/Avaliar golpe de aríete/.test(await page.locator('#conteudo').innerText()));
+     !/golpe de aríete/i.test(await page.locator('#conteudo').innerText()));
   await page.evaluate(() => window.PDA.App.irPara('protecao'));
   await page.waitForTimeout(450);
-  ok('cartão do golpe presente na aba Transitório e proteção',
-     /Avaliar golpe de aríete/.test(await page.locator('#conteudo').innerText()));
+  ok('dados do golpe no cartão de topo da aba Transitório e proteção',
+     /Tempo de manobra/.test(await page.locator('#conteudo').innerText()));
+  ok('a pré-avaliação não tem mais liga/desliga (roda sempre)',
+     (await page.locator('input[data-bind="golpe.avaliar"]').count()) === 0);
   const anc = await page.locator('select[data-bind="golpe.ancoragem"]');
   ok('seletor de ancoragem presente', (await anc.count()) === 1);
   ok('quatro casos oferecidos', (await anc.locator('option').count()) === 4,
@@ -1829,6 +1831,21 @@ function titulo(t) { console.log('\n' + t); }
   ok('memorial tem o capítulo de proteção', memPr.cap);
   ok('com a figura da envoltória protegida', memPr.fig);
   ok('e a tabela de dispositivos', memPr.tab);
+
+  /* TAU lançado no ponto crítico: cavidade de separação e zonas no gráfico */
+  await page.evaluate(() => window.PDA.App.irPara('protecao'));
+  await page.waitForTimeout(450);
+  await page.locator('[data-acao="protTauAqui"][data-x="1500"]').click();
+  await page.waitForTimeout(500);
+  const txtTau = await page.locator('#conteudo').innerText();
+  ok('TAU pré-dimensionado pela cavidade de separação', /cavidade de separação/i.test(txtTau));
+  ok('zonas de alívio listadas sob o gráfico protegido', /zonas de alívio/i.test(txtTau));
+  await page.evaluate(() => {           /* remove o TAU para não interferir adiante */
+    window.PDA.App.st.protecao.dispositivos = window.PDA.App.st.protecao.dispositivos
+      .filter(d => d.tipo !== 'tau');
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(300);
 
   titulo('40. Tipo de junta no trecho');
   await page.evaluate(() => { window.PDA.App.irPara('adutoras'); });

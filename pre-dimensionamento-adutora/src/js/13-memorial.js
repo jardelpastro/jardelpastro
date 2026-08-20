@@ -892,8 +892,13 @@
       }
       if (d.tipo === 'tau' && aval.tau && !aval.tau.erro) {
         D.secao('Tanque alimentador unidirecional (TAU) — ' + n(Number(d.x) || 0, 0) + ' m');
-        D.p('Volume dimensionado para preencher a zona de depressão a jusante do ponto de instalação: ' +
-            (aval.tau.volume ? n(aval.tau.volume, 1) + ' m³ (com 50 % de folga).' : aval.tau.nota));
+        D.p(aval.tau.volume
+          ? 'Volume dimensionado pela cavidade de separação estimada por coluna rígida: rompida a coluna no ' +
+            'ponto, o trecho de jusante (' + n(aval.tau.LJus, 0) + ' m a ' + n(aval.tau.vJus, 2) +
+            ' m/s) desacelera sob a carga disponível em regime (' + n(aval.tau.dH, 1) + ' mca), abrindo uma ' +
+            'cavidade de ' + n(aval.tau.cavidade, 1) + ' m³; o tanque deve conter 1,5 vez esse volume: ' +
+            n(aval.tau.volume, 1) + ' m³.'
+          : aval.tau.nota);
         linhasD.push(['TAU em ' + n(Number(d.x) || 0, 0) + ' m',
           (Number(d.volumeM3) ? ne(d.volumeM3) : n(aval.tau.volume || 0, 1)) + ' m³', aval.classe]);
       }

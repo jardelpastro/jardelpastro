@@ -152,11 +152,19 @@
       } else if (d.tipo === 'chamine') {
         var ch = PR.chamine(st, ctx, res, x);
         var alt = Number(d.altura) > 0 ? Number(d.altura) : (ch && !ch.erro ? ch.altura : null);
+        /* junto à chaminé, a carga fica presa ao nível d'água dela */
         var z = { x0: Math.max(0, x - RAIO_CHAMINE), x1: x + RAIO_CHAMINE,
                   efeito: 'ambos', tipo: 'chamine',
                   rot: 'chaminé em ' + Math.round(x) + ' m' };
         if (alt !== null && ch && !ch.erro) z.headMax = ch.cota + alt;
         out.push(z);
+        /* como tanque aberto, ela alimenta a zona de depressão de jusante
+           igual a um TAU de volume ilimitado */
+        var zd = zonaDepressao(res, x);
+        if (zd.vol > 0 && zd.alcance > x + RAIO_CHAMINE) {
+          out.push({ x0: x, x1: zd.alcance, efeito: 'depressao', tipo: 'chamine',
+                     rot: 'chaminé em ' + Math.round(x) + ' m (alimentação de jusante)' });
+        }
       }
     });
     return out;
@@ -168,17 +176,21 @@
 
   PR.VOLUMES_RHO = [0.5, 0.75, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50];
 
-  /* Energia cinética da coluna d'água da adutora */
+  /* Energia cinética da coluna d'água da adutora, somada trecho a trecho
+     com a velocidade de CADA trecho (usar a velocidade do primeiro para a
+     linha toda superestimava a energia quando o diâmetro muda). */
   function energiaColuna(res, rho) {
-    var m = 0, v0 = 0, L = 0;
+    var m = 0, v0 = 0, L = 0, KE = 0;
     (res.projeto.adutoras || []).forEach(function (r) {
       if (!r.tubo || !(r.tubo.diM > 0) || !(r.L > 0)) return;
       var A = Math.PI * r.tubo.diM * r.tubo.diM / 4;
-      m += rho * A * r.L;
+      var mi = rho * A * r.L;
+      m += mi;
+      KE += 0.5 * mi * r.v * r.v;
       L += r.L;
       if (!v0) v0 = r.v;
     });
-    return { KE: 0.5 * m * v0 * v0, massa: m, v0: v0, L: L };
+    return { KE: KE, massa: m, v0: v0, L: L };
   }
 
   /* Volume de ar inicial para segurar a oscilação dentro de [p2, p1]
@@ -237,11 +249,10 @@
      TAU — tanque alimentador unidirecional
      ================================================================ */
 
-  /* Volume de água para preencher a zona de depressão a jusante do ponto
-     de instalação (onde a envoltória mínima fica negativa). */
-  PR.tau = function (st, ctx, res, xInstal) {
+  /* Zona de depressão a jusante de um ponto: onde a envoltória mínima
+     fica negativa (volume de tubo da zona serve só de referência). */
+  function zonaDepressao(res, xInstal) {
     var env = res.envoltoria;
-    if (!env) return { erro: 'O TAU é dimensionado sobre o perfil — lance o perfil da linha.' };
     var vol = 0, alcance = 0, dentro = false;
     for (var i = 1; i < env.pontos.length; i++) {
       var a = env.pontos[i - 1], b = env.pontos[i];
@@ -255,9 +266,49 @@
         dentro = true;
       } else if (dentro) break;               /* fim da primeira zona de depressão */
     }
-    if (!(vol > 0)) return { volume: 0, nota: 'Não há zona de depressão a jusante deste ponto — o TAU não é necessário aqui.' };
-    return { volume: vol * 1.5, volumeZona: vol, alcance: alcance };
+    return { vol: vol, alcance: alcance };
+  }
+
+  /* O TAU precisa encher a CAVIDADE de separação que se forma no ponto,
+     não o tubo inteiro da zona de depressão. Estimativa por coluna rígida
+     (STEPHENSON, discharge tanks): rompida a coluna, o trecho de jusante
+     segue com a velocidade de regime e desacelera sob a carga que o retém
+     — com a cavidade à pressão atmosférica, essa carga é a própria pressão
+     disponível no ponto em regime (hgl − cota = desnível até a chegada +
+     atrito de jusante):
+        s = v²·Lj / (2·g·ΔH)      Vcav = A·s   (limitado ao tubo de jusante)
+     Volume do TAU = 1,5 × cavidade. */
+  PR.tau = function (st, ctx, res, xInstal) {
+    var env = res.envoltoria;
+    if (!env) return { erro: 'O TAU é dimensionado sobre o perfil — lance o perfil da linha.' };
+    var zona = zonaDepressao(res, xInstal);
+    if (!(zona.vol > 0)) return { volume: 0, nota: 'Não há zona de depressão a jusante deste ponto — o TAU não é necessário aqui.' };
+
+    var p = pontoEm(env, xInstal);
+    var Lj = Math.max(1, env.lTrechos - p.xEscalado);
+    var A = areaEm(res, Math.min(env.lTrechos, p.xEscalado + 1));
+    var vJus = velocidadeEm(res, Math.min(env.lTrechos, p.xEscalado + 1));
+    var dH = Math.max(2, p.hgl - p.cota);     /* nunca menos de 2 mca de carga retentora */
+    var s = vJus * vJus * Lj / (2 * G * dH);
+    var cav = A * Math.min(s, Lj);            /* a cavidade não passa do tubo de jusante */
+    var desce = p.cota > (Number(st.cotas.nivelChegada) || 0);
+    return {
+      volume: cav * 1.5, cavidade: cav, curso: Math.min(s, Lj),
+      LJus: Lj, vJus: vJus, dH: dH,
+      volumeZona: zona.vol, alcance: zona.alcance, desce: desce
+    };
   };
+
+  function velocidadeEm(res, xx) {
+    var acc = 0;
+    for (var i = 0; i < res.projeto.adutoras.length; i++) {
+      var r = res.projeto.adutoras[i];
+      acc += r.L;
+      if (xx <= acc + 1e-9 && r.v > 0) return r.v;
+    }
+    var u = res.projeto.adutoras[res.projeto.adutoras.length - 1];
+    return u && u.v > 0 ? u.v : 0;
+  }
 
   function areaEm(res, xx) {
     var acc = 0;
@@ -396,8 +447,8 @@
       var volT = Number(d.volumeM3) || 0;
       var clT = 'bom', avT = [];
       if (!(volT > 0)) { avT.push('Escolha o volume do TAU — o necessário é da ordem de ' + tau.volume.toFixed(1).replace('.', ',') + ' m³.'); clT = 'na'; }
-      else if (volT + 1e-9 < tau.volume) { avT.push('SUBDIMENSIONADO: a zona de depressão a jusante pede ≈ ' + tau.volume.toFixed(1).replace('.', ',') + ' m³ (já com 50 % de folga).'); clT = 'ruim'; }
-      else if (volT > 3 * tau.volume) { avT.push('SUPERDIMENSIONADO: mais de 3× o volume da zona de depressão.'); clT = 'atencao'; }
+      else if (volT + 1e-9 < tau.volume) { avT.push('SUBDIMENSIONADO: a cavidade de separação estimada pede ≈ ' + tau.volume.toFixed(1).replace('.', ',') + ' m³ (já com 50 % de folga).'); clT = 'ruim'; }
+      else if (volT > 3 * tau.volume) { avT.push('SUPERDIMENSIONADO: mais de 3× a cavidade de separação estimada.'); clT = 'atencao'; }
       return { avisos: avT, classe: clT, tau: tau };
     }
 
@@ -465,6 +516,40 @@
     if (!env) return null;
     var zonas = PR.zonasAlivio(st, ctx, res);
 
+    /* Os pontos da envoltória são os do perfil, que podem ser esparsos:
+       uma zona de alívio curta (ventosa ±300 m, chaminé ±150 m) pode não
+       conter nenhum deles e o efeito ficaria invisível no gráfico. Insere
+       pontos interpolados nas bordas de cada zona e na posição de cada
+       dispositivo, para o patamar aparecer. */
+    var inserir = [];
+    zonas.forEach(function (z) { inserir.push(z.x0, z.x1); });
+    disp.forEach(function (d) {
+      if (d.tipo !== 'rho' && Number(d.x) > 0) inserir.push(Number(d.x));
+    });
+    inserir.forEach(function (xi) {
+      if (!(xi > 0) || !(xi < env.lTrechos)) return;
+      var perto = env.pontos.some(function (p) { return Math.abs(p.xEscalado - xi) < 1; });
+      if (perto) return;
+      var dir = null, esq = null;
+      env.pontos.forEach(function (p) {
+        if (p.xEscalado <= xi && (!esq || p.xEscalado > esq.xEscalado)) esq = p;
+        if (p.xEscalado >= xi && (!dir || p.xEscalado < dir.xEscalado)) dir = p;
+      });
+      if (!esq || !dir || dir.xEscalado <= esq.xEscalado) return;
+      var t = (xi - esq.xEscalado) / (dir.xEscalado - esq.xEscalado);
+      var cota = esq.cota + (dir.cota - esq.cota) * t;
+      var hgl = esq.hgl + (dir.hgl - esq.hgl) * t;
+      var frac = 1 - Math.min(1, Math.max(0, xi / env.lTrechos));
+      env.pontos.push({
+        x: xi / (env.escala || 1), xEscalado: xi, cota: cota, rot: '',
+        hgl: hgl, envMax: hgl + dhSobre * frac, envMin: hgl - dhSub * frac,
+        pPerm: hgl - cota, pMax: hgl + dhSobre * frac - cota,
+        pMin: hgl - dhSub * frac - cota, pn: esq.pn,
+        classe: 'bom', motivos: []
+      });
+    });
+    env.pontos.sort(function (a, b) { return a.xEscalado - b.xEscalado; });
+
     env.pontos.forEach(function (p) {
       var frac = 1 - Math.min(1, Math.max(0, p.xEscalado / env.lTrechos));
       /* lado da depressão com o Δh próprio (pode diferir do da sobrepressão) */
@@ -512,7 +597,8 @@
 
   PR.fontes = [
     { id: 'pr_rho', txt: 'Pré-dimensionamento de RHO pelo método da coluna rígida com ar isotérmico: a energia cinética da coluna é igualada ao trabalho de compressão/expansão do ar, KE = γ·p₀·V₀·ln(p₁/p₀). TSUTIYA, Abastecimento de Água; STEPHENSON, Water Hammer: practical solutions. Anteprojeto — o volume final sai do estudo de transiente.' },
-    { id: 'pr_ventosa', txt: 'Regra usual de anteprojeto para ventosas: DN da ventosa entre 1/12 e 1/8 do DN da linha; pontos altos e espaçamento máximo da ordem de 500 a 800 m. Funções: simples (expulsão em operação), dupla (cinética), tríplice (combinada), quádrupla non-slam (fechamento amortecido). TSUTIYA; AWWA M51 — Air Valves.' }
+    { id: 'pr_ventosa', txt: 'Regra usual de anteprojeto para ventosas: DN da ventosa entre 1/12 e 1/8 do DN da linha; pontos altos e espaçamento máximo da ordem de 500 a 800 m. Funções: simples (expulsão em operação), dupla (cinética), tríplice (combinada), quádrupla non-slam (fechamento amortecido). TSUTIYA; AWWA M51 — Air Valves.' },
+    { id: 'pr_tau', txt: 'Pré-dimensionamento de TAU pela cavidade de separação estimada por coluna rígida: rompida a coluna no ponto, o trecho de jusante desacelera sob a carga disponível em regime (s = v²·Lj/(2·g·ΔH); Vcav = A·s), e o tanque deve conter 1,5 × a cavidade. STEPHENSON, Water Hammer: practical solutions (discharge tanks). Anteprojeto — o volume final sai do estudo de transiente.' }
   ];
 
   PDA.PR = PR;

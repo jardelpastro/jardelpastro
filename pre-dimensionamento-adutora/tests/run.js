@@ -1285,8 +1285,12 @@ stPR.protecao.dispositivos.push(E.novoDispositivo('chamine'));
 stPR.protecao.dispositivos[2].x = 1500;
 stPR.protecao.dispositivos[2].altura = 8;
 const zonas3 = PR.zonasAlivio(stPR, ctxP, resP);
-ok('chaminé cria zona com teto na envoltória máxima',
-   zonas3.length === 3 && zonas3[2].headMax !== undefined, JSON.stringify(zonas3[2]));
+ok('chaminé cria zona local com teto na envoltória máxima',
+   zonas3.some(z => z.tipo === 'chamine' && z.headMax !== undefined),
+   JSON.stringify(zonas3));
+ok('chaminé também alimenta a zona de depressão de jusante (como TAU ilimitado)',
+   zonas3.some(z => z.tipo === 'chamine' && z.efeito === 'depressao' && z.x1 > 1650),
+   JSON.stringify(zonas3));
 const prot3 = PR.envoltoriaProtegida(stPR, ctxP, resP);
 ok('rótulo lista os dispositivos lançados',
    /ventosa/.test(prot3.rotulo) && /TAU/.test(prot3.rotulo) && /chaminé/.test(prot3.rotulo), prot3.rotulo);
@@ -1294,6 +1298,66 @@ const noEntorno = prot3.env.pontos.filter(p => Math.abs(p.xEscalado - 1500) <= 1
 ok('no entorno da chaminé a envoltória máxima respeita o nível d\'água (cota + altura)',
    noEntorno.length > 0 && noEntorno.every(p => p.envMax <= 145 + 8 + 1e-6),
    JSON.stringify(noEntorno.map(p => p.envMax)));
+/* pontos interpolados nas bordas das zonas: o efeito aparece no gráfico
+   mesmo quando o perfil é esparso */
+ok('a envoltória protegida ganha pontos nas bordas das zonas',
+   prot3.env.pontos.length > resP.envoltoria.pontos.length &&
+   prot3.env.pontos.some(p => Math.abs(p.xEscalado - 1200) < 1) &&
+   prot3.env.pontos.some(p => Math.abs(p.xEscalado - 1800) < 1),
+   prot3.env.pontos.map(p => Math.round(p.xEscalado)).join(','));
+ok('pontos inseridos ficam ordenados e com cota interpolada',
+   prot3.env.pontos.every((p, i, a) => i === 0 || p.xEscalado >= a[i - 1].xEscalado) &&
+   prot3.env.pontos.filter(p => Math.abs(p.xEscalado - 1200) < 1)
+     .every(p => p.cota > 100 && p.cota < 145));
+/* chaminé sozinha também alivia o requisito */
+{
+  const stCh = stProt();
+  stCh.perfil.pontos[1].cota = 145;
+  const resCh = C.resumo(stCh, cats);
+  stCh.protecao.dispositivos = [E.novoDispositivo('chamine')];
+  stCh.protecao.dispositivos[0].x = 1500;
+  stCh.protecao.dispositivos[0].altura = 8;
+  const reqCh = PR.requisito(stCh, ctxP, resCh);
+  ok('chaminé sozinha alivia o requisito de depressão', reqCh.aliviadosSub >= 1,
+     String(reqCh.aliviadosSub));
+}
+
+titulo('40c. TAU pela cavidade de separação (coluna rígida)');
+{
+  const stT = stProt();
+  stT.perfil.pontos[1].cota = 145;
+  const resT = C.resumo(stT, cats);
+  const tauC = PR.tau(stT, ctxP, resT, 1500);
+  ok('TAU devolve a cavidade e o volume', !tauC.erro && tauC.cavidade > 0 && tauC.volume > 0,
+     JSON.stringify(tauC));
+  prox('volume = 1,5 × cavidade', tauC.volume, tauC.cavidade * 1.5, 1e-9);
+  /* fecha com a cinemática: s = v²·Lj/(2·g·ΔH), cavidade = A·s */
+  const pT = resT.envoltoria.pontos.filter(p => Math.abs(p.xEscalado - 1500) < 1)[0];
+  const sT = tauC.vJus * tauC.vJus * tauC.LJus / (2 * 9.80665 * tauC.dH);
+  prox('curso da coluna de jusante', tauC.curso, Math.min(sT, tauC.LJus), 1e-9);
+  prox('ΔH é a pressão disponível no ponto em regime', tauC.dH, Math.max(2, pT.hgl - pT.cota), 1e-9);
+  ok('a cavidade é MUITO menor que o tubo da zona de depressão (fim do exagero)',
+     tauC.volume < tauC.volumeZona,
+     JSON.stringify({ volume: tauC.volume, tuboDaZona: tauC.volumeZona }));
+  ok('ponto acima do nível de chegada é sinalizado (gravidade a jusante)',
+     tauC.desce === true);
+}
+/* a energia da coluna soma trecho a trecho com a velocidade de cada um */
+{
+  const st2t = stProt();
+  st2t.adutoras[0].extensao = 1500;
+  const dup = JSON.parse(JSON.stringify(st2t.adutoras[0]));
+  dup.itemRot = 'DN 600'; dup.extensao = 1500; dup.nome = 'Trecho 2';
+  st2t.adutoras.push(dup);
+  const res2t = C.resumo(st2t, cats);
+  const req2t = PR.requisito(st2t, C.contexto(st2t, cats), res2t);
+  const rho2t = PR.rho(st2t, C.contexto(st2t, cats), res2t, req2t);
+  const keMao = res2t.projeto.adutoras.reduce((acc, r) => {
+    const A = Math.PI * r.tubo.diM * r.tubo.diM / 4;
+    return acc + 0.5 * (C.contexto(st2t, cats).rho || 998) * A * r.L * r.v * r.v;
+  }, 0);
+  prox('KE somada por trecho (v de cada trecho)', rho2t.KE, keMao, 1e-6);
+}
 
 titulo('41. Tipos de junta');
 const catFDj = CAT.buscar(cats.todos, 'fd_k7');
