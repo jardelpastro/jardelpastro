@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tempo de Esvaziamento de Adutora</title>
+<style>
+  :root {
+    /* ==========================================================
+       PALETA DO TEMA — cores da logo Pastro Engenharia
+       --primaria ........ azul-marinho da marca (cabeçalho, botões, tubo)
+       --primaria-escura .. variação escura do marinho
+       --realce ........... verde-água (teal) da gota da logo
+       --realce-suave ..... fundo claro derivado do teal
+       ========================================================== */
+    --primaria: #1b2452;
+    --primaria-escura: #101838;
+    --realce: #2aa39c;
+    --realce-suave: #e7f5f4;
+    --realce-borda: #bfe2df;
+    --tubo-interno: #7ed3cb;
+
+    --verde: #2e7d32;
+    --laranja: #e65100;
+    --vermelho: #c62828;
+    --cinza: #5f6368;
+    --borda: #d6dee4;
+    --fundo: #f4f7f8;
+    --card: #ffffff;
+    --texto: #202124;
+    --terreno: #efe6d8;
+    --terreno-borda: #b09b7c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--fundo);
+    color: var(--texto);
+    line-height: 1.5;
+    padding-bottom: 3rem;
+  }
+  header {
+    /* degradê marinho → teal, como no letreiro "ENGENHARIA" da logo */
+    background: linear-gradient(160deg, #101838 0%, #1b2452 55%, #2aa39c 135%);
+    color: #fff;
+    padding: 1.6rem 1rem 1.4rem;
+    text-align: center;
+    position: relative;
+  }
+  .btn-tema {
+    position: absolute; top: .9rem; right: .9rem;
+    width: 2.5rem; height: 2.5rem; border-radius: 50%;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.35);
+    color: #fff; font-size: 1.15rem; cursor: pointer; line-height: 1;
+  }
+  .btn-tema:hover { background: rgba(255,255,255,.25); }
+  header h1 { font-size: 1.45rem; font-weight: 600; }
+  header p { font-size: .9rem; opacity: .85; margin-top: .3rem; }
+  main { max-width: 980px; margin: 0 auto; padding: 1rem; }
+
+  .tabs { display: flex; gap: .5rem; margin: 1rem 0; }
+  .tab-btn {
+    flex: 1; padding: .7rem .5rem; border: 1px solid var(--borda);
+    background: var(--card); border-radius: 10px; cursor: pointer;
+    font-size: .95rem; font-weight: 600; color: var(--cinza);
+    transition: all .15s;
+  }
+  .tab-btn.ativo {
+    background: var(--primaria); color: #fff; border-color: var(--primaria);
+    box-shadow: 0 2px 6px rgba(0,0,0,.18);
+  }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--borda);
+    border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem;
+  }
+  .card h2 {
+    font-size: 1rem; color: var(--primaria-escura); margin-bottom: .8rem;
+    display: flex; align-items: center; gap: .45rem;
+  }
+  .card h2 .num {
+    background: var(--primaria); color: #fff; width: 1.5rem; height: 1.5rem;
+    border-radius: 50%; display: inline-flex; align-items: center;
+    justify-content: center; font-size: .8rem; flex-shrink: 0;
+  }
+
+  .campo { margin-bottom: .85rem; }
+  .campo label {
+    display: block; font-size: .84rem; font-weight: 600;
+    color: var(--cinza); margin-bottom: .25rem;
+  }
+  .campo .dica { font-weight: 400; color: #8a9199; }
+  .linha-input { display: flex; gap: .5rem; align-items: center; }
+  input[type=number], select {
+    width: 100%; padding: .55rem .7rem; font-size: 1rem;
+    border: 1px solid var(--borda); border-radius: 8px;
+    background: #fff; color: var(--texto);
+  }
+  input[type=number]:focus, input[type=text]:focus, select:focus {
+    outline: 2px solid var(--realce); border-color: var(--realce);
+  }
+  input[type=text] {
+    width: 100%; padding: .55rem .7rem; font-size: 1rem;
+    border: 1px solid var(--borda); border-radius: 8px;
+    background: #fff; color: var(--texto);
+  }
+  /* seletor compacto de DN: mostra só "DN ▾"; o valor fica no campo ao lado */
+  select.sel-dn {
+    flex: 0 0 auto; width: auto; padding: .55rem .25rem .55rem .45rem;
+    font-size: .9rem; color: var(--cinza); font-weight: 600;
+  }
+  /* o campo manual tem prioridade de espaço: precisa exibir até 4 dígitos + milhar (1.800) */
+  .linha-input input { flex: 1 1 auto; min-width: 4.6rem; }
+  .unidade { font-size: .85rem; color: var(--cinza); min-width: 2.4rem; }
+
+  .segmento { display: flex; gap: .4rem; }
+  .seg {
+    flex: 1; padding: .5rem .4rem; border: 1px solid var(--borda);
+    background: #fff; border-radius: 8px; cursor: pointer;
+    font-size: .84rem; font-weight: 600; color: var(--cinza); transition: all .15s;
+  }
+  .seg.ativo { background: var(--primaria); color: #fff; border-color: var(--primaria); }
+
+  .subtitulo-lado {
+    font-size: .84rem; font-weight: 700; color: var(--primaria-escura);
+    margin: .8rem 0 .5rem; padding-top: .6rem; border-top: 1px dashed var(--borda);
+  }
+
+  .lados { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+  .lados.um { grid-template-columns: 1fr; }
+  .lados.um #blocoLado1 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+  .lados.um #blocoLado1 .campo-dn { grid-column: 1 / -1; }
+  @media (max-width: 480px) {
+    .lados, .lados.um #blocoLado1 { grid-template-columns: 1fr; }
+  }
+
+  .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .45rem; align-items: center; }
+  .chips .rotulo-chip { font-size: .78rem; color: var(--cinza); }
+  .chip {
+    border: 1px solid var(--realce-borda); background: var(--realce-suave);
+    border-radius: 999px; padding: .18rem .7rem; font-size: .8rem;
+    cursor: pointer; font-weight: 600; color: var(--primaria);
+  }
+  .chip.ativo { background: var(--primaria); color: #fff; border-color: var(--primaria); }
+
+  .resultado-principal {
+    background: var(--realce-suave); border: 1px solid var(--realce-borda);
+    border-radius: 12px; padding: 1.2rem; text-align: center; margin-bottom: 1rem;
+  }
+  .resultado-principal .rotulo { font-size: .85rem; color: var(--cinza); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .resultado-principal .valor { font-size: 2.1rem; font-weight: 700; color: var(--primaria-escura); margin: .2rem 0; }
+  .resultado-principal .detalhe { font-size: .9rem; color: var(--cinza); }
+
+  table.res { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  table.res td { padding: .45rem .3rem; border-bottom: 1px solid #eef2f6; }
+  table.res td:last-child { text-align: right; font-weight: 600; white-space: nowrap; }
+  table.res tr:last-child td { border-bottom: none; }
+
+  .alerta { border-radius: 8px; padding: .6rem .8rem; font-size: .87rem; margin-top: .6rem; display: flex; gap: .5rem; }
+  .alerta.aviso { background: #fff3e0; color: var(--laranja); border: 1px solid #ffd8a8; }
+  .alerta.erro  { background: #fdecea; color: var(--vermelho); border: 1px solid #f5c6c2; }
+  .alerta.ok    { background: #e8f5e9; color: var(--verde); border: 1px solid #bfe3c0; }
+  .alerta.info  { background: var(--realce-suave); color: var(--primaria-escura); border: 1px solid var(--realce-borda); }
+
+  .memoria { font-size: .86rem; }
+  .memoria .passo {
+    padding: .55rem .7rem; background: #f8fafc; border: 1px solid #eef2f6;
+    border-radius: 8px; margin-bottom: .5rem;
+  }
+  .memoria .passo b { color: var(--primaria-escura); }
+
+  /* ---------- notação matemática (memória de cálculo) ---------- */
+  #memoria { display: grid; grid-template-columns: 1fr; gap: .55rem; }
+  @media (min-width: 800px) { #memoria { grid-template-columns: 1fr 1fr; } }
+  #memoria .passo { margin-bottom: 0; }
+  .passo-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: .45rem; margin-bottom: .15rem; }
+  .fonte { font-size: .74rem; color: #8a9199; font-style: italic; }
+  .eq {
+    display: block; text-align: center;
+    font-family: "Cambria Math", "STIX Two Math", Cambria, Georgia, serif;
+    font-style: italic; font-size: 1.06rem; color: var(--primaria-escura);
+    margin: .5rem 0; line-height: 1.4;
+  }
+  .eq .num-final { font-style: normal; font-weight: 700; }
+  .frac {
+    display: inline-flex; flex-direction: column; vertical-align: middle;
+    margin: 0 .18em; line-height: 1.25;
+  }
+  .frac > span { display: block; padding: 0 .35em; text-align: center; }
+  .frac > span:first-child { border-bottom: 1.3px solid currentColor; }
+  .sqrt { display: inline-flex; align-items: flex-start; white-space: nowrap; }
+  .sqrt::before { content: "√"; }
+  .sqrt > span { border-top: 1.3px solid currentColor; padding: 0 .12em; }
+
+  /* hipóteses em largura total, itens em duas colunas */
+  .hipoteses-grid { display: grid; grid-template-columns: 1fr; gap: .5rem; }
+  @media (min-width: 800px) {
+    .hipoteses-grid { grid-template-columns: 1fr 1fr; }
+    .hipoteses-grid .passo { margin-bottom: 0; }
+    .hipoteses-grid .passo:last-child { grid-column: 1 / -1; }
+  }
+
+  .esquema { width: 100%; height: auto; display: block; margin: .2rem auto .9rem; }
+  .esquema text { font-family: "Segoe UI", Roboto, Arial, sans-serif; }
+  .rodape { text-align: center; font-size: .78rem; color: #8a9199; margin-top: 1.2rem; padding: 0 1rem; }
+  .oculto { display: none; }
+
+  /* ==========================================================
+     TEMA ESCURO — mesmas cores da marca sobre fundos escuros
+     ========================================================== */
+  html[data-tema="escuro"] {
+    color-scheme: dark;
+    --primaria: #46579f;
+    --primaria-escura: #c0caf2;
+    --realce: #38bdb4;
+    --realce-suave: #0f2e33;
+    --realce-borda: #1e4d4f;
+    --tubo-interno: #63c5be;
+    --verde: #7fd18a;
+    --laranja: #ffb26b;
+    --vermelho: #ff7b72;
+    --cinza: #9fa8c4;
+    --borda: #2a3154;
+    --fundo: #0c1126;
+    --card: #151b38;
+    --texto: #e6e9f2;
+    --terreno: #3a3527;
+    --terreno-borda: #6f6142;
+  }
+  html[data-tema="escuro"] input[type=number],
+  html[data-tema="escuro"] input[type=text],
+  html[data-tema="escuro"] select { background: #0e142c; color: var(--texto); }
+  html[data-tema="escuro"] .seg { background: #0e142c; }
+  html[data-tema="escuro"] .chip { color: var(--realce); }
+  html[data-tema="escuro"] .chip.ativo { color: #fff; }
+  html[data-tema="escuro"] .alerta.aviso { background: #33250e; border-color: #54401e; }
+  html[data-tema="escuro"] .alerta.erro  { background: #361513; border-color: #5c2724; }
+  html[data-tema="escuro"] .alerta.ok    { background: #0f2b16; border-color: #1f4a2a; }
+  html[data-tema="escuro"] .memoria .passo { background: #10162e; border-color: #232b52; }
+  html[data-tema="escuro"] table.res td { border-bottom-color: #232b52; }
+  html[data-tema="escuro"] .campo .dica,
+  html[data-tema="escuro"] .rodape,
+  html[data-tema="escuro"] .chips .rotulo-chip,
+  html[data-tema="escuro"] .fonte { color: #7f89ab; }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="btn-tema" id="btnTema" onclick="alternarTema()" title="Alternar tema claro/escuro">🌙</button>
+  <h1>💧 Tempo de Esvaziamento de Adutora</h1>
+  <p>Cálculo do tempo de esvaziamento do trecho pela descarga de fundo</p>
+</header>
+
+<main>
+
+  <div class="tabs">
+    <button class="tab-btn ativo" id="tabTempo" onclick="mudarModo('tempo')">⏱️ Calcular tempo de esvaziamento</button>
+    <button class="tab-btn" id="tabDim" onclick="mudarModo('dim')">📐 Dimensionar a descarga</button>
+  </div>
+
+  <div class="grid">
+
+    <!-- ===================== ENTRADAS ===================== -->
+    <div>
+      <div class="card">
+        <h2><span class="num">1</span> Dados da adutora (trecho a esvaziar)</h2>
+
+        <div class="campo">
+          <label>Posição da descarga</label>
+          <div class="segmento">
+            <button class="seg ativo" id="segUm" onclick="mudarConfig('um')">Extremidade<br>(um lado)</button>
+            <button class="seg" id="segDois" onclick="mudarConfig('dois')">Ponto baixo<br>(dois lados)</button>
+          </div>
+        </div>
+
+        <!-- ============ ESQUEMA: UM LADO ============ -->
+        <svg class="esquema" id="esqUm" viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg" aria-label="Esquema do trecho com descarga na extremidade">
+          <polygon points="20,60 440,160 440,200 20,200" fill="var(--terreno)"/>
+          <line x1="20" y1="60" x2="440" y2="160" stroke="var(--terreno-borda)" stroke-width="2"/>
+          <line x1="45" y1="72" x2="400" y2="152" stroke="var(--primaria)" stroke-width="9" stroke-linecap="round"/>
+          <line x1="45" y1="72" x2="400" y2="152" stroke="var(--tubo-interno)" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="45" cy="72" r="5" fill="var(--primaria-escura)"/>
+          <text x="38" y="52" font-size="12" fill="var(--primaria-escura)" font-weight="bold">Ponto alto</text>
+          <text x="38" y="65" font-size="10" fill="var(--cinza)">(ventosa)</text>
+          <rect x="394" y="150" width="12" height="18" rx="2" fill="var(--primaria-escura)"/>
+          <path d="M 400 170 q 6 16 22 24" stroke="var(--realce)" stroke-width="4" fill="none" stroke-dasharray="1 6" stroke-linecap="round"/>
+          <text x="330" y="190" font-size="12" fill="var(--primaria-escura)" font-weight="bold">Descarga</text>
+          <text x="330" y="203" font-size="11" fill="var(--cinza)" id="svgDd">d = 75 mm</text>
+          <text x="200" y="98" font-size="12" fill="var(--primaria)" font-weight="bold" transform="rotate(12.7 200 98)" id="svgL">L = 1.500 m</text>
+          <text x="200" y="130" font-size="11" fill="var(--cinza)" transform="rotate(12.7 200 130)" id="svgD">DN 300</text>
+          <line x1="428" y1="72" x2="428" y2="160" stroke="var(--vermelho)" stroke-width="1.5"/>
+          <line x1="45" y1="72" x2="428" y2="72" stroke="var(--vermelho)" stroke-width="1" stroke-dasharray="4 4"/>
+          <polygon points="428,72 424,80 432,80" fill="var(--vermelho)"/>
+          <polygon points="428,160 424,152 432,152" fill="var(--vermelho)"/>
+          <text x="405" y="120" font-size="12" fill="var(--vermelho)" font-weight="bold" id="svgH" text-anchor="end">H = 20 m</text>
+        </svg>
+
+        <!-- ============ ESQUEMA: DOIS LADOS ============ -->
+        <svg class="esquema oculto" id="esqDois" viewBox="0 0 460 215" xmlns="http://www.w3.org/2000/svg" aria-label="Esquema do trecho com descarga em ponto baixo entre dois lados">
+          <polygon points="20,60 230,170 440,95 440,205 20,205" fill="var(--terreno)"/>
+          <polyline points="20,60 230,170 440,95" fill="none" stroke="var(--terreno-borda)" stroke-width="2"/>
+          <!-- tubo esquerdo -->
+          <line x1="42" y1="70" x2="222" y2="163" stroke="var(--primaria)" stroke-width="9" stroke-linecap="round"/>
+          <line x1="42" y1="70" x2="222" y2="163" stroke="var(--tubo-interno)" stroke-width="4" stroke-linecap="round"/>
+          <!-- tubo direito -->
+          <line x1="238" y1="159" x2="424" y2="102" stroke="var(--primaria)" stroke-width="9" stroke-linecap="round"/>
+          <line x1="238" y1="159" x2="424" y2="102" stroke="var(--tubo-interno)" stroke-width="4" stroke-linecap="round"/>
+          <!-- pontos altos -->
+          <circle cx="42" cy="70" r="5" fill="var(--primaria-escura)"/>
+          <text x="34" y="50" font-size="11" fill="var(--primaria-escura)" font-weight="bold">Ponto alto esq.</text>
+          <circle cx="424" cy="102" r="5" fill="var(--primaria-escura)"/>
+          <text x="436" y="88" font-size="11" fill="var(--primaria-escura)" font-weight="bold" text-anchor="end">Ponto alto dir.</text>
+          <!-- descarga -->
+          <rect x="224" y="164" width="12" height="16" rx="2" fill="var(--primaria-escura)"/>
+          <path d="M 230 182 q 2 10 12 16" stroke="var(--realce)" stroke-width="4" fill="none" stroke-dasharray="1 6" stroke-linecap="round"/>
+          <text x="230" y="210" font-size="11.5" fill="var(--primaria-escura)" font-weight="bold" text-anchor="middle" id="svg2Dd">Descarga · d = 75 mm</text>
+          <!-- rótulos L1 / L2 -->
+          <text x="118" y="100" font-size="12" fill="var(--primaria)" font-weight="bold" transform="rotate(27.3 118 100)" id="svg2L1">L₁ = 1.000 m</text>
+          <text x="118" y="128" font-size="10.5" fill="var(--cinza)" transform="rotate(27.3 118 128)" id="svg2D">DN₁ 300</text>
+          <text x="325" y="120" font-size="12" fill="var(--primaria)" font-weight="bold" transform="rotate(-16.9 325 120)" id="svg2L2">L₂ = 500 m</text>
+          <text x="325" y="142" font-size="10.5" fill="var(--cinza)" transform="rotate(-16.9 325 142)" id="svg2D2">DN₂ 300</text>
+          <!-- desnível H1 -->
+          <line x1="30" y1="70" x2="30" y2="168" stroke="var(--vermelho)" stroke-width="1.5"/>
+          <line x1="30" y1="70" x2="42" y2="70" stroke="var(--vermelho)" stroke-width="1" stroke-dasharray="3 3"/>
+          <line x1="30" y1="168" x2="224" y2="168" stroke="var(--vermelho)" stroke-width="1" stroke-dasharray="4 4" opacity=".55"/>
+          <polygon points="30,70 26,78 34,78" fill="var(--vermelho)"/>
+          <polygon points="30,168 26,160 34,160" fill="var(--vermelho)"/>
+          <text x="36" y="150" font-size="11.5" fill="var(--vermelho)" font-weight="bold" id="svg2H1">H₁ = 15 m</text>
+          <!-- desnível H2 -->
+          <line x1="436" y1="102" x2="436" y2="168" stroke="var(--vermelho)" stroke-width="1.5"/>
+          <line x1="424" y1="102" x2="436" y2="102" stroke="var(--vermelho)" stroke-width="1" stroke-dasharray="3 3"/>
+          <line x1="236" y1="168" x2="436" y2="168" stroke="var(--vermelho)" stroke-width="1" stroke-dasharray="4 4" opacity=".55"/>
+          <polygon points="436,102 432,110 440,110" fill="var(--vermelho)"/>
+          <polygon points="436,168 432,160 440,160" fill="var(--vermelho)"/>
+          <text x="430" y="150" font-size="11.5" fill="var(--vermelho)" font-weight="bold" text-anchor="end" id="svg2H2">H₂ = 8 m</text>
+        </svg>
+
+        <div class="lados um" id="gridLados">
+        <div id="blocoLado1">
+          <div class="subtitulo-lado oculto" id="titLado1">⬅️ Lado esquerdo</div>
+          <div class="campo campo-dn">
+            <label id="lblD1">Diâmetro da adutora — DN <span class="dica">(interno)</span></label>
+            <div class="linha-input">
+              <select id="selD1" class="sel-dn" onchange="aoMudarDN(1,'sel')"></select>
+              <input type="text" inputmode="numeric" id="inpD1" value="300" oninput="aoMudarDN(1,'inp')" onblur="formatarCampoDN(this)">
+              <span class="unidade">mm</span>
+            </div>
+          </div>
+          <div class="campo">
+            <label id="lblL1">Extensão do trecho — L <span class="dica">(entre o ponto alto e a descarga)</span></label>
+            <div class="linha-input">
+              <input type="number" id="inpL1" min="0" step="10" value="1500" oninput="calcular()">
+              <span class="unidade">m</span>
+            </div>
+          </div>
+          <div class="campo">
+            <label id="lblH1">Desnível — H <span class="dica">(cota do ponto alto − cota da descarga)</span></label>
+            <div class="linha-input">
+              <input type="number" id="inpH1" min="0" step="0.5" value="20" oninput="calcular()">
+              <span class="unidade">m</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="blocoLado2" class="oculto">
+          <div class="subtitulo-lado">➡️ Lado direito</div>
+          <div class="campo">
+            <label>Diâmetro — DN₂ <span class="dica">(lado direito)</span></label>
+            <div class="linha-input">
+              <select id="selD2" class="sel-dn" onchange="aoMudarDN(2,'sel')"></select>
+              <input type="text" inputmode="numeric" id="inpD2" value="300" oninput="aoMudarDN(2,'inp')" onblur="formatarCampoDN(this)">
+              <span class="unidade">mm</span>
+            </div>
+          </div>
+          <div class="campo">
+            <label>Extensão — L₂ <span class="dica">(do ponto alto direito até a descarga)</span></label>
+            <div class="linha-input">
+              <input type="number" id="inpL2" min="0" step="10" value="500" oninput="calcular()">
+              <span class="unidade">m</span>
+            </div>
+          </div>
+          <div class="campo">
+            <label>Desnível — H₂ <span class="dica">(cota do ponto alto direito − cota da descarga)</span></label>
+            <div class="linha-input">
+              <input type="number" id="inpH2" min="0" step="0.5" value="8" oninput="calcular()">
+              <span class="unidade">m</span>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">2</span> Dados da descarga</h2>
+
+        <div class="campo" id="campoDescarga">
+          <label>Diâmetro da descarga — d</label>
+          <div class="linha-input">
+            <select id="selDd" class="sel-dn" onchange="escolherDN('selDd','inpDd')"></select>
+            <input type="text" inputmode="numeric" id="inpDd" value="75" oninput="calcular()" onblur="formatarCampoDN(this)">
+            <span class="unidade">mm</span>
+          </div>
+          <div class="chips" id="chipsSugestao"></div>
+        </div>
+
+        <div class="campo oculto" id="campoTempoAlvo">
+          <label>Tempo de esvaziamento desejado — t</label>
+          <div class="linha-input">
+            <input type="text" inputmode="decimal" id="inpTalvo" value="2" oninput="calcular()">
+            <span class="unidade">horas</span>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label>Coeficiente de vazão — C<sub>d</sub> <span class="dica">(tipo de saída da descarga)</span></label>
+          <div class="linha-input">
+            <select id="selCd" onchange="sincronizarSelect('selCd','inpCd')">
+              <option value="0.61">Orifício / parede delgada — Cd = 0,61</option>
+              <option value="0.82" selected>Tubo curto + válvula (usual) — Cd = 0,82</option>
+              <option value="0.97">Bocal com bordas arredondadas — Cd = 0,97</option>
+              <option value="custom">Personalizado…</option>
+            </select>
+            <input type="text" inputmode="decimal" id="inpCd" value="0,82" oninput="calcular()" style="max-width:6.5rem">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== RESULTADOS ===================== -->
+    <div>
+      <div class="resultado-principal" id="boxResultado">
+        <div class="rotulo" id="resRotulo">Tempo de esvaziamento</div>
+        <div class="valor" id="resValor">—</div>
+        <div class="detalhe" id="resDetalhe"></div>
+      </div>
+
+      <div class="card">
+        <h2>📊 Resumo do cálculo</h2>
+        <table class="res" id="tabResumo"></table>
+        <div id="alertas"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== HIPÓTESES (largura total) ===================== -->
+  <div class="card">
+    <h2>ℹ️ Hipóteses e observações</h2>
+    <div class="memoria hipoteses-grid">
+      <div class="passo">A adutora é considerada <b>isolada a montante</b> (registro fechado — sem vazão afluente durante o esvaziamento).</div>
+      <div class="passo">É admitida <b>entrada de ar adequada</b> nos pontos altos (ventosas). Sem admissão de ar suficiente, o tempo real será maior e há risco de <b>colapso por subpressão</b>.</div>
+      <div class="passo">Cada lado é tratado com <b>declividade uniforme</b> até a descarga. Com dois lados de desníveis diferentes, o esvaziamento ocorre em <b>duas fases</b>: primeiro só o lado mais alto rebaixa (o outro permanece cheio, pressurizado pela coluna vizinha); quando os níveis se igualam, os dois lados esvaziam juntos.</div>
+      <div class="passo">Prática usual: descarga com diâmetro entre <b>D/6 e D/4</b> da adutora e tempo de esvaziamento típico de <b>2 a 6 horas</b> (ajuste conforme a operação prevista e o corpo receptor).</div>
+      <div class="passo">Prever <b>proteção anti-erosiva</b> (caixa de descarga, enrocamento) no lançamento quando a velocidade do jato for elevada.</div>
+      <div class="passo"><b>Referências:</b> Azevedo Netto — <i>Manual de Hidráulica</i> (orifícios, bocais e esvaziamento de reservatórios); Porto, R.M. — <i>Hidráulica Básica</i>, EESC-USP (escoamento por orifícios sob carga variável); Tsutiya, M.T. — <i>Abastecimento de Água</i> (descargas em adutoras).</div>
+    </div>
+  </div>
+
+  <!-- ===================== MEMÓRIA DE CÁLCULO (largura total) ===================== -->
+  <div class="card memoria">
+    <h2>🧮 Memória de cálculo</h2>
+    <div id="memoria"></div>
+  </div>
+
+  <div class="rodape">
+    Ferramenta de pré-dimensionamento — os resultados devem ser verificados em projeto. g = 9,81 m/s².
+  </div>
+</main>
+
+<script>
+"use strict";
+
+const G = 9.81;
+const DN_COMERCIAIS = [50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1100, 1200];
+let modo = "tempo";     // "tempo" | "dim"
+let config = "um";      // "um" | "dois"
+let dn2Editada = false; // usuário já mexeu no DN do lado direito?
+
+const fmt = (v, casas = 2) =>
+  isFinite(v) ? v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas }) : "—";
+
+function fmtTempo(seg) {
+  if (!isFinite(seg) || seg < 0) return "—";
+  if (seg < 1) return "0 s";
+  if (seg < 60) return fmt(seg, 0) + " s";
+  const h = Math.floor(seg / 3600);
+  const min = Math.round((seg - h * 3600) / 60);
+  if (h === 0) return min + " min";
+  if (min === 0) return h + " h";
+  return h + " h " + min + " min";
+}
+
+/* ---------- notação matemática ---------- */
+const frac = (cima, baixo) => `<span class="frac"><span>${cima}</span><span>${baixo}</span></span>`;
+const sqrt = x => `<span class="sqrt"><span>${x}</span></span>`;
+const RES = x => `<span class="num-final">${x}</span>`;
+
+/* Os seletores de DN mostram sempre só "DN"; a lista abre ao clicar e o
+   valor escolhido é lançado no campo numérico ao lado. */
+function preencherSelects() {
+  for (const selId of ["selD1", "selD2", "selDd"]) {
+    const sel = document.getElementById(selId);
+    const ph = document.createElement("option");
+    ph.value = ""; ph.textContent = "DN"; ph.disabled = false;
+    sel.appendChild(ph);
+    DN_COMERCIAIS.forEach(dn => {
+      const o = document.createElement("option");
+      o.value = dn; o.textContent = "DN " + dn;
+      sel.appendChild(o);
+    });
+    sel.value = "";
+  }
+}
+
+function escolherDN(selId, inpId) {
+  const sel = document.getElementById(selId);
+  if (sel.value !== "") document.getElementById(inpId).value = fmtDN(parseInt(sel.value, 10));
+  sel.value = "";   // o seletor volta a exibir apenas "DN"
+  calcular();
+}
+
+function sincronizarSelect(selId, inpId) {
+  const sel = document.getElementById(selId);
+  const inp = document.getElementById(inpId);
+  if (sel.value !== "custom") inp.value = sel.value.replace(".", ",");
+  calcular();
+}
+
+/* DN de referência p/ sugestão da descarga: o maior lado */
+function dnReferencia() {
+  const D1 = numDN("inpD1");
+  if (config !== "dois") return D1;
+  return Math.max(D1 || 0, numDN("inpD2") || 0);
+}
+
+/* Faixa usual da descarga: DNs comerciais entre D/6 e D/4 (se nenhum cair
+   na faixa, o DN comercial mais próximo de D/5). */
+function faixaUsualDescarga(Dmm) {
+  const dMin = Dmm / 6, dMax = Dmm / 4;
+  let lista = DN_COMERCIAIS.filter(dn => dn >= dMin - 0.01 && dn <= dMax + 0.01);
+  if (!lista.length) {
+    const alvo = Dmm / 5;
+    lista = [DN_COMERCIAIS.reduce((p, c) => Math.abs(c - alvo) < Math.abs(p - alvo) ? c : p)];
+  }
+  return lista;
+}
+
+/* Ao mudar um DN da adutora, já preenche a descarga com o DN sugerido
+   (maior DN comercial da faixa usual do maior lado) — o usuário pode alterar. */
+function aoMudarDN(lado, origem) {
+  if (origem === "sel") {
+    const sel = document.getElementById("selD" + lado);
+    if (sel.value !== "") document.getElementById("inpD" + lado).value = fmtDN(parseInt(sel.value, 10));
+    sel.value = "";   // o seletor volta a exibir apenas "DN"
+  }
+  if (lado === 2 && origem !== "auto") dn2Editada = true;
+  const Dref = dnReferencia();
+  if (Dref > 0) {
+    const faixa = faixaUsualDescarga(Dref);
+    document.getElementById("inpDd").value = fmtDN(faixa[faixa.length - 1]);
+  }
+  calcular();
+}
+
+function aplicarSugestao(dn) {
+  document.getElementById("inpDd").value = fmtDN(dn);
+  calcular();
+}
+
+function mudarModo(novo) {
+  modo = novo;
+  document.getElementById("tabTempo").classList.toggle("ativo", modo === "tempo");
+  document.getElementById("tabDim").classList.toggle("ativo", modo === "dim");
+  document.getElementById("campoDescarga").classList.toggle("oculto", modo === "dim");
+  document.getElementById("campoTempoAlvo").classList.toggle("oculto", modo === "tempo");
+  calcular();
+}
+
+function mudarConfig(nova) {
+  config = nova;
+  const dois = config === "dois";
+  document.getElementById("segUm").classList.toggle("ativo", !dois);
+  document.getElementById("segDois").classList.toggle("ativo", dois);
+  document.getElementById("blocoLado2").classList.toggle("oculto", !dois);
+  document.getElementById("gridLados").classList.toggle("um", !dois);
+  document.getElementById("titLado1").classList.toggle("oculto", !dois);
+  document.getElementById("esqUm").classList.toggle("oculto", dois);
+  document.getElementById("esqDois").classList.toggle("oculto", !dois);
+  document.getElementById("lblD1").innerHTML = dois
+    ? 'Diâmetro — DN₁ <span class="dica">(lado esquerdo)</span>'
+    : 'Diâmetro da adutora — DN <span class="dica">(interno)</span>';
+  document.getElementById("lblL1").innerHTML = dois
+    ? 'Extensão — L₁ <span class="dica">(do ponto alto esquerdo até a descarga)</span>'
+    : 'Extensão do trecho — L <span class="dica">(entre o ponto alto e a descarga)</span>';
+  document.getElementById("lblH1").innerHTML = dois
+    ? 'Desnível — H₁ <span class="dica">(cota do ponto alto esquerdo − cota da descarga)</span>'
+    : 'Desnível — H <span class="dica">(cota do ponto alto − cota da descarga)</span>';
+  // ao ativar o 2º lado pela primeira vez, herda o DN do esquerdo
+  if (dois && !dn2Editada) {
+    document.getElementById("inpD2").value = document.getElementById("inpD1").value;
+  }
+  calcular();
+}
+
+/* aceita vírgula como separador decimal */
+function num(id) { return parseFloat(String(document.getElementById(id).value).replace(",", ".")); }
+
+/* DNs (mm, inteiros): ignora o ponto de milhar — "1.800" → 1800 */
+function numDN(id) { return parseInt(String(document.getElementById(id).value).replace(/\D/g, ""), 10); }
+const fmtDN = v => isFinite(v) ? v.toLocaleString("pt-BR") : "";
+function formatarCampoDN(el) {
+  const v = parseInt(String(el.value).replace(/\D/g, ""), 10);
+  if (isFinite(v)) el.value = fmtDN(v);
+}
+
+function alerta(tipo, icone, texto) {
+  return `<div class="alerta ${tipo}"><span>${icone}</span><span>${texto}</span></div>`;
+}
+
+function renderChips(Dref, dAtualMm, doisDNs) {
+  const box = document.getElementById("chipsSugestao");
+  if (!(Dref > 0)) { box.innerHTML = ""; return; }
+  const faixa = faixaUsualDescarga(Dref);
+  const chips = faixa.map(dn =>
+    `<button class="chip${Math.abs(dn - dAtualMm) < 0.01 ? " ativo" : ""}" onclick="aplicarSugestao(${dn})">DN ${dn}</button>`
+  ).join("");
+  box.innerHTML = `<span class="rotulo-chip">Faixa usual p/ DN ${fmt(Dref, 0)}${doisDNs ? " (maior lado)" : ""} — D/6 a D/4:</span>${chips}`;
+}
+
+function calcular() {
+  // sincroniza o seletor de Cd com o valor digitado (aceita vírgula)
+  const selCd = document.getElementById("selCd");
+  const cdVal = document.getElementById("inpCd").value.replace(",", ".");
+  selCd.value = ["0.61", "0.82", "0.97"].includes(cdVal) ? cdVal : "custom";
+
+  const dois = config === "dois";
+  const D1mm = numDN("inpD1"), Cd = num("inpCd");
+  const D2mm = dois ? numDN("inpD2") : D1mm;
+  const L1 = num("inpL1"), H1 = num("inpH1");
+  const L2 = dois ? num("inpL2") : 0;
+  const H2 = dois ? num("inpH2") : 0;
+  const Dref = dois ? Math.max(D1mm || 0, D2mm || 0) : D1mm;
+  const dnsDiferentes = dois && D1mm !== D2mm;
+
+  const resValor = document.getElementById("resValor");
+  const resDetalhe = document.getElementById("resDetalhe");
+  const resRotulo = document.getElementById("resRotulo");
+  const tabResumo = document.getElementById("tabResumo");
+  const alertas = document.getElementById("alertas");
+  const memoria = document.getElementById("memoria");
+
+  renderChips(Dref, numDN("inpDd"), dnsDiferentes);
+
+  const erros = [];
+  if (!(D1mm > 0)) erros.push(dois ? "Informe o diâmetro do lado esquerdo (DN₁)." : "Informe o diâmetro da adutora.");
+  if (dois && !(D2mm > 0)) erros.push("Informe o diâmetro do lado direito (DN₂).");
+  if (!(L1 > 0)) erros.push(dois ? "Informe a extensão do lado esquerdo (L₁)." : "Informe a extensão do trecho.");
+  if (!(H1 > 0)) erros.push(dois ? "Informe um desnível maior que zero para o lado esquerdo (H₁)." : "Informe um desnível maior que zero (a descarga deve estar abaixo do ponto alto).");
+  if (dois && !(L2 > 0)) erros.push("Informe a extensão do lado direito (L₂).");
+  if (dois && !(H2 > 0)) erros.push("Informe um desnível maior que zero para o lado direito (H₂).");
+  if (!(Cd > 0 && Cd <= 1)) erros.push("O coeficiente de vazão deve estar entre 0 e 1.");
+
+  let dmm, tAlvoH;
+  if (modo === "tempo") {
+    dmm = numDN("inpDd");
+    if (!(dmm > 0)) erros.push("Informe o diâmetro da descarga.");
+  } else {
+    tAlvoH = num("inpTalvo");
+    if (!(tAlvoH > 0)) erros.push("Informe o tempo de esvaziamento desejado.");
+  }
+
+  if (erros.length) {
+    resValor.textContent = "—";
+    resDetalhe.textContent = "";
+    tabResumo.innerHTML = "";
+    memoria.innerHTML = "";
+    alertas.innerHTML = erros.map(e => alerta("erro", "⚠️", e)).join("");
+    return;
+  }
+
+  const D1 = D1mm / 1000, D2 = D2mm / 1000;
+  const A1 = Math.PI * D1 * D1 / 4;         // seção do lado esquerdo (m²)
+  const A2 = Math.PI * D2 * D2 / 4;         // seção do lado direito (m²)
+  const V = A1 * L1 + A2 * L2;               // volume total (m³)
+  const raiz2g = Math.sqrt(2 * G);
+
+  // "capacitância" de cada lado: volume por metro de carga (m³/m)
+  const c1 = A1 * L1 / H1;
+  const c2 = dois ? A2 * L2 / H2 : 0;
+
+  // lado mais alto comanda a fase 1
+  const Halto = dois ? Math.max(H1, H2) : H1;
+  const Hbaixo = dois ? Math.min(H1, H2) : 0;
+  const cAlto = dois ? (H1 >= H2 ? c1 : c2) : c1;
+
+  // fator geométrico F tal que  t = 2·F / (Cd·a·√(2g))
+  const F = cAlto * (Math.sqrt(Halto) - Math.sqrt(Hbaixo)) + (c1 + c2) * Math.sqrt(Hbaixo);
+
+  let d, dReq = null, dnAdotado = null, aReq = null;
+  if (modo === "dim") {
+    const tAlvoS = tAlvoH * 3600;
+    aReq = 2 * F / (Cd * tAlvoS * raiz2g);
+    dReq = Math.sqrt(4 * aReq / Math.PI) * 1000;   // mm
+    dnAdotado = DN_COMERCIAIS.find(dn => dn >= dReq) || null;
+    d = (dnAdotado || dReq) / 1000;
+  } else {
+    d = dmm / 1000;
+  }
+
+  const a = Math.PI * d * d / 4;
+  const K = Cd * a * raiz2g;
+  const t1 = 2 * cAlto * (Math.sqrt(Halto) - Math.sqrt(Hbaixo)) / K;  // fase 1
+  const t2 = 2 * (c1 + c2) * Math.sqrt(Hbaixo) / K;                    // fase 2
+  const t = dois ? t1 + t2 : 2 * F / K;
+
+  const Q0 = Cd * a * Math.sqrt(2 * G * Halto);   // vazão inicial (m³/s)
+  const v0 = Cd * Math.sqrt(2 * G * Halto);        // velocidade inicial na seção da descarga (m/s)
+  const Qm = V / t;
+  const relacao = (d * 1000) / Dref;
+
+  // ---------- resultado principal ----------
+  if (modo === "tempo") {
+    resRotulo.textContent = "Tempo de esvaziamento";
+    resValor.textContent = fmtTempo(t);
+    resDetalhe.textContent = `Volume de ${fmt(V, 1)} m³ descarregado por DN ${fmt(d * 1000, 0)}`;
+  } else {
+    resRotulo.textContent = "Diâmetro de descarga recomendado";
+    if (dnAdotado) {
+      resValor.textContent = "DN " + dnAdotado;
+      resDetalhe.textContent = `Mínimo teórico de ${fmt(dReq, 1)} mm → tempo resultante de ${fmtTempo(t)}`;
+    } else {
+      resValor.textContent = fmt(dReq, 0) + " mm";
+      resDetalhe.textContent = "Acima do maior DN comercial da lista — verifique os dados ou preveja descargas múltiplas.";
+    }
+  }
+
+  // ---------- resumo ----------
+  const linhas = [];
+  if (dnsDiferentes) {
+    linhas.push(["Área da seção — lado esquerdo (A₁)", fmt(A1, 4) + " m²"]);
+    linhas.push(["Área da seção — lado direito (A₂)", fmt(A2, 4) + " m²"]);
+  } else {
+    linhas.push(["Área da seção da adutora (A)", fmt(A1, 4) + " m²"]);
+  }
+  linhas.push(["Volume do trecho (V)", fmt(V, 1) + " m³"]);
+  if (modo === "dim") linhas.push(["Diâmetro mínimo teórico da descarga", fmt(dReq, 1) + " mm"]);
+  linhas.push(["Área da descarga (a)", fmt(a, 5) + " m²"]);
+  linhas.push(["Vazão inicial da descarga (Q₀)", fmt(Q0 * 1000, 1) + " L/s"]);
+  linhas.push(["Vazão média durante o esvaziamento", fmt(Qm * 1000, 1) + " L/s"]);
+  linhas.push(["Velocidade inicial na descarga (v₀)", fmt(v0, 2) + " m/s"]);
+  linhas.push(["Velocidade média na descarga (vₘ = Qₘ/a)", fmt(Qm / a, 2) + " m/s"]);
+  linhas.push(["Relação d/D" + (dnsDiferentes ? " (maior lado)" : ""), fmt(relacao, 2) + " (1/" + fmt(1 / relacao, 1) + ")"]);
+  if (dois) {
+    linhas.push(["Fase 1 — só o lado mais alto (H " + fmt(Halto, 1) + " → " + fmt(Hbaixo, 1) + " m)", fmtTempo(t1)]);
+    linhas.push(["Fase 2 — os dois lados juntos (H " + fmt(Hbaixo, 1) + " → 0)", fmtTempo(t2)]);
+  }
+  linhas.push(["Tempo de esvaziamento total (t)", fmtTempo(t)]);
+  tabResumo.innerHTML = linhas.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+
+  // ---------- alertas (recalculados a cada alteração) ----------
+  let av = "";
+  if (modo === "tempo" && d * 1000 >= Dref)
+    av += alerta("aviso", "⚠️", "A descarga tem diâmetro igual ou maior que a adutora — verifique os dados.");
+  if (relacao < 1 / 6 - 0.005 && d * 1000 < Dref)
+    av += alerta("aviso", "⚠️", "Descarga menor que D/6 da adutora — abaixo da faixa usual (D/6 a D/4). O esvaziamento tende a ser demorado.");
+  if (t > 6 * 3600)
+    av += alerta("aviso", "⏱️", "Tempo de esvaziamento acima de 6 h — considere aumentar o diâmetro da descarga ou dividir o trecho com descargas intermediárias.");
+  // A velocidade do jato depende apenas do desnível e do Cd (v = Cd·√(2gH)) —
+  // a linha abaixo é sempre exibida e atualizada para deixar isso visível.
+  if (v0 > 6)
+    av += alerta("aviso", "🌊", `Velocidade inicial do jato: <b>${fmt(v0, 1)} m/s</b> — elevada; prever dissipação de energia e proteção anti-erosiva no lançamento. <i>v = C<sub>d</sub>·√(2gH): depende do desnível e do Cd — um DN de descarga maior aumenta a vazão (Q = v·a), não a velocidade.</i>`);
+  else
+    av += alerta("ok", "🌊", `Velocidade inicial do jato: <b>${fmt(v0, 1)} m/s</b> — dentro do usual. <i>v = C<sub>d</sub>·√(2gH): depende do desnível e do Cd — um DN de descarga maior aumenta a vazão (Q = v·a), não a velocidade.</i>`);
+  if (av.indexOf("aviso") === -1)
+    av = alerta("ok", "✅", "Parâmetros dentro das faixas usuais de projeto.") + av;
+  av += alerta("info", "💡", `A vazão inicial de ${fmt(Q0 * 1000, 1)} L/s decresce ao longo do esvaziamento até zero.`);
+  alertas.innerHTML = av;
+
+  // ---------- memória de cálculo ----------
+  const FONTE_GEO = "geometria";
+  const FONTE_ORIF = "eq. dos orifícios (Torricelli) — Azevedo Netto, Manual de Hidráulica";
+  const FONTE_ESVAZ = "integração da eq. dos orifícios sob carga variável — Porto, Hidráulica Básica; Azevedo Netto, Manual de Hidráulica";
+  const FONTE_FASES = "balanço de volumes por fases, integrando a eq. dos orifícios sob carga variável — a partir de Porto, Hidráulica Básica";
+  const FONTE_DIM = "eq. do tempo de esvaziamento isolada para a área da descarga";
+
+  let n = 0;
+  const passos = [];
+  const item = (titulo, fonte, ...eqs) =>
+    passos.push(`<div class="passo"><div class="passo-cab"><b>${++n}. ${titulo}</b><span class="fonte">${fonte}</span></div>${eqs.map(l => `<div class="eq">${l}</div>`).join("")}</div>`);
+
+  // 1. volume
+  if (dnsDiferentes) {
+    item("Volume do trecho", FONTE_GEO + " — volume do cilindro",
+      `V = ${frac("π·D₁²", "4")}·L₁ + ${frac("π·D₂²", "4")}·L₂`,
+      `V = ${frac(`π·${fmt(D1, 3)}²`, "4")}·${fmt(L1, 0)} + ${frac(`π·${fmt(D2, 3)}²`, "4")}·${fmt(L2, 0)} = ${RES(fmt(V, 1) + " m³")}`);
+  } else {
+    item("Volume do trecho", FONTE_GEO + " — volume do cilindro",
+      `V = ${frac("π·D²", "4")}·${dois ? "(L₁ + L₂)" : "L"}`,
+      `V = ${frac(`π·${fmt(D1, 3)}²`, "4")}·${fmt(L1 + L2, 0)} = ${RES(fmt(V, 1) + " m³")}`);
+  }
+
+  // capacitâncias (dois lados)
+  if (dois) {
+    item("Capacidade de carga de cada lado <span style='font-weight:400'>(volume por metro de carga)</span>", FONTE_GEO + " — trecho de declividade uniforme",
+      `c<sub>i</sub> = ${frac("A<sub>i</sub>·L<sub>i</sub>", "H<sub>i</sub>")}`,
+      `c₁ = ${frac(`${fmt(A1, 4)}·${fmt(L1, 0)}`, fmt(H1, 1))} = ${RES(fmt(c1, 2) + " m³/m")} &nbsp;&nbsp; c₂ = ${frac(`${fmt(A2, 4)}·${fmt(L2, 0)}`, fmt(H2, 1))} = ${RES(fmt(c2, 2) + " m³/m")}`);
+  }
+
+  // dimensionamento (área necessária)
+  if (modo === "dim") {
+    if (dois) {
+      item(`Área necessária da descarga para t = ${fmt(tAlvoH, 1)} h`, FONTE_DIM,
+        `a<sub>nec</sub> = ${frac(`2·[c<sub>alto</sub>·(${sqrt("H<sub>alto</sub>")} − ${sqrt("H<sub>baixo</sub>")}) + (c₁+c₂)·${sqrt("H<sub>baixo</sub>")}]`, `C<sub>d</sub>·t·${sqrt("2g")}`)}`,
+        `a<sub>nec</sub> = ${frac(`2·${fmt(F, 2)}`, `${fmt(Cd, 2)}·${fmt(tAlvoH * 3600, 0)}·${sqrt("2·9,81")}`)} = ${RES(fmt(aReq, 5) + " m²")}`,
+        `d<sub>mín</sub> = ${sqrt(frac("4·a<sub>nec</sub>", "π"))} = ${RES(fmt(dReq, 1) + " mm")}${dnAdotado ? " → adotado " + RES("DN " + dnAdotado) : ""}`);
+    } else {
+      item(`Área necessária da descarga para t = ${fmt(tAlvoH, 1)} h`, FONTE_DIM,
+        `a<sub>nec</sub> = ${frac("2·V", `C<sub>d</sub>·t·${sqrt("2gH")}`)}`,
+        `a<sub>nec</sub> = ${frac(`2·${fmt(V, 1)}`, `${fmt(Cd, 2)}·${fmt(tAlvoH * 3600, 0)}·${sqrt(`2·9,81·${fmt(H1, 1)}`)}`)} = ${RES(fmt(aReq, 5) + " m²")}`,
+        `d<sub>mín</sub> = ${sqrt(frac("4·a<sub>nec</sub>", "π"))} = ${RES(fmt(dReq, 1) + " mm")}${dnAdotado ? " → adotado " + RES("DN " + dnAdotado) : ""}`);
+    }
+  }
+
+  // área da descarga
+  item(modo === "dim" ? "Área da descarga adotada" : "Área da descarga", FONTE_GEO + " — área do círculo",
+    `a = ${frac("π·d²", "4")}`,
+    `a = ${frac(`π·${fmt(d, 3)}²`, "4")} = ${RES(fmt(a, 5) + " m²")}`);
+
+  // vazão inicial
+  item(`Vazão inicial pela descarga <span style='font-weight:400'>(carga inicial H = ${fmt(Halto, 1)} m)</span>`, FONTE_ORIF,
+    `Q₀ = C<sub>d</sub>·a·${sqrt("2gH")}`,
+    `Q₀ = ${fmt(Cd, 2)}·${fmt(a, 5)}·${sqrt(`2·9,81·${fmt(Halto, 1)}`)} = ${fmt(Q0, 4)} m³/s = ${RES(fmt(Q0 * 1000, 1) + " L/s")}`);
+
+  // tempo
+  if (dois) {
+    item(`Fase 1 — rebaixamento do lado mais alto <span style='font-weight:400'>(de ${fmt(Halto, 1)} m a ${fmt(Hbaixo, 1)} m; o outro lado permanece cheio)</span>`, FONTE_FASES,
+      `t₁ = ${frac(`2·c<sub>alto</sub>·(${sqrt("H<sub>alto</sub>")} − ${sqrt("H<sub>baixo</sub>")})`, `C<sub>d</sub>·a·${sqrt("2g")}`)}`,
+      `t₁ = ${frac(`2·${fmt(cAlto, 2)}·(${sqrt(fmt(Halto, 1))} − ${sqrt(fmt(Hbaixo, 1))})`, `${fmt(Cd, 2)}·${fmt(a, 5)}·${sqrt("2·9,81")}`)} = ${fmt(t1, 0)} s = ${RES(fmtTempo(t1))}`);
+    item(`Fase 2 — os dois lados esvaziam juntos <span style='font-weight:400'>(de ${fmt(Hbaixo, 1)} m até 0)</span>`, FONTE_FASES,
+      `t₂ = ${frac(`2·(c₁ + c₂)·${sqrt("H<sub>baixo</sub>")}`, `C<sub>d</sub>·a·${sqrt("2g")}`)}`,
+      `t₂ = ${frac(`2·(${fmt(c1, 2)} + ${fmt(c2, 2)})·${sqrt(fmt(Hbaixo, 1))}`, `${fmt(Cd, 2)}·${fmt(a, 5)}·${sqrt("2·9,81")}`)} = ${fmt(t2, 0)} s = ${RES(fmtTempo(t2))}`);
+    item("Tempo total de esvaziamento", FONTE_FASES,
+      `t = t₁ + t₂`,
+      `t = ${fmtTempo(t1)} + ${fmtTempo(t2)} = ${RES(fmtTempo(t))}`);
+  } else {
+    item("Tempo de esvaziamento <span style='font-weight:400'>(carga decrescente, declividade uniforme)</span>", FONTE_ESVAZ,
+      `t = ${frac("2·V", `C<sub>d</sub>·a·${sqrt("2gH")}`)} = ${frac("2·V", "Q₀")}`,
+      `t = ${frac(`2·${fmt(V, 1)}`, `${fmt(Q0, 4)}`)} = ${fmt(t, 0)} s = ${RES(fmtTempo(t))}`);
+  }
+  memoria.innerHTML = passos.join("");
+
+  // ---------- esquemas ----------
+  document.getElementById("svgL").textContent = "L = " + fmt(L1, 0) + " m";
+  document.getElementById("svgH").textContent = "H = " + fmt(H1, 1) + " m";
+  document.getElementById("svgD").textContent = "DN " + fmt(D1mm, 0);
+  document.getElementById("svgDd").textContent = "d = " + fmt(d * 1000, 0) + " mm";
+  document.getElementById("svg2L1").textContent = "L₁ = " + fmt(L1, 0) + " m";
+  document.getElementById("svg2H1").textContent = "H₁ = " + fmt(H1, 1) + " m";
+  document.getElementById("svg2L2").textContent = "L₂ = " + fmt(L2, 0) + " m";
+  document.getElementById("svg2H2").textContent = "H₂ = " + fmt(H2, 1) + " m";
+  document.getElementById("svg2D").textContent = "DN₁ " + fmt(D1mm, 0);
+  document.getElementById("svg2D2").textContent = "DN₂ " + fmt(D2mm, 0);
+  document.getElementById("svg2Dd").textContent = "Descarga · d = " + fmt(d * 1000, 0) + " mm";
+}
+
+/* ---------- tema claro/escuro ---------- */
+function aplicarTema(t) {
+  document.documentElement.dataset.tema = t;
+  const b = document.getElementById("btnTema");
+  if (b) b.textContent = t === "escuro" ? "☀️" : "🌙";
+  try { localStorage.setItem("tema-esvaziamento", t); } catch (e) {}
+}
+function alternarTema() {
+  aplicarTema(document.documentElement.dataset.tema === "escuro" ? "claro" : "escuro");
+}
+(function () {
+  let t = null;
+  try { t = localStorage.getItem("tema-esvaziamento"); } catch (e) {}
+  if (t !== "claro" && t !== "escuro") {
+    t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "escuro" : "claro";
+  }
+  aplicarTema(t);
+})();
+
+preencherSelects();
+aoMudarDN(1, "auto");
+</script>
+</body>
+</html>
