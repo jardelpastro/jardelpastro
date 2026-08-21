@@ -2735,18 +2735,29 @@ html.imprimindo-doc #doc-saida { display: block; }
             fim:    { min: null, med: null, maxd: null, maxh: null }
           }
         },
-        chegada: { cotaTerreno: null, cotaGI: null, dnAfluenteMm: 400, degrauEntradaM: 0.05 },
+        chegada: { cotaTerreno: null, cotaGI: null, dnAfluenteMm: 400, laminaAfluentePct: 75, degrauEntradaM: 0.10 },
         canal: { larguraM: 0.6, alturaM: null, bordaLivreM: 0.3, nCanais: 1, nReserva: 0, comportas: true },
         bypass: {
           canal: 'auto',            /* 'auto' | 'sim' | 'nao' — canal de by-pass do gradeamento */
           reservaGrade: 'manual',   /* grade do canal reserva: 'manual' | 'mecanizada' */
           extravasor: 'nao',        /* 'nao' | 'sim' — extravasor / by-pass geral da estação */
           cotaExtravasorM: null, destinoExtravasor: '', anuenciaAmbiental: false,
+          racExiste: false,         /* RAC — reservatório de acumulação */
+          racVolM3: null,
           energia: 'nenhuma'        /* 'nenhuma' | 'gerador_fixo' | 'tomada_gerador' | 'dupla_alimentacao' */
+        },
+        /* dados do conjunto motobomba de referência (catálogo do fabricante) */
+        bomba: {
+          marca: '', modelo: '',
+          pesoKg: null, alturaMm: null, rotorMm: null, tipoRotor: '',
+          rpm: null, polos: null, tensaoV: 380,
+          submergMinMm: null,        /* submergência mínima do fabricante (prevalece sobre a estimativa) */
+          passagemSolidosMm: null,
+          inversor: false, freqRedeHz: 60, freqOperHz: null
         },
         residuos: {
           cacambaTipo: 'auto',      /* 'auto' | 'estacionaria' | 'rollon' */
-          cacambaM3: null, cacambaReserva: true,
+          cacambaM3: 5, cacambaReserva: true,
           monovia: { usar: true, vaoM: 4, percursoM: null, alturaVigaM: null, profPocoM: null,
                      cargaBombaKg: null, cargaExtraKg: null, talhaTipo: 'auto' }
         },
@@ -2754,13 +2765,13 @@ html.imprimindo-doc #doc-saida { display: block; }
           arranjo: 'grades',
           niveis: [
             { id: 'grossa', ativo: false, limpeza: 'manual', espacMm: 75, barraId: 'b95x508',
-              formaBarra: 'retangular', inclGraus: 60, obstrucaoPct: 50, degrauAposM: 0.05,
+              formaBarra: 'retangular', inclGraus: 60, obstrucaoPct: 50, degrauAposM: 0.10,
               perfilLateralMm: 30, betaOverride: null, espessuraMm: null },
             { id: 'media', ativo: true, limpeza: 'manual', espacMm: 30, barraId: 'b79x381',
-              formaBarra: 'retangular', inclGraus: 60, obstrucaoPct: 50, degrauAposM: 0.05,
+              formaBarra: 'retangular', inclGraus: 60, obstrucaoPct: 50, degrauAposM: 0.10,
               perfilLateralMm: 30, betaOverride: null, espessuraMm: null },
             { id: 'fina', ativo: true, limpeza: 'manual', espacMm: 15, barraId: 'b64x381',
-              formaBarra: 'retangular', inclGraus: 60, obstrucaoPct: 50, degrauAposM: 0.05,
+              formaBarra: 'retangular', inclGraus: 60, obstrucaoPct: 50, degrauAposM: 0.10,
               perfilLateralMm: 30, betaOverride: null, espessuraMm: null }
           ],
           cesto: { compM: 0.6, largM: 0.6, altM: 0.8, altMolhadaM: 0.45, espacMm: 25,
@@ -4362,10 +4373,17 @@ html.imprimindo-doc #doc-saida { display: block; }
         'v na QMH = ' + out.v.max.toFixed(2).replace('.', ',') + ' m/s (faixa ' + crit.vCanal[0].toFixed(2).replace('.', ',') + ' a ' + crit.vCanal[1].toFixed(2).replace('.', ',') + ' m/s)');
       chk(out.v.min >= crit.vCanal[0] * 0.7, out.v.min >= crit.vCanal[0] * 0.5,
         'v na Qmín = ' + out.v.min.toFixed(2).replace('.', ',') + ' m/s — abaixo de ~0,20 m/s começa a sedimentar matéria orgânica');
-      chk(out.tes <= crit.tesFaixa[1] + 1e-9, out.tes <= crit.tesFaixa[1] * 1.2,
-        'taxa de escoamento superficial = ' + Math.round(out.tes) + ' m³/m²·dia (limite ' + crit.tesFaixa[1] + ')');
-      chk(out.L >= LCalc - 1e-9, out.L >= LCalc * 0.9,
-        'comprimento adotado ' + out.L.toFixed(2).replace('.', ',') + ' m × necessário ' + LCalc.toFixed(2).replace('.', ',') + ' m (L = 22,5·H)');
+      chk(out.tes >= crit.tesFaixa[0] - 1e-9 && out.tes <= crit.tesFaixa[1] + 1e-9,
+        out.tes >= crit.tesFaixa[0] * 0.5 && out.tes <= crit.tesFaixa[1] * 1.2,
+        'taxa de escoamento superficial = ' + Math.round(out.tes) + ' m³/m²·dia (faixa da NBR 12209: ' +
+        crit.tesFaixa[0] + ' a ' + crit.tesFaixa[1] + ' — abaixo do mínimo o desarenador está superdimensionado ' +
+        'e passa a decantar matéria orgânica)');
+      chk(out.L >= LCalc - 1e-9 && out.L <= LCalc * 2 + 1e-9, out.L >= LCalc * 0.9 && out.L <= LCalc * 3,
+        'comprimento adotado ' + out.L.toFixed(2).replace('.', ',') + ' m × necessário ' + LCalc.toFixed(2).replace('.', ',') +
+        ' m (L = 22,5·H) — acima de ~2× o necessário é superdimensionamento (custo e decantação de orgânicos)');
+      chk(out.b <= bCalc * 2 + 1e-9, out.b <= bCalc * 3,
+        'largura adotada ' + out.b.toFixed(2).replace('.', ',') + ' m × necessária ' + bCalc.toFixed(2).replace('.', ',') +
+        ' m — largura em excesso derruba a velocidade e decanta matéria orgânica');
       chk(out.canaleta.vol >= areia7, out.canaleta.vol >= areia7 * 0.7,
         'canaleta de areia: ' + out.canaleta.vol.toFixed(2).replace('.', ',') + ' m³ para ' + areia7.toFixed(2).replace('.', ',') + ' m³ em ' + out.diasAcumulo + ' dias');
     }
@@ -4390,7 +4408,8 @@ html.imprimindo-doc #doc-saida { display: block; }
       out.tdh = tdh;
       out.vol = Qmax * tdh * 60 / nOper;
       out.prof = pos(d.profAeradoM) || 3.0;
-      var relLB = pos(d.relLB) || 3;
+      var relLB = pos(d.relLB) || 3;           /* zero/vazio cai no padrão 3:1 */
+      out.relLB = relLB;
       out.larg = Math.sqrt(out.vol / (out.prof * relLB));
       out.comp = out.larg * relLB;
       out.arMin = out.comp * crit.arAerado[0];
@@ -4399,6 +4418,8 @@ html.imprimindo-doc #doc-saida { display: block; }
         'tempo de detenção na QMH = ' + tdh.toFixed(1).replace('.', ',') + ' min (faixa ' + crit.tdhAerado[0] + ' a ' + crit.tdhAerado[1] + ' min)');
       chk(out.prof >= crit.profAerado[0] && out.prof <= crit.profAerado[1], true,
         'profundidade útil = ' + out.prof.toFixed(1).replace('.', ',') + ' m (faixa ' + crit.profAerado[0] + ' a ' + crit.profAerado[1] + ' m)');
+      chk(relLB >= 2.5 && relLB <= 5, relLB >= 2 && relLB <= 6,
+        'relação comprimento/largura = ' + relLB.toFixed(1).replace('.', ',') + ':1 (usual de 3:1 a 5:1, mínimo ~2,5:1 — evita curto-circuito hidráulico)');
     }
 
     if (tipo === 'vortice') {
@@ -4574,6 +4595,56 @@ html.imprimindo-doc #doc-saida { display: block; }
   };
 
   /* ================================================================
+     Canal de chegada: velocidade no coletor afluente (seção circular
+     parcialmente cheia) e verificações de velocidade do canal
+     ================================================================ */
+
+  CE.calcCanal = function (st, vaz, perfil) {
+    var ch = st.eee.chegada;
+    var crit = DE.critGrade;
+    var D = (pos(ch.dnAfluenteMm) || 400) / 1000;
+    var yD = Math.min(0.95, Math.max(0.10, (pos(ch.laminaAfluentePct) || 75) / 100));
+    /* área molhada da seção circular com lâmina y = yD·D */
+    var theta = 2 * Math.acos(1 - 2 * yD);
+    var area = D * D / 8 * (theta - Math.sin(theta));
+    var vChegada = area > 0 ? vaz.qDim / area : 0;
+
+    var nOperC = CE.canais(st).oper;
+    var p0 = perfil.pontos[0];
+    var vQMH = p0 ? p0.v.max : 0;
+    var vQmed = p0 ? p0.v.med : 0;
+    var hQMH = p0 ? p0.lamina.max : 0;
+
+    /* faixa de largura que deixa o canal na faixa de velocidade recomendada,
+       com a lâmina atual (imposta pela Parshall) */
+    var bFaixa = hQMH > 0 ? [
+      vaz.qDim / nOperC / (crit.vCanalMax * hQMH),
+      vaz.qDim / nOperC / (crit.vCanalMin * hQMH)
+    ] : null;
+
+    var checks = [];
+    function chk(ok, atencao, txt) { checks.push({ ok: ok, atencao: !ok && atencao, txt: txt }); }
+    function f2(v) { return Number(v).toFixed(2).replace('.', ','); }
+    chk(vQMH <= crit.vCanalMax + 1e-9, vQMH <= crit.vCanalMax * 1.3,
+      'v no canal na QMH = ' + f2(vQMH) + ' m/s (recomendado até ' + f2(crit.vCanalMax) + ' m/s a montante da grade)');
+    chk(vQmed >= crit.vCanalMin - 1e-9, vQmed >= crit.vCanalMin * 0.7,
+      'v no canal na Q média = ' + f2(vQmed) + ' m/s (NBR 12209: ≥ ' + f2(crit.vCanalMin) +
+      ' m/s pelo menos uma vez ao dia — autolimpeza)');
+    if (vChegada > 0) {
+      chk(vQMH >= 0.5 * vChegada, vQMH >= 0.35 * vChegada,
+        'desaceleração na transição: v canal/v chegada = ' + f2(vQMH / vChegada) +
+        ' na QMH (v chegada = ' + f2(vChegada) + ' m/s) — abaixo de ~0,5 a areia deposita logo na entrada; ' +
+        'reduza a largura do canal ou aprofunde a lâmina');
+    }
+
+    return {
+      D: D, yD: yD, area: area, vChegada: vChegada,
+      vQMH: vQMH, vQmed: vQmed, hQMH: hQMH, bFaixa: bFaixa,
+      checks: checks, ok: checks.every(function (c) { return c.ok; })
+    };
+  };
+
+  /* ================================================================
      Poço de sucção
      ================================================================ */
 
@@ -4644,8 +4715,13 @@ html.imprimindo-doc #doc-saida { display: block; }
     var Dboca = dnBocaMm / 1000;
     var vBoca = qBomba / (Math.PI * Dboca * Dboca / 4);
     var subMinVortice = DE.submergenciaMinima(Dboca, vBoca);
-    var subMotor = pos(p.altMotorM) || 0;
-    var submergencia = pos(p.submergOverrideM) || Math.max(subMinVortice, subMotor);
+    /* a submergência mínima do FABRICANTE (catálogo, em mm) prevalece quando
+       informada — nas submersíveis ela já cobre vórtice e refrigeração; a
+       estimativa anti-vórtice (ANSI/HI) fica como referência quando não há dado */
+    var subFabricante = (pos(st.eee.bomba && st.eee.bomba.submergMinMm) || 0) / 1000;
+    if (!(subFabricante > 0)) subFabricante = pos(p.altMotorM) || 0;   /* campo antigo */
+    var submergencia = pos(p.submergOverrideM) ||
+      (subFabricante > 0 ? subFabricante : subMinVortice);
     if (temCota && naMin !== null) cotaFundo = num(p.cotaFundoOverride);
     if (temCota && naMin !== null && cotaFundo === null) cotaFundo = naMin - submergencia;
 
@@ -4709,7 +4785,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       rotForma: rotForma, areaTotal: areaTotal, areaUtil: areaUtil, areaCamara: areaCamara,
       hNec: hNec, hUtil: hUtil, volUtil: volUtil,
       naMax: naMax, naMin: naMin, cotaFundo: cotaFundo, cotaLaje: cotaLaje, altTotal: altTotal,
-      dnBocaMm: dnBocaMm, vBoca: vBoca, subMinVortice: subMinVortice, subMotor: subMotor,
+      dnBocaMm: dnBocaMm, vBoca: vBoca, subMinVortice: subMinVortice, subMotor: subFabricante,
       submergencia: submergencia, tempos: tempos, temCota: temCota,
       checks: checks, ok: checks.every(function (c) { return c.ok; })
     };
@@ -4728,8 +4804,9 @@ html.imprimindo-doc #doc-saida { display: block; }
     var conc = st.eee.concessionaria || 'nenhuma';
     var qDimLs = vaz.qDim * 1000;
     var checks = [];
-    function chk(ok, atencao, txt) { checks.push({ ok: ok, atencao: !ok && atencao, txt: txt }); }
-    function nota(txt) { checks.push({ ok: true, nota: true, txt: txt }); }
+    /* dom: 'gradeamento' | 'extravasor' | 'bombas' | 'poco' | 'geral' — define em que aba o aviso aparece */
+    function chk(ok, atencao, txt, dom) { checks.push({ ok: ok, atencao: !ok && atencao, txt: txt, dom: dom || 'gradeamento' }); }
+    function nota(txt, dom) { checks.push({ ok: true, nota: true, txt: txt, dom: dom || 'gradeamento' }); }
     function fmt2(v, d) { return Number(v).toFixed(d === undefined ? 1 : d).replace('.', ','); }
 
     var usaGrades = st.eee.grade.arranjo === 'grades';
@@ -4813,11 +4890,11 @@ html.imprimindo-doc #doc-saida { display: block; }
     /* ---- reserva de bombas (NBR 12208) ---- */
     var nInst = Math.max(1, Math.round(Number(st.bombas.instaladas) || 1));
     var nOp = Math.max(1, Math.min(nInst, Math.round(Number(st.bombas.operando) || 1)));
-    chk(nInst >= 2, false, 'NBR 12208: mínimo 2 conjuntos motobomba (instalados: ' + nInst + ')');
+    chk(nInst >= 2, false, 'NBR 12208: mínimo 2 conjuntos motobomba (instalados: ' + nInst + ')', 'bombas');
     chk(nInst > nOp, false,
       'NBR 12208: com a unidade de maior capacidade fora de operação, as restantes devem atender a vazão ' +
       'máxima — instalados ' + nInst + ' e ' + nOp + ' necessários em operação ' +
-      (nInst > nOp ? '(reserva de ' + (nInst - nOp) + ' conjunto(s))' : '(SEM reserva)'));
+      (nInst > nOp ? '(reserva de ' + (nInst - nOp) + ' conjunto(s))' : '(SEM reserva)'), 'bombas');
 
     /* ---- extravasor e energia de emergência (NBR 12208) ---- */
     var temExtravasor = bp.extravasor === 'sim';
@@ -4827,11 +4904,11 @@ html.imprimindo-doc #doc-saida { display: block; }
       'energia de emergência (gerador fixo, tomada para gerador móvel ou 2ª alimentação) ou volume de ' +
       'acumulação. Atual: ' + (temExtravasor ? 'extravasor' : 'sem extravasor') + ' · ' +
       ({ nenhuma: 'sem energia de emergência', gerador_fixo: 'gerador fixo',
-         tomada_gerador: 'tomada para gerador móvel', dupla_alimentacao: '2ª alimentação' })[bp.energia || 'nenhuma']);
+         tomada_gerador: 'tomada para gerador móvel', dupla_alimentacao: '2ª alimentação' })[bp.energia || 'nenhuma'], 'extravasor');
     if (temExtravasor) {
       chk(!!bp.anuenciaAmbiental, true,
         'Extravasor previsto: a extravasão exige ANUÊNCIA PRÉVIA do órgão ambiental (NBR 12208) — ' +
-        (bp.anuenciaAmbiental ? 'anuência registrada no projeto' : 'anuência ainda não registrada'));
+        (bp.anuenciaAmbiental ? 'anuência registrada no projeto' : 'anuência ainda não registrada'), 'extravasor');
     }
 
     /* tempo de acumulação até o extravasor (ou até a chegada), na Q média de fim de plano */
@@ -4853,16 +4930,25 @@ html.imprimindo-doc #doc-saida { display: block; }
         if (temExtravasor && bp.anuenciaAmbiental) {
           /* com extravasor licenciado, a acumulação curta é aceitável: o excedente verte pelo extravasor */
           nota('Acumulação com bombas paradas: ' + fmt2(extrav.tMedMin, 0) + ' min na Q média até a ' + rotLimite +
-            ' (' + fmt2(volAcum, 1) + ' m³) — depois disso o excedente verte pelo extravasor licenciado');
+            ' (' + fmt2(volAcum, 1) + ' m³) — depois disso o excedente verte pelo extravasor licenciado', 'extravasor');
         } else {
-          /* sem extravasor licenciado: acumulação curta é grave, a menos que haja
-             energia de emergência para religar as bombas */
+          /* sem extravasor licenciado: soma o RAC (reservatório de acumulação),
+             quando existir; sem RAC, o tempo é mesmo de poucos minutos e a
+             contingência precisa vir do RAC ou da energia de emergência */
+          var volRac = bp.racExiste ? (num(bp.racVolM3) || 0) : 0;
+          var tComRac = vaz.qMedFim > 0 ? (volAcum + volRac) / vaz.qMedFim / 60 : Infinity;
+          extrav.volRac = volRac;
+          extrav.tMedComRacMin = tComRac;
           var alvoMin = conf.autonomiaExtravMinH * 60;
-          chk(extrav.tMedMin >= alvoMin, temEnergia || extrav.tMedMin >= alvoMin / 4,
-            'Acumulação com bombas paradas: ' + fmt2(extrav.tMedMin, 0) + ' min na Q média até a ' + rotLimite +
-            ' (' + fmt2(volAcum, 1) + ' m³) — sem extravasor licenciado, a prática usual pede ≥ ' +
-            (conf.autonomiaExtravMinH * 60) + ' min' +
-            (temEnergia ? ' (atenuado: há energia de emergência prevista)' : ' ou fonte de energia de emergência'));
+          extrav.volRacNecessario = Math.max(0, vaz.qMedFim * alvoMin * 60 - volAcum);
+          chk(tComRac >= alvoMin, temEnergia || tComRac >= alvoMin / 4,
+            'Acumulação com bombas paradas: ' + fmt2(extrav.tMedMin, 0) + ' min no próprio poço' +
+            (volRac > 0 ? ' + RAC de ' + fmt2(volRac, 0) + ' m³ = ' + fmt2(tComRac, 0) + ' min' : '') +
+            ' na Q média — sem extravasor licenciado, a prática pede ≥ ' + alvoMin + ' min: ' +
+            (tComRac >= alvoMin ? 'atendido com o RAC'
+              : 'prever RAC de ~' + fmt2(extrav.volRacNecessario, 0) + ' m³' +
+                (temEnergia ? ' (atenuado: há energia de emergência prevista)' : ' e/ou energia de emergência')),
+            'extravasor');
         }
       }
     }
@@ -4873,16 +4959,16 @@ html.imprimindo-doc #doc-saida { display: block; }
         chk(poco.camaras >= poco.nInst, true,
           'SANEPAR MPS 11.1: bombas submersíveis em poço úmido exigem câmaras de sucção INDEPENDENTES por ' +
           'bomba, comunicadas por válvulas — arranjo atual: ' +
-          (poco.camaras > 1 ? poco.camaras + ' câmara(s) para ' + poco.nInst + ' bombas' : 'câmara única'));
+          (poco.camaras > 1 ? poco.camaras + ' câmara(s) para ' + poco.nInst + ' bombas' : 'câmara única'), 'poco');
       }
       if (qDimLs > conf.qMedidorLs) {
         var temMedidor = CE.temPeca(st, 'medidor_vazao');
         chk(temMedidor, true, 'SANEPAR MPS 11.1: Q > ' + fmt2(conf.qMedidorLs) + ' L/s exige medidor ' +
           'eletromagnético na linha de recalque — ' + (temMedidor ? 'medidor lançado nas peças' :
-          'nenhuma peça "Medidor de vazão" lançada nos barriletes/linha'));
+          'nenhuma peça "Medidor de vazão" lançada nos barriletes/linha'), 'bombas');
       }
       if (qDimLs <= conf.qCompactaLs) {
-        nota('SANEPAR: vazão até ' + fmt2(conf.qCompactaLs) + ' L/s — avaliar EEE compacta padronizada');
+        nota('SANEPAR: vazão até ' + fmt2(conf.qCompactaLs) + ' L/s — avaliar EEE compacta padronizada', 'geral');
       }
       if (usaGrades && niveisAtivos.length >= 2) {
         var g1 = niveisAtivos[niveisAtivos.length - 2], g2 = niveisAtivos[niveisAtivos.length - 1];
@@ -4891,7 +4977,7 @@ html.imprimindo-doc #doc-saida { display: block; }
           '15–20 mm (adotado: ' + fmt2(g1.aMm, 0) + ' e ' + fmt2(g2.aMm, 0) + ' mm); canal reserva com grade de 20 mm');
       }
       nota('SANEPAR: prever manômetros em caixa de aço inox e estudo de transitórios da linha de recalque ' +
-        '(MPS módulo 9.11) — a pré-avaliação de transiente deste programa não substitui o estudo');
+        '(MPS módulo 9.11) — a pré-avaliação de transiente deste programa não substitui o estudo', 'bombas');
     }
     if (conc === 'sabesp') {
       if (temMecanizada && !(canais.oper >= 2 && (canais.reserva >= 1 || temBypassCanal))) {
@@ -4900,11 +4986,11 @@ html.imprimindo-doc #doc-saida { display: block; }
           canais.oper + ' operando + ' + canais.reserva + ' reserva' + (temBypassCanal ? ' + by-pass' : ''));
       }
       nota('SABESP: conferir a NTS 020 (elevatórias — elaboração de projetos) e os desenhos-padrão de canais, ' +
-        'grades e caixa de areia');
+        'grades e caixa de areia', 'geral');
     }
 
     /* ---- passagem de sólidos da bomba × espaçamento da grade ---- */
-    var passagemMm = pos(st.eee.poco.passagemSolidosMm);
+    var passagemMm = pos(st.eee.bomba && st.eee.bomba.passagemSolidosMm) || pos(st.eee.poco.passagemSolidosMm);
     if (passagemMm && usaGrades && niveisAtivos.length) {
       var menorEspac = Math.min.apply(null, niveisAtivos.map(function (g) { return g.aMm; }));
       chk(menorEspac <= passagemMm, false,
@@ -4970,10 +5056,14 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     var pesoAreiaCheia = cap * R.fatorEnchimentoAreia * R.densAreia;
     if (nAreia > 0 && tipo === 'estacionaria') {
-      chk(pesoAreiaCheia <= R.cargaPoliguindasteKg, pesoAreiaCheia <= R.cargaPoliguindasteKg * 2,
+      /* mais de 5 t é comum (caçamba de 5 m³ chega lá): vira só um lembrete de
+         especificar poliguindaste reforçado; grave apenas acima de ~10 t */
+      chk(pesoAreiaCheia <= R.cargaPoliguindasteKg * 2, pesoAreiaCheia <= R.cargaPoliguindasteKg * 2,
         'caçamba de areia de ' + fN(cap, 0) + ' m³ com ' + Math.round(R.fatorEnchimentoAreia * 100) +
-        ' % de enchimento pesa ~' + fN(pesoAreiaCheia, 0) + ' kg (poliguindaste convencional: ' +
-        fN(R.cargaPoliguindasteKg, 0) + ' kg)');
+        ' % de enchimento pesa ~' + fN(pesoAreiaCheia, 0) + ' kg' +
+        (pesoAreiaCheia > R.cargaPoliguindasteKg
+          ? ' — acima de ' + fN(R.cargaPoliguindasteKg, 0) + ' kg, especificar poliguindaste reforçado (até ~10 t)'
+          : ' (dentro do poliguindaste convencional, ~' + fN(R.cargaPoliguindasteKg, 0) + ' kg)'));
     }
     chk(dias >= R.autonomiaDiasMin && dias <= R.autonomiaDiasPadrao, dias <= 15,
       'autonomia de ' + dias + ' dia(s) entre retiradas (usual: até ' + R.autonomiaDiasPadrao +
@@ -4982,7 +5072,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     /* ---- monovia / talha ---- */
     var mv = rs.monovia || {};
     var cargaCesto = cesto ? cesto.cargaTotal : 0;
-    var cargaBomba = pos(mv.cargaBombaKg) || 0;
+    var cargaBomba = pos(st.eee.bomba && st.eee.bomba.pesoKg) || pos(mv.cargaBombaKg) || 0;
     var cargaExtra = pos(mv.cargaExtraKg) || 0;
     var carga = Math.max(cargaCesto, cargaBomba, cargaExtra);
     var mon = null;
@@ -5087,6 +5177,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     }
 
     var cesto = st.eee.grade.arranjo === 'cesto' ? CE.calcCesto(st, vaz) : null;
+    var canal = CE.calcCanal(st, vaz, perfil);
     var poco = CE.calcPoco(st, vaz, perfil);
     var conformidade = CE.calcConformidade(st, vaz, grades, cesto, desar, poco);
     var residuos = CE.calcResiduos(st, vaz, desar, cesto, poco);
@@ -5100,6 +5191,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     }
     grades.forEach(function (gr) { varre(gr.checks, ({ grossa: 'Grade grossa', media: 'Grade média', fina: 'Grade fina' })[gr.nivel.id] || 'Grade'); });
     if (cesto) varre(cesto.checks, 'Cesto');
+    varre(canal.checks, 'Canal de chegada');
     varre(desar.checks, 'Desarenador');
     varre(poco.checks, 'Poço de sucção');
     varre(conformidade.checks, 'Conformidade');
@@ -5115,7 +5207,7 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     return {
       vaz: vaz, grades: grades, cesto: cesto, parshall: parshall,
-      desarenador: desar, perfil: perfil, poco: poco,
+      desarenador: desar, perfil: perfil, canal: canal, poco: poco,
       conformidade: conformidade, residuos: residuos, avisos: avisos
     };
   };
@@ -7857,6 +7949,8 @@ html.imprimindo-doc #doc-saida { display: block; }
           { chave: true, dica: 'Larguras usuais de canal: ' + DE.largurasCanal.map(function (v) { return UI.num(v, 2); }).join(' · ') + ' m. A mesma largura vale para as grades.' })),
       avancado('chegada',
         h('div', { class: 'grade' },
+          UI.campo(st, 'Lâmina no coletor afluente (% do DN)', 'eee.chegada.laminaAfluentePct',
+            { dica: 'Relação y/D do coletor na QMH (NBR 9649 limita a 75%). Define a área molhada e a velocidade de chegada.' }),
           UI.campo(st, 'Degrau na entrada do canal (m)', 'eee.chegada.degrauEntradaM',
             { dica: 'Degrau entre a GI do coletor e o fundo do canal de entrada, para a chegada não afogar o coletor.' }),
           UI.campo(st, 'Altura do canal (m)', 'eee.canal.alturaM',
@@ -7865,6 +7959,25 @@ html.imprimindo-doc #doc-saida { display: block; }
               dica: 'Em branco: lâmina máxima + borda livre, arredondada. Digite para fixar.' }),
           UI.campo(st, 'Borda livre (m)', 'eee.canal.bordaLivreM')))
       ]));
+
+    /* --- velocidades: chegada × canal --- */
+    if (r && r.canal) {
+      var cn = r.canal;
+      raiz.appendChild(UI.cartao('Velocidades — chegada e canal',
+        'o coletor chega com velocidade própria; o canal precisa ficar na faixa',
+        [h('div', { class: 'faixa-resumo', style: 'margin-bottom:8px' },
+          chip('v no coletor de chegada (QMH)', n(cn.vChegada, 2) + ' m/s',
+            'DN ' + n(cn.D * 1000, 0) + ' a ' + n(cn.yD * 100, 0) + '% de lâmina', 'forte'),
+          chip('v no canal (QMH)', n(cn.vQMH, 2) + ' m/s', 'recomendado ' + n(DE.critGrade.vCanalMin, 2) + ' a ' + n(DE.critGrade.vCanalMax, 2)),
+          chip('v no canal (Qméd)', n(cn.vQmed, 2) + ' m/s', '≥ ' + n(DE.critGrade.vCanalMin, 2) + ' — autolimpeza'),
+          cn.bFaixa ? chip('Largura p/ ficar na faixa', n(cn.bFaixa[0], 2) + ' a ' + n(cn.bFaixa[1], 2) + ' m',
+            'com a lâmina atual de ' + n(cn.hQMH, 2) + ' m', 'forte') : null),
+         tabChecks(cn.checks),
+         h('p', { class: 'nota' },
+           'A lâmina do canal é imposta pela Calha Parshall (controle de jusante); a largura é a alavanca da ' +
+           'velocidade. A velocidade de chegada influencia a transição: desacelerar demais na entrada deposita ' +
+           'areia antes da grade — o ideal é o canal correr com ao menos ~metade da velocidade do coletor.')]));
+    }
 
     /* --- arranjo --- */
     var canais = CE.canais(st);
@@ -7900,6 +8013,9 @@ html.imprimindo-doc #doc-saida { display: block; }
     /* --- by-pass e conformidade --- */
     if (r) raiz.appendChild(FE.cartaoConformidade(st, r));
 
+    /* --- extravasor e RAC (contingência de jusante da chegada) --- */
+    if (r) raiz.appendChild(FE.cartaoExtravasor(st, r));
+
     /* perfil de níveis resumido fica na aba do poço; aqui, as lâminas por ponto */
     if (r && gr.arranjo === 'grades') {
       raiz.appendChild(UI.cartao('Lâminas e velocidades no canal', 'da chegada ao desarenador, por vazão',
@@ -7924,8 +8040,13 @@ html.imprimindo-doc #doc-saida { display: block; }
   FE.cartaoConformidade = function (st, r) {
     var cf = r.conformidade;
     var bp = st.eee.bypass;
+    /* só o que diz respeito ao gradeamento/canais — bombas, extravasor e poço
+       têm os seus avisos nas próprias abas; o consolidado fica em Resultados */
+    var doGrad = cf.checks.filter(function (c) {
+      return !c.dom || c.dom === 'gradeamento' || c.dom === 'geral';
+    });
     /* reprovações primeiro, depois atenções, depois o que atende e as notas */
-    var ordenados = cf.checks.slice().sort(function (a, b) {
+    var ordenados = doGrad.slice().sort(function (a, b) {
       function peso(c) { return c.nota ? 3 : (c.ok ? 2 : (c.atencao ? 1 : 0)); }
       return peso(a) - peso(b);
     });
@@ -8234,8 +8355,8 @@ html.imprimindo-doc #doc-saida { display: block; }
       chip('Reserva', rs.nReserva + ' ud'),
       chip('Total de caçambas', rs.nTotal + ' ud', null, 'forte'),
       rs.pesoAreiaCheia ? chip('Peso da caçamba de areia', n(rs.pesoAreiaCheia, 0) + ' kg',
-        'poliguindaste ~' + n(DE.residuos.cargaPoliguindasteKg, 0) + ' kg',
-        rs.pesoAreiaCheia > DE.residuos.cargaPoliguindasteKg ? 'alerta' : null) : null));
+        rs.pesoAreiaCheia > DE.residuos.cargaPoliguindasteKg ? 'poliguindaste reforçado (até ~10 t)' : 'poliguindaste convencional (~5 t)',
+        rs.pesoAreiaCheia > DE.residuos.cargaPoliguindasteKg * 2 ? 'alerta' : null) : null));
     corpo.push(tabChecks(rs.checks));
     corpo.push(h('p', { class: 'nota' },
       'Baia da caçamba: piso de concreto com contenção e ralo (percolado de volta ao poço), caçamba fechada e ' +
@@ -8263,8 +8384,12 @@ html.imprimindo-doc #doc-saida { display: block; }
         UI.campo(st, 'Bombas instaladas', 'bombas.instaladas',
           { dica: 'Total com reserva. NBR 12208: prever unidade(s) de reserva — arranjo usual "n + 1".' }),
         UI.campo(st, 'Bombas em operação simultânea', 'bombas.operando'),
-        UI.campo(st, 'Partidas por hora admissíveis (por motor)', 'eee.poco.partidasHora',
-          { dica: 'Limite do fabricante do motor. Usual: 6 partidas/h em motores médios; até 10–15 nos pequenos.' }),
+        UI.campo(st, 'Partidas por hora (por motor)', 'eee.poco.partidasHora',
+          { chave: true,
+            sufixo: 'partidas/h  =  1 a cada ' +
+              UI.num(60 / Math.max(1, Number(st.eee.poco.partidasHora) || DE.critPoco.partidasHoraPadrao), 0) + ' min',
+            dica: 'Limite do fabricante do motor — normalmente o dado vem assim: "X partidas por hora". ' +
+                  '6 partidas/h = 1 a cada 10 min (o usual em motores médios); motores pequenos admitem 10–15.' }),
         UI.check(st, 'Considerar rodízio automático entre os conjuntos', 'eee.poco.considerarRodizio',
           { dica: 'Com rodízio, as partidas se distribuem entre todos os conjuntos instalados — o intervalo mínimo entre partidas do MESMO motor se mantém mesmo com o poço ciclando mais rápido.' })),
        h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
@@ -8312,8 +8437,11 @@ html.imprimindo-doc #doc-saida { display: block; }
       [h('div', { class: 'grade' },
         UI.campo(st, 'DN da boca de sucção (mm)', 'eee.poco.dnBocaMm',
           { dica: 'Usada na submergência mínima contra vórtice (ANSI/HI 9.8).' }),
-        UI.campo(st, 'NA mínimo do fabricante (m acima do fundo)', 'eee.poco.altMotorM',
-          { dica: 'Bombas submersíveis: altura mínima de esgoto para refrigerar o motor (catálogo). Prevalece o maior valor entre este e a submergência anti-vórtice.' }),
+        UI.campo(st, 'Submergência mínima do fabricante (mm)', 'eee.bomba.submergMinMm',
+          { chave: true,
+            dica: 'Do catálogo da bomba (também aparece no quadro da bomba, aba Bombas e níveis). Quando informada, ' +
+                  'PREVALECE: é ela que define a cota do fundo abaixo do NA mínimo. Sem esse dado, o programa usa a ' +
+                  'estimativa anti-vórtice do Hydraulic Institute (ANSI/HI 9.8).' }),
         h('div', { style: 'display:flex;align-items:flex-end;padding-bottom:2px' },
           UI.check(st, 'Aplicar NA mín/máx na linha de recalque', 'eee.poco.aplicarCotas',
             { dica: 'Mantém as cotas de sucção da aba "Bombas e níveis" amarradas ao poço calculado.' }))),
@@ -8337,9 +8465,6 @@ html.imprimindo-doc #doc-saida { display: block; }
            'anti-vórtice ' + n(p.subMinVortice, 2) + ' m'),
          chip('Cota do fundo', p.cotaFundo !== null ? n(p.cotaFundo, 3) + ' m' : '—'),
          chip('Profundidade total', p.altTotal !== null ? n(p.altTotal, 2) + ' m' : '—', 'laje ao fundo'))]));
-
-    /* extravasor e energia de emergência */
-    raiz.appendChild(FE.cartaoExtravasor(st, r));
 
     /* movimentação de cargas e resíduos */
     raiz.appendChild(FE.cartaoMovimentacao(st, r));
@@ -8384,7 +8509,7 @@ html.imprimindo-doc #doc-saida { display: block; }
             h('td', {}, isFinite(l[1]) ? n(l[1], 1) : '—'),
             h('td', { class: 'esq nota' }, l[2]));
         })),
-       tabChecks(p.checks),
+       tabChecks(p.checks.concat(r.conformidade.checks.filter(function (c) { return c.dom === 'poco'; }))),
        h('p', { class: 'nota' }, UI.botaoFonte(['nbr12208', 'metcalf', 'hi98'], DE.fontePoco + '\n\n' + DE.fonteSubmergencia))]));
 
     return raiz;
@@ -8474,11 +8599,12 @@ html.imprimindo-doc #doc-saida { display: block; }
     return raiz;
   };
 
-  /* extravasor / by-pass geral da estação e energia de emergência */
+  /* extravasor / by-pass geral da estação + RAC (reservatório de acumulação) */
   FE.cartaoExtravasor = function (st, r) {
     var cf = r.conformidade;
     var ex = cf.extravasor;
-    return UI.cartao('Extravasor e energia de emergência',
+    var checks = cf.checks.filter(function (c) { return c.dom === 'extravasor'; });
+    return UI.cartao('Extravasor e acumulação (RAC)',
       'contingência contra paralisação — NBR 12208',
       [h('div', { class: 'grade' },
         UI.select(st, 'Extravasor / by-pass geral da estação', 'eee.bypass.extravasor', [
@@ -8487,9 +8613,9 @@ html.imprimindo-doc #doc-saida { display: block; }
         ], { chave: true,
              dica: 'O extravasor descarrega o esgoto por gravidade quando as bombas param (falta de energia, ' +
                    'manutenção). QUANDO PODE: somente com ANUÊNCIA PRÉVIA do órgão ambiental (NBR 12208), com a ' +
-                   'cota protegendo a estação contra afogamento e dispositivo contra retorno. QUANDO É A SAÍDA ' +
-                   'USUAL: onde o lançamento eventual é admissível e licenciado. Onde é vedado, a contingência ' +
-                   'vira energia de emergência e/ou volume de acumulação (prática: ≥ 2 h na vazão média).' }),
+                   'cota protegendo a estação contra afogamento e dispositivo contra retorno. Onde o lançamento é ' +
+                   'vedado, a contingência vira RAC (reservatório de acumulação) e/ou energia de emergência ' +
+                   '(aba Bombas e níveis).' }),
         st.eee.bypass.extravasor === 'sim' ? UI.campo(st, 'Cota da soleira do extravasor (m)', 'eee.bypass.cotaExtravasorM',
           { dica: 'Acima do NA máximo operacional e abaixo da cota que afogaria a estação ou a rede afluente. ' +
                   'Em branco: o tempo de acumulação é medido até a GI da tubulação de chegada.' }) : null,
@@ -8497,25 +8623,147 @@ html.imprimindo-doc #doc-saida { display: block; }
           { tipo: 'texto', dica: 'Galeria, curso d\'água… — registrar o destino e as condicionantes da licença.' }) : null,
         st.eee.bypass.extravasor === 'sim' ? UI.check(st, 'Anuência do órgão ambiental registrada', 'eee.bypass.anuenciaAmbiental',
           { dica: 'NBR 12208: a extravasão exige anuência prévia do órgão ambiental (IAT no PR, CETESB em SP…).' }) : null,
+        UI.check(st, 'Prever RAC — reservatório de acumulação', 'eee.bypass.racExiste',
+          { dica: 'Volume extra (tanque enterrado ou câmara ampliada) que segura o esgoto durante uma parada. ' +
+                  'Sem extravasor licenciado, o poço sozinho acumula só alguns minutos — o RAC (ou a energia de ' +
+                  'emergência) é o que dá autonomia real. Prática usual: ≥ 2 h sobre a vazão média.' }),
+        st.eee.bypass.racExiste ? UI.campo(st, 'Volume do RAC (m³)', 'eee.bypass.racVolM3',
+          { chave: true, placeholder: ex && ex.volRacNecessario ? n(ex.volRacNecessario, 0) : '',
+            dica: 'Em branco/zero: sem volume. A marca d\'água mostra o volume necessário para ' +
+                  (DE.conf.autonomiaExtravMinH * 60) + ' min na Q média.' }) : null),
+       ex ? h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
+         PDA.F.chip('Acumulação no poço', n(ex.volAcum, 1) + ' m³', 'NA máx até a ' + ex.rotLimite, 'forte'),
+         PDA.F.chip('Tempo só com o poço (Qméd)', isFinite(ex.tMedMin) ? n(ex.tMedMin, 0) + ' min' : '—'),
+         ex.volRac > 0 ? PDA.F.chip('Com RAC de ' + n(ex.volRac, 0) + ' m³', isFinite(ex.tMedComRacMin) ? n(ex.tMedComRacMin, 0) + ' min' : '—',
+           'meta ≥ ' + (DE.conf.autonomiaExtravMinH * 60) + ' min',
+           ex.tMedComRacMin < DE.conf.autonomiaExtravMinH * 60 ? 'alerta' : null) : null,
+         !(ex.volRac > 0) && ex.volRacNecessario > 0 && st.eee.bypass.extravasor !== 'sim'
+           ? PDA.F.chip('RAC p/ ' + (DE.conf.autonomiaExtravMinH * 60) + ' min', '~' + n(ex.volRacNecessario, 0) + ' m³', 'volume necessário', 'alerta') : null)
+         : h('p', { class: 'nota', style: 'margin-top:8px' },
+             'Informe as cotas (chegada e poço) para o programa medir o volume de acumulação e o tempo até extravasar.'),
+       tabChecks(checks),
+       h('p', { class: 'nota' },
+         'Prever boia adicional no nível de extravasamento com alarme e acionamento automático da bomba reserva (MPS SANEPAR). ' +
+         'A energia de emergência (gerador / 2ª alimentação) fica na aba Bombas e níveis. ',
+         UI.botaoFonte(['nbr12208', 'mps_sanepar', 'nts_sabesp'], DE.fonteConf))]);
+  };
+
+  /* quadro do conjunto motobomba de referência — aba Bombas e níveis */
+  FE.cartaoBomba = function (st, ctx, res) {
+    var bm = st.eee.bomba;
+    var r = res && res.eee;
+    return UI.cartao('Conjunto motobomba de referência',
+      'dados do catálogo do fabricante — alimentam a submergência, a grade e a monovia',
+      [h('div', { class: 'grade' },
+        UI.campo(st, 'Marca', 'eee.bomba.marca', { tipo: 'texto', chave: true }),
+        UI.campo(st, 'Modelo', 'eee.bomba.modelo', { tipo: 'texto', chave: true }),
+        UI.campo(st, 'Peso do conjunto (kg)', 'eee.bomba.pesoKg',
+          { dica: 'Bomba + motor (catálogo). Dimensiona a talha, a viga da monovia e o tubo-guia.' }),
+        UI.campo(st, 'Submergência mínima (mm)', 'eee.bomba.submergMinMm',
+          { chave: true, dica: 'Do catálogo. Quando informada, PREVALECE sobre a estimativa anti-vórtice e define a cota do fundo do poço abaixo do NA mínimo.' }),
+        UI.campo(st, 'Passagem de sólidos (mm)', 'eee.bomba.passagemSolidosMm',
+          { dica: 'Esfera livre que o rotor engole. Cruza com o espaçamento da grade mais fina (a grade deve reter o que a bomba não engole).' }),
+        UI.campo(st, 'Ø do rotor (mm)', 'eee.bomba.rotorMm'),
+        UI.campo(st, 'Tipo do rotor', 'eee.bomba.tipoRotor',
+          { tipo: 'texto', dica: 'Aberto, vórtice, canal, monocanal, triturador…' }),
+        UI.campo(st, 'Rotação (rpm)', 'eee.bomba.rpm'),
+        UI.campo(st, 'Nº de polos', 'eee.bomba.polos'),
+        UI.campo(st, 'Tensão (V)', 'eee.bomba.tensaoV'),
+        UI.campo(st, 'Altura do conjunto (mm)', 'eee.bomba.alturaMm',
+          { dica: 'Altura física da bomba instalada — útil no curso da talha e no NA mínimo de refrigeração.' })),
+       h('div', { class: 'grade', style: 'margin-top:6px' },
+        UI.check(st, 'Acionamento com inversor de frequência (VSD)', 'eee.bomba.inversor',
+          { dica: 'Com VSD a bomba pode operar abaixo da frequência da rede, ajustando a vazão ao afluente e reduzindo partidas.' }),
+        UI.campo(st, 'Frequência da rede (Hz)', 'eee.bomba.freqRedeHz'),
+        bm.inversor ? UI.campo(st, 'Frequência de operação (Hz)', 'eee.bomba.freqOperHz',
+          { chave: true, placeholder: UI.numEdit(bm.freqRedeHz || 60),
+            dica: 'Frequência do ponto de operação com o VSD (ex.: 48,4 Hz). Informativa — o ajuste fino do ponto é feito com a curva da bomba, na aba Bombas e níveis.' }) : null),
+       res && res.projeto ? h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
+         chip('Vazão por bomba', n(ctx.qBomba * 1000, 1) + ' L/s', n(ctx.qBomba * 3600, 1) + ' m³/h', 'forte'),
+         chip('Altura manométrica', n(res.projeto.Hm, 2) + ' mca'),
+         chip('Potência de eixo', n(res.projeto.bhpCv, 1) + ' cv', 'motor ' + UI.numEdit(res.projeto.motorCv) + ' cv'),
+         chip('Conjuntos', ctx.nOp + ' + ' + (ctx.nInst - ctx.nOp) + ' reserva', ctx.nInst + ' instalados'),
+         r && r.poco ? chip('Submergência adotada', n(r.poco.submergencia, 2) + ' m',
+           (Number(bm.submergMinMm) > 0 ? 'do fabricante' : 'estimada (ANSI/HI)'), 'forte') : null) : null]);
+  };
+
+  /* quadro-resumo da bomba e da elevatória — aba Resumo */
+  FE.quadroBombaResumo = function (st, ctx, res) {
+    var bm = st.eee.bomba;
+    var r = res && res.eee;
+    if (!r) return null;
+    var p = r.poco, cen = res.projeto;
+    function lin(rot, unit, total) {
+      return h('tr', {}, h('td', { class: 'esq' }, rot),
+        h('td', {}, unit), h('td', {}, total === undefined ? '—' : total));
+    }
+    var vsd = bm.inversor;
+    var linhas = [
+      lin('Marca / modelo', (bm.marca || '—') + (bm.modelo ? ' ' + bm.modelo : ''), ''),
+      lin('Quantidade', '1', ctx.nOp + ' operando + ' + (ctx.nInst - ctx.nOp) + ' reserva = ' + ctx.nInst),
+      lin('Vazão', n(ctx.qBomba * 1000, 1) + ' L/s', n(ctx.qTotal * 1000, 1) + ' L/s'),
+      lin('Altura manométrica', n(cen.Hm, 2) + ' mca', n(cen.Hm, 2) + ' mca'),
+      lin('Potência de eixo (BHP)', n(cen.bhpCv, 1) + ' cv', n(cen.bhpCv * ctx.nOp, 1) + ' cv'),
+      lin('Motor comercial', UI.numEdit(cen.motorCv) + ' cv', UI.numEdit(cen.motorCv * ctx.nInst) + ' cv (instalada)'),
+      lin('Acionamento', vsd ? 'inversor de frequência (VSD)' : 'partida direta/convencional',
+        vsd && bm.freqOperHz ? 'operação a ' + UI.numEdit(bm.freqOperHz) + ' Hz (rede ' + UI.numEdit(bm.freqRedeHz || 60) + ' Hz)' : (UI.numEdit(bm.freqRedeHz || 60) + ' Hz')),
+      bm.rotorMm ? lin('Rotor', UI.numEdit(bm.rotorMm) + ' mm' + (bm.tipoRotor ? ' — ' + bm.tipoRotor : ''), '') : null,
+      bm.rpm ? lin('Rotação', UI.numEdit(bm.rpm) + ' rpm' + (bm.polos ? ' (' + UI.numEdit(bm.polos) + ' polos)' : ''), '') : null,
+      lin('Submergência mínima', Number(bm.submergMinMm) > 0 ? UI.numEdit(bm.submergMinMm) + ' mm (fabricante)' : n(p.subMinVortice * 1000, 0) + ' mm (estimada ANSI/HI)',
+        'adotada: ' + n(p.submergencia, 2) + ' m'),
+      bm.passagemSolidosMm ? lin('Passagem de sólidos', UI.numEdit(bm.passagemSolidosMm) + ' mm', '') : null,
+      bm.alturaMm ? lin('Altura do conjunto', UI.numEdit(bm.alturaMm) + ' mm', '') : null,
+      bm.pesoKg ? lin('Peso do conjunto', UI.numEdit(bm.pesoKg) + ' kg',
+        r.residuos && r.residuos.monovia ? 'talha ' + n(r.residuos.monovia.capTalha, 0) + ' kg (' + (r.residuos.monovia.talhaTipo === 'eletrica' ? 'elétrica' : 'manual') + ')' : '') : null,
+      bm.tensaoV ? lin('Tensão', UI.numEdit(bm.tensaoV) + ' V', '') : null,
+      lin('Poço de sucção', p.rotForma, p.camaras > 1 ? p.camaras + ' câmaras · V útil ' + n(p.volUtil, 1) + ' m³' : 'V útil ' + n(p.volUtil, 1) + ' m³'),
+      p.naMax !== null ? lin('Níveis', 'NA ' + n(p.naMin, 2) + ' a ' + n(p.naMax, 2) + ' m', 'fundo ' + n(p.cotaFundo, 2) + ' m') : null
+    ].filter(Boolean);
+    return UI.cartao('Quadro-resumo — conjuntos elevatórios',
+      'unitário e total · preencha os dados do catálogo na aba Bombas e níveis',
+      [UI.tabela([{ rot: 'Item', esq: true }, 'Unitário', 'Total / observação'], linhas)]);
+  };
+
+  /* perfil hidráulico completo (entrada + linha de recalque) — aba Resumo */
+  FE.cartaoPerfilResumo = function (st, ctx, res) {
+    var r = res && res.eee;
+    if (!r) return null;
+    var corpo = [];
+    if (r.perfil.temCota && r.poco.naMax !== null) {
+      corpo.push(UI.sub('Da chegada ao poço de sucção'));
+      corpo.push(FE.svgPerfilEntrada(r));
+    } else {
+      corpo.push(h('p', { class: 'nota' },
+        'Informe a cota da GI da chegada (aba Chegada e gradeamento) para desenhar o perfil da entrada.'));
+    }
+    try {
+      var pie = res.piezometrica;
+      if (pie && pie.length > 1) {
+        corpo.push(UI.sub('Linha de recalque — piezométrica'));
+        corpo.push(PDA.Res.svgPerfil(st, ctx, res));
+      }
+    } catch (e) { /* recalque ainda sem dados */ }
+    return UI.cartao('Perfil hidráulico completo', 'entrada da EEE + linha de recalque', corpo);
+  };
+
+  /* energia de emergência + exigências de bombas — aba Bombas e níveis */
+  FE.cartaoEnergia = function (st, ctx, res) {
+    var r = res && res.eee;
+    if (!r) return null;
+    var checks = r.conformidade.checks.filter(function (c) { return c.dom === 'bombas'; });
+    return UI.cartao('Energia de emergência e exigências dos conjuntos',
+      'NBR 12208 · concessionária',
+      [h('div', { class: 'grade' },
         UI.select(st, 'Energia de emergência', 'eee.bypass.energia', [
           { v: 'nenhuma', rot: 'Nenhuma' },
           { v: 'tomada_gerador', rot: 'Tomada externa + chave para gerador móvel' },
           { v: 'gerador_fixo', rot: 'Grupo gerador fixo (partida automática)' },
           { v: 'dupla_alimentacao', rot: 'Segunda alimentação elétrica independente' }
         ], { chave: true,
-             dica: 'NBR 12208: na falta de extravasor licenciado (ou volume de acumulação), prever fonte de ' +
-                   'energia de emergência. Prática: tomada para gerador móvel nas EEEs menores; gerador fixo com ' +
-                   'partida automática nas de porte médio/grande ou onde o extravasamento é inadmissível.' })),
-       ex ? h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
-         PDA.F.chip('Volume de acumulação', n(ex.volAcum, 1) + ' m³', 'do NA máx até a ' + ex.rotLimite, 'forte'),
-         PDA.F.chip('Tempo até extravasar (Qméd)', isFinite(ex.tMedMin) ? n(ex.tMedMin, 0) + ' min' : '—',
-           'prática: ≥ ' + (DE.conf.autonomiaExtravMinH * 60) + ' min', ex.tMedMin < DE.conf.autonomiaExtravMinH * 60 ? 'alerta' : null),
-         PDA.F.chip('Tempo até extravasar (QMH)', isFinite(ex.tMaxMin) ? n(ex.tMaxMin, 0) + ' min' : '—'))
-         : h('p', { class: 'nota', style: 'margin-top:8px' },
-             'Informe as cotas (chegada e poço) para o programa medir o volume de acumulação e o tempo até extravasar.'),
-       h('p', { class: 'nota' },
-         'Prever boia adicional no nível de extravasamento com alarme e acionamento automático da bomba reserva (MPS SANEPAR). ',
-         UI.botaoFonte(['nbr12208', 'mps_sanepar', 'nts_sabesp'], DE.fonteConf))]);
+             dica: 'NBR 12208: na falta de extravasor licenciado (ou RAC suficiente), prever fonte de energia ' +
+                   'de emergência. Prática: tomada para gerador móvel nas EEEs menores; gerador fixo com partida ' +
+                   'automática nas de porte médio/grande ou onde o extravasamento é inadmissível.' })),
+       tabChecks(checks)]);
   };
 
   /* monovia/talha, tubos-guia e caçambas */
@@ -8529,8 +8777,8 @@ html.imprimindo-doc #doc-saida { display: block; }
         { dica: 'Estrutura de içamento para retirar bombas submersíveis, cesto de sólidos e comportas. ' +
                 'SANEPAR MPS 11.1: obrigatória para qualquer peça acima de 25 kgf; a talha pode ser removível. ' +
                 'Alternativas em EEE pequenas: turco giratório (davit) de 250–1.000 kg ou pórtico móvel.' }),
-      UI.campo(st, 'Peso do conjunto motobomba (kg)', 'eee.residuos.monovia.cargaBombaKg',
-        { chave: true, dica: 'Peso da bomba submersível com motor (catálogo). Define a talha, a viga da monovia e o tubo-guia.' }),
+      UI.campo(st, 'Peso do conjunto motobomba (kg)', 'eee.bomba.pesoKg',
+        { chave: true, dica: 'Peso da bomba submersível com motor (catálogo). Também aparece no quadro da bomba, na aba Bombas e níveis. Define a talha, a viga da monovia e o tubo-guia.' }),
       UI.campo(st, 'Vão da viga (m)', 'eee.residuos.monovia.vaoM',
         { dica: 'Distância entre apoios da viga da monovia (tabela indicativa para 3, 4, 5 e 6 m).' })));
     corpo.push(avancado('monovia',
@@ -10598,14 +10846,18 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     var conteudo;
     switch (App.aba) {
-      case 'resumo':     conteudo = PDA.F.abaResumo(st, ctx, res); break;
+      case 'resumo':     conteudo = [PDA.F.abaResumo(st, ctx, res),
+                                     PDA.FE.cartaoPerfilResumo(st, ctx, res),
+                                     PDA.FE.quadroBombaResumo(st, ctx, res)]; break;
       case 'projeto':    conteudo = PDA.F.abaProjeto(st, ctx, res); break;
       case 'vazoes':     conteudo = PDA.FE.abaVazoes(st, ctx, res); break;
       case 'gradeamento': conteudo = PDA.FE.abaGradeamento(st, ctx, res); break;
       case 'areia':      conteudo = PDA.FE.abaAreia(st, ctx, res); break;
       case 'poco':       conteudo = PDA.FE.abaPoco(st, ctx, res); break;
       case 'perfilEEE':  conteudo = PDA.FE.abaPerfilEEE(st, ctx, res); break;
-      case 'bombas':     conteudo = PDA.F.abaBombas(st, ctx, res); break;
+      case 'bombas':     conteudo = [PDA.F.abaBombas(st, ctx, res),
+                                     PDA.FE.cartaoBomba(st, ctx, res),
+                                     PDA.FE.cartaoEnergia(st, ctx, res)]; break;
       case 'succao':     conteudo = PDA.F.abaSuccao(st, ctx); break;
       case 'barrilete':  conteudo = PDA.F.abaBarrilete(st, ctx); break;
       case 'adutoras':   conteudo = PDA.F.abaAdutoras(st, ctx, res); break;
@@ -11099,6 +11351,19 @@ html.imprimindo-doc #doc-saida { display: block; }
       App.st.eee.poco.nCamaras = Math.max(2, Number(App.st.bombas.instaladas) || 2);
       App.st.eee.poco.camaras = 'unica';
     }
+    /* dados que migraram para o bloco da bomba */
+    if (App.st.eee && App.st.eee.bomba) {
+      var bm = App.st.eee.bomba, po = App.st.eee.poco || {}, mv = (App.st.eee.residuos || {}).monovia || {};
+      if (!(Number(bm.passagemSolidosMm) > 0) && Number(po.passagemSolidosMm) > 0) {
+        bm.passagemSolidosMm = po.passagemSolidosMm;
+      }
+      if (!(Number(bm.submergMinMm) > 0) && Number(po.altMotorM) > 0) {
+        bm.submergMinMm = Math.round(Number(po.altMotorM) * 1000);
+      }
+      if (!(Number(bm.pesoKg) > 0) && Number(mv.cargaBombaKg) > 0) {
+        bm.pesoKg = mv.cargaBombaKg;
+      }
+    }
   };
 
   App.autoPreencherPNTodos = function () {
@@ -11458,10 +11723,16 @@ html.imprimindo-doc #doc-saida { display: block; }
     st.eee.poco.L1 = 5.0; st.eee.poco.L2 = 4.7;
     st.eee.poco.partidasHora = 10;
     st.eee.poco.dnBocaMm = 200;
-    st.eee.poco.altMotorM = 0.75;          /* NA mínimo do fabricante (submersível) */
-    st.eee.poco.passagemSolidosMm = 90;    /* Sulzer XFP 206J: 90 × 110 mm */
-    st.eee.residuos.monovia.cargaBombaKg = 690;
     st.eee.bypass.energia = 'tomada_gerador';
+
+    /* conjunto de referência da planilha: Sulzer XFP 206J CB2 / PE 210/6 */
+    st.eee.bomba = {
+      marca: 'Sulzer', modelo: 'XFP 206J CB2 (motor PE 210/6)',
+      pesoKg: 690, alturaMm: 1481, rotorMm: 320, tipoRotor: 'Aberto',
+      rpm: 958, polos: 6, tensaoV: 380,
+      submergMinMm: 750, passagemSolidosMm: 90,
+      inversor: true, freqRedeHz: 60, freqOperHz: 48.41
+    };
 
     /* barrilete e linha de recalque, como na planilha LRE03 */
     st.barrileteIndividual.ativo = true;
