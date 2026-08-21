@@ -411,6 +411,20 @@ tr.alvo-abaixo td { box-shadow: inset 0 -2px 0 var(--teal-vivo); }
 .caixa-esquema.recolhida svg, .caixa-esquema.recolhida .leg { display: none; }
 .caixa-esquema .leg { font-size: 11.5px; color: var(--texto-2); margin-top: 5px; }
 
+/* seção recolhível de ajustes avançados dos cartões da EEE */
+details.avancado {
+  margin: 8px 0 2px; border: 1px dashed var(--border); border-radius: var(--r);
+  padding: 3px 11px; background: var(--surface-2);
+}
+details.avancado > summary {
+  cursor: pointer; font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--texto-3); padding: 5px 0; user-select: none;
+  list-style-position: inside;
+}
+details.avancado[open] { padding-bottom: 11px; }
+details.avancado[open] > summary { margin-bottom: 6px; }
+@media print { details.avancado { border: none; padding: 0; } details.avancado > summary { display: none; } }
+
 /* ---------------- perfil piezométrico ---------------- */
 
 .perfil { width: 100%; height: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; }
@@ -2378,6 +2392,8 @@ html.imprimindo-doc #doc-saida { display: block; }
     vBarrasMin:       0.60,  /* m/s, na Q média — evita acúmulo antes da grade */
     vCanalMin:        0.40,  /* m/s — evita deposição de areia no canal */
     vCanalMax:        0.80,  /* m/s recomendado no canal de aproximação */
+    inclManual:       [45, 60],  /* ° com a horizontal — grade de limpeza manual (NBR 12209) */
+    inclMec:          [60, 90],  /* ° — grade mecanizada (60–90°, conforme o equipamento) */
     hfMinManualM:     0.15,  /* perda mínima a considerar no perfil — grade manual */
     hfMinMecM:        0.10,  /* perda mínima a considerar — grade mecanizada */
     obstrucaoPct:     50     /* obstrução usual de verificação */
@@ -2777,7 +2793,7 @@ html.imprimindo-doc #doc-saida { display: block; }
         },
         poco: {
           formato: 'retangular', L1: 3.0, L2: 3.0, diametroM: 3.0,
-          camaras: 'unica', espParedeM: 0.20,
+          nCamaras: 1, camaras: 'unica', espParedeM: 0.20,
           partidasHora: 6, considerarRodizio: true,
           alturaUtilM: null, naMaxOverride: null, degrauEntradaM: 0.10,
           dnBocaMm: 200, altMotorM: null, submergOverrideM: null,
@@ -4147,6 +4163,14 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     var checks = [];
     function chk(ok, atencao, txt) { checks.push({ ok: ok, atencao: !ok && atencao, txt: txt }); }
+    /* inclinação com a horizontal: manual 45–60° (NBR 12209); mecanizada
+       60–90°, conforme o equipamento */
+    var faixaIncl = mec ? crit.inclMec : crit.inclManual;
+    chk(incl >= faixaIncl[0] - 1e-9 && incl <= faixaIncl[1] + 1e-9,
+      incl >= faixaIncl[0] - 5 && incl <= faixaIncl[1] + 5,
+      'inclinação de ' + incl.toFixed(0) + '° — grade ' + (mec ? 'MECANIZADA: faixa de ' : 'MANUAL: faixa de ') +
+      faixaIncl[0] + '° a ' + faixaIncl[1] + '° com a horizontal' +
+      (mec ? ' (conforme o fabricante do equipamento)' : ' (NBR 12209 — mais deitada facilita o rastelo, mas ocupa mais canal)'));
     chk(vbMax <= vLim + 1e-9, vbMax <= vLim * 1.15,
       'v entre barras na QMH = ' + vbMax.toFixed(2).replace('.', ',') + ' m/s (limite ' + vLim.toFixed(2).replace('.', ',') + ' m/s)');
     chk(vbMed >= crit.vBarrasMin - 1e-9, vbMed >= crit.vBarrasMin * 0.8,
@@ -4541,6 +4565,7 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     return {
       b: b, pontos: pontos, seq: seq, temCota: temCota, series: series, qq: qq,
+      cotaTerreno: num(ch.cotaTerreno),
       fundoChegada: temCota ? fundoChegada : null,
       fundoDesarenador: fundoDesar, saida: saida,
       altCanal: pos(canal.alturaM) ||
@@ -4570,8 +4595,12 @@ html.imprimindo-doc #doc-saida { display: block; }
     var qDetencao = vaz.qMedRef || vaz.qMedFim || 0;
     var volMaxDetencao = (crit.detencaoMaxMin * 60) * qDetencao;
 
-    /* geometria */
-    var camaras = p.camaras === 'porBomba' ? nInst : 1;
+    /* geometria — nº de câmaras flexível (1 = câmara única; até 1 por bomba;
+       arranjos intermediários como 4 bombas em 2 câmaras são válidos) */
+    var camaras = Math.round(pos(p.nCamaras) ||
+      (p.camaras === 'porBomba' ? nInst : 1));            /* compatibilidade com projetos antigos */
+    camaras = Math.max(1, Math.min(nInst, camaras));
+    var bombasPorCamara = nInst / camaras;
     var esp = pos(p.espParedeM) || 0.20;
     var areaTotal, rotForma;
     if (p.formato === 'circular') {
@@ -4588,9 +4617,12 @@ html.imprimindo-doc #doc-saida { display: block; }
       : areaTotal;
     var areaCamara = areaUtil / camaras;
 
-    /* altura útil: adotada ou a necessária pelo volume de ciclo */
-    var volMinTotal = volMinCiclo * camaras;            /* cada câmara precisa do volume da(s) sua(s) bomba(s) */
-    if (camaras === 1) volMinTotal = volMinCiclo;
+    /* altura útil: adotada ou a necessária pelo volume de ciclo.
+       As câmaras são COMUNICADAS por válvulas (normalmente abertas): em
+       operação normal o poço trabalha como volume único, e o ciclo é
+       protegido pelo rodízio entre os conjuntos — o volume mínimo é o do
+       SISTEMA, não a soma por câmara. As divisórias só descontam área. */
+    var volMinTotal = volMinCiclo;
     var hNec = areaUtil > 0 ? volMinTotal / areaUtil : 0;
     var hUtil = pos(p.alturaUtilM) || Math.max(crit.alturaUtilMinM, Math.ceil(hNec * 20) / 20);
     var volUtil = areaUtil * hUtil;
@@ -4631,7 +4663,10 @@ html.imprimindo-doc #doc-saida { display: block; }
       detencaoNorma: minutos(volUtil, qDetencao),         /* Qméd de início de plano — critério da norma */
       detencaoIni: minutos(volUtil, vaz.qMinRef),          /* Qmín do horizonte — informativo, mais severo */
       detencaoFim: minutos(volUtil, vaz.fases.fim.min.v || vaz.qMinRef),
-      cicloMin: qBomba > 0 ? 4 * (volUtil / camaras) / qBomba / 60 : Infinity
+      cicloMin: qBomba > 0 ? 4 * volUtil / qBomba / 60 : Infinity,
+      /* contingência: uma câmara isolada para limpeza, as demais operando */
+      cicloCamaraIsolada: (camaras > 1 && qBomba > 0)
+        ? 4 * (volUtil * (camaras - 1) / camaras) / qBomba / 60 : null
     };
 
     var checks = [];
@@ -4651,6 +4686,18 @@ html.imprimindo-doc #doc-saida { display: block; }
         'NA máx ' + naMax.toFixed(2).replace('.', ',') + ' m mantém a Parshall em escoamento livre (limite ' +
         perfil.saida.naMaxLivre.toFixed(2).replace('.', ',') + ' m)');
     }
+    if (camaras > 1) {
+      chk(Math.abs(bombasPorCamara - Math.round(bombasPorCamara)) < 1e-9, true,
+        nInst + ' bombas em ' + camaras + ' câmaras = ' +
+        (Math.round(bombasPorCamara * 10) / 10).toFixed(1).replace('.', ',') +
+        ' bombas por câmara — prefira uma divisão exata (ex.: 4 bombas em 2 câmaras, 6 em 2 ou 3)');
+      if (isFinite(tempos.cicloCamaraIsolada)) {
+        chk(tempos.cicloCamaraIsolada * 60 >= Tsistema - 1, true,
+          'com uma câmara isolada para limpeza, o ciclo cai para ' +
+          tempos.cicloCamaraIsolada.toFixed(1).replace('.', ',') + ' min (admissível ' +
+          (Tsistema / 60).toFixed(1).replace('.', ',') + ' min) — condição temporária de manutenção');
+      }
+    }
     chk(hUtil >= crit.alturaUtilMinM - 1e-9, hUtil >= crit.alturaUtilMinM * 0.8,
       'altura útil ' + hUtil.toFixed(2).replace('.', ',') + ' m (mínima prática ' + crit.alturaUtilMinM.toFixed(2).replace('.', ',') + ' m)');
 
@@ -4658,7 +4705,8 @@ html.imprimindo-doc #doc-saida { display: block; }
       nInst: nInst, nOp: nOp, qBomba: qBomba, partidas: partidas, nAltern: nAltern,
       Tmotor: Tmotor, Tsistema: Tsistema,
       volMinCiclo: volMinCiclo, volMinTotal: volMinTotal, volMaxDetencao: volMaxDetencao,
-      camaras: camaras, rotForma: rotForma, areaTotal: areaTotal, areaUtil: areaUtil, areaCamara: areaCamara,
+      camaras: camaras, bombasPorCamara: bombasPorCamara,
+      rotForma: rotForma, areaTotal: areaTotal, areaUtil: areaUtil, areaCamara: areaCamara,
       hNec: hNec, hUtil: hUtil, volUtil: volUtil,
       naMax: naMax, naMin: naMin, cotaFundo: cotaFundo, cotaLaje: cotaLaje, altTotal: altTotal,
       dnBocaMm: dnBocaMm, vBoca: vBoca, subMinVortice: subMinVortice, subMotor: subMotor,
@@ -4716,30 +4764,40 @@ html.imprimindo-doc #doc-saida { display: block; }
     var temBypassCanal = bp.canal === 'sim';
     var bypassNecessario = false, bypassMotivo = '';
     if (usaGrades) {
+      /* o canal RESERVA já cumpre a função de by-pass — canal de by-pass
+         dedicado só faz sentido quando não há reserva */
+      var temReserva = canais.reserva >= 1;
+      var arranjoTxt = temReserva
+        ? canais.oper + ' operando + ' + canais.reserva + ' reserva (a reserva já é o by-pass)'
+        : (canais.n === 1 ? 'canal único' : canais.n + ' canais, todos operando') +
+          (temBypassCanal ? ' + canal de by-pass com grade manual' : ', sem by-pass');
       if (temMecanizada) {
         /* NBR 12209: mínimo 2 unidades, cada uma para a vazão total; uma pode ser manual (reserva/by-pass) */
-        var atende = (canais.n >= 2 && canais.reserva >= 1) || temBypassCanal;
-        bypassNecessario = !(canais.n >= 2 && canais.reserva >= 1);
+        var atende = temReserva || temBypassCanal;
+        bypassNecessario = !temReserva;
         bypassMotivo = 'gradeamento mecanizado sem canal reserva';
         chk(atende, false,
           'Gradeamento mecanizado: a NBR 12209 exige no mínimo 2 unidades (canal reserva isolável por ' +
-          'comportas — a reserva pode ter grade MANUAL) ou canal de by-pass com grade manual. Arranjo atual: ' +
-          canais.oper + ' operando + ' + canais.reserva + ' reserva' + (temBypassCanal ? ' + canal de by-pass' : ', sem by-pass'));
-        if (canais.reserva >= 1) {
+          'comportas — a reserva pode ter grade MANUAL e faz o papel de by-pass). Arranjo atual: ' + arranjoTxt);
+        if (temReserva) {
           var resMec = bp.reservaGrade === 'mecanizada';
           nota('Canal reserva com grade ' + (resMec ? 'MECANIZADA (padrão em grandes estações — SABESP usa 2 ' +
-            'mecanizadas + 1 manual de by-pass)' : 'MANUAL (admitido pela NBR 12209; espaçamento igual ou ' +
+            'mecanizadas + 1 manual de reserva/by-pass)' : 'MANUAL (admitido pela NBR 12209; espaçamento igual ou ' +
             'imediatamente superior ao da mecanizada)'));
         }
       } else {
         var isolavel = canais.n >= 2 || temBypassCanal;
         chk(isolavel, true,
-          'Grades manuais em canal único ' + (temBypassCanal ? 'com' : 'sem') + ' by-pass: ' +
-          (isolavel ? 'há como isolar o canal para manutenção'
+          'Grades manuais — ' + arranjoTxt + ': ' +
+          (isolavel ? 'há como isolar um canal para manutenção'
                     : 'não há como limpar/manter o canal sem represar ou verter esgoto — prever canal de ' +
                       'by-pass com grade manual ou um segundo canal'));
         bypassNecessario = canais.n < 2;
         bypassMotivo = 'canal único de gradeamento';
+      }
+      if (temReserva && temBypassCanal) {
+        nota('Canal de by-pass dedicado é redundante com o canal reserva — a reserva já cumpre essa função; ' +
+          'mantenha o by-pass dedicado apenas se a operação exigir contorno com TODOS os canais gradeados em uso');
       }
       if (canais.n >= 2 && canais.reserva === 0) {
         chk(false, true, canais.n + ' canais, todos operando: sem canal reserva, a manutenção de um canal ' +
@@ -4811,11 +4869,11 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     /* ---- exigências de concessionária ---- */
     if (conc === 'sanepar') {
-      if (st.bombas.tipo === 'submersivel') {
-        chk(st.eee.poco.camaras === 'porBomba', true,
+      if (st.bombas.tipo === 'submersivel' && poco) {
+        chk(poco.camaras >= poco.nInst, true,
           'SANEPAR MPS 11.1: bombas submersíveis em poço úmido exigem câmaras de sucção INDEPENDENTES por ' +
           'bomba, comunicadas por válvulas — arranjo atual: ' +
-          (st.eee.poco.camaras === 'porBomba' ? 'uma câmara por bomba' : 'câmara única'));
+          (poco.camaras > 1 ? poco.camaras + ' câmara(s) para ' + poco.nInst + ' bombas' : 'câmara única'));
       }
       if (qDimLs > conf.qMedidorLs) {
         var temMedidor = CE.temPeca(st, 'medidor_vazao');
@@ -7667,6 +7725,17 @@ html.imprimindo-doc #doc-saida { display: block; }
 
   function eee(st) { return PDA.CE.calcular(st); }
 
+  /* seção "Ajustes avançados" recolhível — lembra o estado aberto entre
+     re-renderizações (o formulário é redesenhado a cada tecla) */
+  var avAbertos = {};
+  function avancado(id) {
+    var det = h('details', { class: 'avancado', open: avAbertos[id] ? '' : null },
+      h('summary', {}, 'Ajustes avançados'));
+    det.addEventListener('toggle', function () { avAbertos[id] = det.open; });
+    for (var i = 1; i < arguments.length; i++) UI.add(det, arguments[i]);
+    return det;
+  }
+
   /* ================================================================
      Aba: Vazões de esgoto
      ================================================================ */
@@ -7690,17 +7759,18 @@ html.imprimindo-doc #doc-saida { display: block; }
           vz.modo === 'qmh' ? UI.campo(st, 'QMH de fim de plano', 'eee.vazoes.qmhFim',
             { chave: true, sufixo: vz.unid, dica: 'Vazão máxima horária no horizonte de projeto — a vazão de dimensionamento das bombas, do gradeamento e da Calha Parshall.' }) : null
         ),
-        h('div', { class: 'grade' },
-          UI.campo(st, 'K1 — dia de maior contribuição', 'eee.vazoes.k1',
-            { dica: 'Qmáx,diária = K1 · Qmédia. Usual K1 = 1,2 (NBR 9649).' }),
-          UI.campo(st, 'K2 — hora de maior contribuição', 'eee.vazoes.k2',
-            { dica: 'QMH = K2 · Qmáx,diária = K1·K2·Qmédia. Usual K2 = 1,5 (NBR 9649).' }),
-          UI.campo(st, 'K3 — vazão mínima', 'eee.vazoes.kMin',
-            { dica: 'Qmín = K3 · Qmédia. Usual K3 = 0,5 (NBR 9649 / Tsutiya).' }),
-          UI.campo(st, 'Início de plano (% do fim)', 'eee.vazoes.fracInicio',
-            { dica: 'Quando as vazões de início de plano não são informadas, elas são estimadas como esta fração das vazões de fim de plano.' }),
-          UI.campo(st, 'Meio de plano (% do fim)', 'eee.vazoes.fracMeio',
-            { dica: 'Idem, para o meio de plano.' })
+        avancado('vaz-coef',
+          h('div', { class: 'grade' },
+            UI.campo(st, 'K1 — dia de maior contribuição', 'eee.vazoes.k1',
+              { dica: 'Qmáx,diária = K1 · Qmédia. Usual K1 = 1,2 (NBR 9649).' }),
+            UI.campo(st, 'K2 — hora de maior contribuição', 'eee.vazoes.k2',
+              { dica: 'QMH = K2 · Qmáx,diária = K1·K2·Qmédia. Usual K2 = 1,5 (NBR 9649).' }),
+            UI.campo(st, 'K3 — vazão mínima', 'eee.vazoes.kMin',
+              { dica: 'Qmín = K3 · Qmédia. Usual K3 = 0,5 (NBR 9649 / Tsutiya).' }),
+            UI.campo(st, 'Início de plano (% do fim)', 'eee.vazoes.fracInicio',
+              { dica: 'Quando as vazões de início de plano não são informadas, elas são estimadas como esta fração das vazões de fim de plano.' }),
+            UI.campo(st, 'Meio de plano (% do fim)', 'eee.vazoes.fracMeio',
+              { dica: 'Idem, para o meio de plano.' }))
         ),
         h('div', { class: 'linha', style: 'margin-top:6px' },
           UI.check(st, 'Usar a QMH de fim de plano como vazão da linha de recalque', 'eee.vazoes.aplicarNaLR',
@@ -7783,16 +7853,17 @@ html.imprimindo-doc #doc-saida { display: block; }
         UI.campo(st, 'Cota da GI da tubulação de chegada (m)', 'eee.chegada.cotaGI',
           { chave: true, dica: 'Geratriz inferior do coletor afluente no ponto de entrada. É a amarra de todo o perfil hidráulico: canal, grades, Parshall e NA máximo do poço descem a partir dela.' }),
         UI.campo(st, 'DN da tubulação afluente (mm)', 'eee.chegada.dnAfluenteMm'),
-        UI.campo(st, 'Degrau na entrada do canal (m)', 'eee.chegada.degrauEntradaM',
-          { dica: 'Degrau entre a GI do coletor e o fundo do canal de entrada, para a chegada não afogar o coletor.' })),
-      h('div', { class: 'grade' },
         UI.campo(st, 'Largura do canal (m)', 'eee.canal.larguraM',
-          { chave: true, dica: 'Larguras usuais de canal: ' + DE.largurasCanal.map(function (v) { return UI.num(v, 2); }).join(' · ') + ' m. A mesma largura vale para as grades.' }),
-        UI.campo(st, 'Altura do canal (m)', 'eee.canal.alturaM',
-          { editado: st.eee.canal.alturaM !== null && st.eee.canal.alturaM !== undefined && st.eee.canal.alturaM !== '',
-            placeholder: r ? UI.num(r.perfil.altCanal, 2) : '',
-            dica: 'Em branco: lâmina máxima + borda livre, arredondada. Digite para fixar.' }),
-        UI.campo(st, 'Borda livre (m)', 'eee.canal.bordaLivreM'))
+          { chave: true, dica: 'Larguras usuais de canal: ' + DE.largurasCanal.map(function (v) { return UI.num(v, 2); }).join(' · ') + ' m. A mesma largura vale para as grades.' })),
+      avancado('chegada',
+        h('div', { class: 'grade' },
+          UI.campo(st, 'Degrau na entrada do canal (m)', 'eee.chegada.degrauEntradaM',
+            { dica: 'Degrau entre a GI do coletor e o fundo do canal de entrada, para a chegada não afogar o coletor.' }),
+          UI.campo(st, 'Altura do canal (m)', 'eee.canal.alturaM',
+            { editado: st.eee.canal.alturaM !== null && st.eee.canal.alturaM !== undefined && st.eee.canal.alturaM !== '',
+              placeholder: r ? UI.num(r.perfil.altCanal, 2) : '',
+              dica: 'Em branco: lâmina máxima + borda livre, arredondada. Digite para fixar.' }),
+          UI.campo(st, 'Borda livre (m)', 'eee.canal.bordaLivreM')))
       ]));
 
     /* --- arranjo --- */
@@ -7853,7 +7924,12 @@ html.imprimindo-doc #doc-saida { display: block; }
   FE.cartaoConformidade = function (st, r) {
     var cf = r.conformidade;
     var bp = st.eee.bypass;
-    var linhas = cf.checks.map(function (c) {
+    /* reprovações primeiro, depois atenções, depois o que atende e as notas */
+    var ordenados = cf.checks.slice().sort(function (a, b) {
+      function peso(c) { return c.nota ? 3 : (c.ok ? 2 : (c.atencao ? 1 : 0)); }
+      return peso(a) - peso(b);
+    });
+    var linhas = ordenados.map(function (c) {
       var cl = c.nota ? 'na' : (c.ok ? 'bom' : (c.atencao ? 'atencao' : 'ruim'));
       return h('tr', { class: c.nota ? '' : cl },
         h('td', { class: 'esq' }, c.txt),
@@ -7863,17 +7939,26 @@ html.imprimindo-doc #doc-saida { display: block; }
     return UI.cartao('By-pass e conformidade normativa',
       'NBR 12208 / NBR 12209 · exigências de concessionária',
       [h('div', { class: 'grade' },
-        UI.select(st, 'Canal de by-pass do gradeamento', 'eee.bypass.canal', [
-          { v: 'auto', rot: cf.bypass.necessario ? 'Decidir depois (o programa indica: NECESSÁRIO)' : 'Decidir depois (o programa indica: dispensável)' },
-          { v: 'sim', rot: 'Sim — canal de by-pass com grade de limpeza manual' },
-          { v: 'nao', rot: 'Não haverá canal de by-pass' }
-        ], { chave: true,
-             dica: 'O canal de by-pass contorna o gradeamento quando um canal precisa sair de operação. ' +
-                   'QUANDO PODE: sempre — é a contingência recomendada. QUANDO É OBRIGATÓRIO (NBR 12209): ' +
-                   'quando o gradeamento é MECANIZADO e não há canal reserva isolável — a norma exige no mínimo ' +
-                   '2 unidades, cada uma com capacidade para a vazão total, e admite que uma delas seja grade de ' +
-                   'limpeza MANUAL usada como reserva/by-pass. O canal de by-pass nunca deve lançar esgoto sem ' +
-                   'gradear: leva grade manual com espaçamento igual ou imediatamente superior ao da grade principal.' }),
+        cf.canais.reserva >= 1
+          ? h('div', { class: 'campo' },
+              h('span', { class: 'rot' }, 'Canal de by-pass do gradeamento',
+                UI.dica('O canal RESERVA já cumpre a função de by-pass: é isolado por comportas e assume a vazão ' +
+                        'quando um canal operante sai de serviço. Um canal de by-pass dedicado só faz sentido ' +
+                        'quando não há reserva (canal único).')),
+              h('div', { style: 'align-self:center;padding:5px 0' },
+                h('b', {}, 'dispensável'), ' — o canal reserva já é o by-pass'))
+          : UI.select(st, 'Canal de by-pass do gradeamento', 'eee.bypass.canal', [
+              { v: 'auto', rot: cf.bypass.necessario ? 'Decidir depois (o programa indica: NECESSÁRIO)' : 'Decidir depois (o programa indica: dispensável)' },
+              { v: 'sim', rot: 'Sim — canal de by-pass com grade de limpeza manual' },
+              { v: 'nao', rot: 'Não haverá canal de by-pass' }
+            ], { chave: true,
+                 dica: 'O canal de by-pass contorna o gradeamento quando o canal precisa sair de operação. ' +
+                       'QUANDO PODE: sempre — é a contingência recomendada. QUANDO É OBRIGATÓRIO (NBR 12209): ' +
+                       'quando o gradeamento é MECANIZADO e não há canal reserva isolável — a norma exige no mínimo ' +
+                       '2 unidades, cada uma com capacidade para a vazão total, e admite que uma delas seja grade de ' +
+                       'limpeza MANUAL usada como reserva/by-pass (um canal 1+1 já atende: a reserva É o by-pass). ' +
+                       'O canal de by-pass nunca deve lançar esgoto sem gradear: leva grade manual com espaçamento ' +
+                       'igual ou imediatamente superior ao da grade principal.' }),
         cf.canais.reserva >= 1 ? UI.select(st, 'Grade do canal reserva', 'eee.bypass.reservaGrade', [
           { v: 'manual', rot: 'Manual (admitido pela NBR 12209)' },
           { v: 'mecanizada', rot: 'Mecanizada (padrão SABESP em grandes unidades)' }
@@ -7909,21 +7994,29 @@ html.imprimindo-doc #doc-saida { display: block; }
     corpo.push(h('div', { class: 'grade' },
       UI.select(st, 'Limpeza', base + '.limpeza', [
         { v: 'manual', rot: 'Manual (rastelo)' }, { v: 'mecanizada', rot: 'Mecanizada' }
-      ], { dica: 'A limpeza mecanizada permite adotar perda de carga mínima menor no perfil (0,10 m contra 0,15 m) e é usual quando o material retido é grande ou a estação é de porte. A NBR 12209 recomenda mecanizar quando a Q de projeto supera 250 L/s.' }),
+      ], { chave: true, dica: 'A limpeza mecanizada permite adotar perda de carga mínima menor no perfil (0,10 m contra 0,15 m). A NBR 12209 EXIGE mecanizar as grades média e fina quando a QMH de fim de plano atinge 100 L/s (a grade grossa é isenta) — o cartão de conformidade avisa.' }),
       UI.campo(st, 'Espaçamento entre barras (mm)', base + '.espacMm',
         { chave: true, dica: classe.rot + ': espaçamento usual de ' + classe.faixaMm[0] + ' a ' + classe.faixaMm[1] + ' mm (Jordão & Pessôa; NBR 12209).' }),
-      UI.select(st, 'Barra comercial', base + '.barraId',
-        DE.barras.map(function (b) { return { v: b.id, rot: b.rot }; }),
-        { dica: 'Barras chatas de aço usuais em grades. A espessura entra na eficiência E = a/(a+t) e na perda de Kirschmer.' }),
-      UI.select(st, 'Forma da barra', base + '.formaBarra',
-        DE.formasBarra.map(function (f) { return { v: f.id, rot: f.rot + ' (β = ' + UI.numEdit(f.beta) + ')' }; }),
-        { dica: 'Coeficiente β de Kirschmer conforme a seção da barra.' }),
       UI.campo(st, 'Inclinação (°)', base + '.inclGraus',
-        { dica: 'Com a horizontal. Manual: 45 a 60°; mecanizada: 60 a 90°.' }),
-      UI.campo(st, 'Obstrução de verificação (%)', base + '.obstrucaoPct',
-        { dica: 'A grade é verificada parcialmente obstruída (usual 50 %): a velocidade dobra e a perda cresce — é o que define o acionamento da limpeza.' }),
-      UI.campo(st, 'Degrau após a grade (m)', base + '.degrauAposM',
-        { dica: 'Degrau de fundo lançado logo a jusante, que compensa a perda de carga da grade e devolve a lâmina do canal.' })));
+        { chave: true,
+          dica: 'Ângulo COM A HORIZONTAL. NBR 12209: limpeza manual de 45° a 60°; mecanizada de 60° a 90° ' +
+                '(a norma admite vertical — conforme o fabricante do equipamento).\n\nCuidado com a confusão ' +
+                'clássica: a tabela do Metcalf & Eddy traz 30°–45° (manual) MEDIDOS DA VERTICAL — é a mesma ' +
+                'faixa de 45°–60° com a horizontal. O programa verifica a faixa conforme a limpeza escolhida.' })));
+    corpo.push(avancado('grade-' + nv.id,
+      h('div', { class: 'grade' },
+        UI.select(st, 'Barra comercial', base + '.barraId',
+          DE.barras.map(function (b) { return { v: b.id, rot: b.rot }; }),
+          { dica: 'Barras chatas de aço usuais em grades. A espessura entra na eficiência E = a/(a+t) e na perda de Kirschmer.' }),
+        UI.select(st, 'Forma da barra', base + '.formaBarra',
+          DE.formasBarra.map(function (f) { return { v: f.id, rot: f.rot + ' (β = ' + UI.numEdit(f.beta) + ')' }; }),
+          { dica: 'Coeficiente β de Kirschmer conforme a seção da barra.' }),
+        UI.campo(st, 'Obstrução de verificação (%)', base + '.obstrucaoPct',
+          { dica: 'A grade é verificada parcialmente obstruída (usual 50 %): a velocidade dobra e a perda cresce — é o que define o acionamento da limpeza.' }),
+        UI.campo(st, 'Degrau após a grade (m)', base + '.degrauAposM',
+          { dica: 'Degrau de fundo lançado logo a jusante, que compensa a perda de carga da grade e devolve a lâmina do canal.' }),
+        UI.campo(st, 'Perfil U lateral (mm)', base + '.perfilLateralMm',
+          { dica: 'Largura do quadro/perfil lateral em cada borda, descontada da largura livre no cálculo do número de barras.' }))));
 
     var gcalc = null;
     if (r) r.grades.forEach(function (x) { if (x.nivel.id === nv.id) gcalc = x; });
@@ -8100,12 +8193,13 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     /* sólidos */
     corpo.push(UI.sub('Quantidades esperadas de sólidos'));
-    corpo.push(h('div', { class: 'grade' },
-      UI.campo(st, 'Taxa de areia (L/m³ de esgoto)', 'eee.desarenador.taxaAreiaLm3',
-        { dica: 'Usual de 0,02 a 0,04 L/m³ (20 a 40 L por 1.000 m³).' }),
-      UI.campo(st, 'Taxa de material gradeado (L/m³)', 'eee.desarenador.taxaGradeadoLm3',
-        { dica: 'Usual de 0,03 a 0,08 L/m³, conforme o espaçamento da grade mais fina.' }),
-      UI.campo(st, 'Dias de acúmulo para remoção', 'eee.desarenador.diasAcumulo')));
+    corpo.push(avancado('desar-taxas',
+      h('div', { class: 'grade' },
+        UI.campo(st, 'Taxa de areia (L/m³ de esgoto)', 'eee.desarenador.taxaAreiaLm3',
+          { dica: 'Usual de 0,02 a 0,04 L/m³ (20 a 40 L por 1.000 m³).' }),
+        UI.campo(st, 'Taxa de material gradeado (L/m³)', 'eee.desarenador.taxaGradeadoLm3',
+          { dica: 'Usual de 0,03 a 0,08 L/m³, conforme o espaçamento da grade mais fina.' }),
+        UI.campo(st, 'Dias de acúmulo para remoção', 'eee.desarenador.diasAcumulo'))));
     corpo.push(UI.tabela([{ rot: 'Fase', esq: true }, 'Esgoto (m³/d)', 'Areia (m³/d)', 'Areia (m³/' + d.diasAcumulo + ' d)',
                           'Gradeado (m³/d)', 'Gradeado (m³/' + d.diasAcumulo + ' d)'],
       CE.FASES.map(function (f) {
@@ -8190,11 +8284,15 @@ html.imprimindo-doc #doc-saida { display: block; }
           : null,
         st.eee.poco.formato !== 'circular' ? UI.campo(st, 'L1 (m)', 'eee.poco.L1') : null,
         st.eee.poco.formato !== 'circular' ? UI.campo(st, 'L2 (m)', 'eee.poco.L2') : null,
-        UI.select(st, 'Câmaras', 'eee.poco.camaras', [
-          { v: 'unica', rot: 'Uma câmara única para todas as bombas' },
-          { v: 'porBomba', rot: 'Uma câmara por bomba (paredes divisórias)' }
-        ], { dica: 'Arranjos previstos: câmara única (usual) ou uma câmara independente por conjunto — exigência de algumas concessionárias quando é preciso esgotar e limpar uma câmara sem parar a estação (MPS SANEPAR). Cada câmara precisa do volume de ciclo da sua bomba.' }),
-        st.eee.poco.camaras === 'porBomba' ? UI.campo(st, 'Espessura das divisórias (m)', 'eee.poco.espParedeM') : null,
+        UI.campo(st, 'Número de câmaras', 'eee.poco.nCamaras',
+          { sufixo: 'ud', chave: true,
+            dica: 'De 1 (câmara única, usual) até uma câmara por bomba. Arranjos intermediários valem: 4 bombas ' +
+                  'em 2 câmaras (2 por câmara), 6 bombas em 2 ou 3 câmaras… As câmaras são comunicadas por ' +
+                  'válvulas normalmente ABERTAS: em operação o poço trabalha como volume único (o volume de ciclo ' +
+                  'NÃO se multiplica pelas câmaras — as divisórias só descontam área). A separação serve para ' +
+                  'esgotar e limpar uma câmara sem parar a estação (MPS SANEPAR exige câmaras independentes por ' +
+                  'bomba nas EEEs de poço úmido).' }),
+        Math.round(Number(st.eee.poco.nCamaras) || 1) > 1 ? UI.campo(st, 'Espessura das divisórias (m)', 'eee.poco.espParedeM') : null,
         UI.campo(st, 'Altura útil (m)', 'eee.poco.alturaUtilM',
           { placeholder: n(p.hUtil, 2), editado: !!st.eee.poco.alturaUtilM,
             dica: 'Entre NA mínimo e NA máximo. Em branco: a necessária pelo volume de ciclo, com mínimo prático de ' + n(DE.critPoco.alturaUtilMinM, 2) + ' m.' }),
@@ -8202,6 +8300,9 @@ html.imprimindo-doc #doc-saida { display: block; }
           { dica: 'Queda entre o canal de saída da Parshall e o NA máximo do poço.' })),
        h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
          chip('Poço', p.rotForma, p.camaras > 1 ? p.camaras + ' câmaras' : 'câmara única', 'forte'),
+         p.camaras > 1 ? chip('Bombas por câmara', n(p.bombasPorCamara, p.bombasPorCamara % 1 ? 1 : 0) + ' ud',
+           p.nInst + ' bombas / ' + p.camaras + ' câmaras',
+           Math.abs(p.bombasPorCamara - Math.round(p.bombasPorCamara)) > 1e-9 ? 'alerta' : null) : null,
          chip('Área útil', n(p.areaUtil, 2) + ' m²', p.camaras > 1 ? n(p.areaCamara, 2) + ' m² por câmara' : null),
          chip('Altura útil', n(p.hUtil, 2) + ' m', 'necessária ' + n(p.hNec, 2) + ' m'),
          chip('Volume útil', n(p.volUtil, 2) + ' m³', 'mínimo ' + n(p.volMinTotal, 2) + ' m³',
@@ -8209,22 +8310,26 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     raiz.appendChild(UI.cartao('Níveis e submergência', 'NA máximo, NA mínimo e cota do fundo',
       [h('div', { class: 'grade' },
-        UI.campo(st, 'NA máximo (m) — sobrepor', 'eee.poco.naMaxOverride',
-          { placeholder: p.naMax !== null ? n(p.naMax, 3) : '', editado: st.eee.poco.naMaxOverride !== null && st.eee.poco.naMaxOverride !== undefined && st.eee.poco.naMaxOverride !== '',
-            dica: 'Em branco: vem do perfil hidráulico (saída da Parshall menos o degrau de entrada).' }),
         UI.campo(st, 'DN da boca de sucção (mm)', 'eee.poco.dnBocaMm',
           { dica: 'Usada na submergência mínima contra vórtice (ANSI/HI 9.8).' }),
         UI.campo(st, 'NA mínimo do fabricante (m acima do fundo)', 'eee.poco.altMotorM',
           { dica: 'Bombas submersíveis: altura mínima de esgoto para refrigerar o motor (catálogo). Prevalece o maior valor entre este e a submergência anti-vórtice.' }),
-        UI.campo(st, 'Submergência — sobrepor (m)', 'eee.poco.submergOverrideM',
-          { placeholder: n(p.submergencia, 2) }),
-        UI.campo(st, 'Cota do fundo — sobrepor (m)', 'eee.poco.cotaFundoOverride',
-          { placeholder: p.cotaFundo !== null ? n(p.cotaFundo, 3) : '' }),
-        UI.campo(st, 'Cota da laje de cobertura (m)', 'eee.poco.cotaLajeOverride',
-          { placeholder: p.cotaLaje !== null ? n(p.cotaLaje, 2) : '', dica: 'Em branco: terreno + 0,10 m.' }),
         h('div', { style: 'display:flex;align-items:flex-end;padding-bottom:2px' },
           UI.check(st, 'Aplicar NA mín/máx na linha de recalque', 'eee.poco.aplicarCotas',
             { dica: 'Mantém as cotas de sucção da aba "Bombas e níveis" amarradas ao poço calculado.' }))),
+       avancado('poco-niveis',
+        h('p', { class: 'nota', style: 'margin:2px 0 6px' },
+          'Sobreposições: em branco, o programa calcula tudo a partir do perfil hidráulico e da submergência. Digite apenas o que quiser fixar.'),
+        h('div', { class: 'grade' },
+          UI.campo(st, 'NA máximo (m) — sobrepor', 'eee.poco.naMaxOverride',
+            { placeholder: p.naMax !== null ? n(p.naMax, 3) : '', editado: st.eee.poco.naMaxOverride !== null && st.eee.poco.naMaxOverride !== undefined && st.eee.poco.naMaxOverride !== '',
+              dica: 'Em branco: vem do perfil hidráulico (saída da Parshall menos o degrau de entrada).' }),
+          UI.campo(st, 'Submergência — sobrepor (m)', 'eee.poco.submergOverrideM',
+            { placeholder: n(p.submergencia, 2) }),
+          UI.campo(st, 'Cota do fundo — sobrepor (m)', 'eee.poco.cotaFundoOverride',
+            { placeholder: p.cotaFundo !== null ? n(p.cotaFundo, 3) : '' }),
+          UI.campo(st, 'Cota da laje de cobertura (m)', 'eee.poco.cotaLajeOverride',
+            { placeholder: p.cotaLaje !== null ? n(p.cotaLaje, 2) : '', dica: 'Em branco: terreno + 0,10 m.' }))),
        h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
          chip('NA máximo', p.naMax !== null ? n(p.naMax, 3) + ' m' : '—', 'perfil hidráulico', 'forte'),
          chip('NA mínimo', p.naMin !== null ? n(p.naMin, 3) + ' m' : '—'),
@@ -8270,7 +8375,8 @@ html.imprimindo-doc #doc-saida { display: block; }
           ['Subida do NA (QMH início de plano, bombas paradas)', p.tempos.subidaIni, 'enchimento mais lento'],
           ['Subida do NA (QMH fim de plano)', p.tempos.subidaFim, 'enchimento mais rápido'],
           ['Descida do NA (bombas ligadas, Qméd afluindo)', p.tempos.descida, 'esvaziamento'],
-          ['Detenção na menor vazão do horizonte', p.tempos.detencaoIni, '≤ ' + DE.critPoco.detencaoMaxMin + ' min — septicidade'],
+          ['Detenção na Q média de início de plano', p.tempos.detencaoNorma, '≤ ' + DE.critPoco.detencaoMaxMin + ' min — NBR 12208 / MPS SANEPAR'],
+          ['Detenção na menor vazão do horizonte', p.tempos.detencaoIni, 'informativo — condição mais severa'],
           ['Ciclo mínimo (na vazão crítica Q = Qb/2)', p.tempos.cicloMin, '≥ ' + n(p.Tsistema / 60, 1) + ' min admissível']
         ].map(function (l) {
           return h('tr', {},
@@ -8425,17 +8531,19 @@ html.imprimindo-doc #doc-saida { display: block; }
                 'Alternativas em EEE pequenas: turco giratório (davit) de 250–1.000 kg ou pórtico móvel.' }),
       UI.campo(st, 'Peso do conjunto motobomba (kg)', 'eee.residuos.monovia.cargaBombaKg',
         { chave: true, dica: 'Peso da bomba submersível com motor (catálogo). Define a talha, a viga da monovia e o tubo-guia.' }),
-      UI.campo(st, 'Outra carga a içar (kg)', 'eee.residuos.monovia.cargaExtraKg',
-        { dica: 'Comporta, válvula, contrapeso… quando for mais pesada que a bomba e o cesto.' }),
       UI.campo(st, 'Vão da viga (m)', 'eee.residuos.monovia.vaoM',
-        { dica: 'Distância entre apoios da viga da monovia (tabela indicativa para 3, 4, 5 e 6 m).' }),
-      UI.campo(st, 'Percurso do trole (m)', 'eee.residuos.monovia.percursoM',
-        { placeholder: mv ? UI.numEdit(mv.vaoM) : '', dica: 'Do eixo do poço até a baia da caçamba/caminhão.' }),
-      UI.select(st, 'Talha', 'eee.residuos.monovia.talhaTipo', [
-        { v: 'auto', rot: 'Escolher automaticamente' },
-        { v: 'manual', rot: 'Manual de corrente' },
-        { v: 'eletrica', rot: 'Elétrica de corrente' }
-      ], { dica: 'Automático: elétrica quando a capacidade passa de 500 kg ou a elevação passa de 6 m (ergonomia e NR-17); manual nas demais.' })));
+        { dica: 'Distância entre apoios da viga da monovia (tabela indicativa para 3, 4, 5 e 6 m).' })));
+    corpo.push(avancado('monovia',
+      h('div', { class: 'grade' },
+        UI.campo(st, 'Outra carga a içar (kg)', 'eee.residuos.monovia.cargaExtraKg',
+          { dica: 'Comporta, válvula, contrapeso… quando for mais pesada que a bomba e o cesto.' }),
+        UI.campo(st, 'Percurso do trole (m)', 'eee.residuos.monovia.percursoM',
+          { placeholder: mv ? UI.numEdit(mv.vaoM) : '', dica: 'Do eixo do poço até a baia da caçamba/caminhão.' }),
+        UI.select(st, 'Talha', 'eee.residuos.monovia.talhaTipo', [
+          { v: 'auto', rot: 'Escolher automaticamente' },
+          { v: 'manual', rot: 'Manual de corrente' },
+          { v: 'eletrica', rot: 'Elétrica de corrente' }
+        ], { dica: 'Automático: elétrica quando a capacidade passa de 500 kg ou a elevação passa de 6 m (ergonomia e NR-17); manual nas demais.' }))));
 
     if (mv) {
       corpo.push(h('div', { class: 'faixa-resumo', style: 'margin:8px 0' },
@@ -8473,7 +8581,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       if (txt !== undefined && txt !== null) e.textContent = txt;
       return e;
     }
-    var W = 980, HH = 430;
+    var W = 980, HH = 470;
     var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + HH, class: 'esquema', style: 'max-width:980px' });
     var p = r.poco, perfil = r.perfil;
     if (!perfil.temCota || p.naMax === null || p.cotaFundo === null) return svg;
@@ -8486,22 +8594,27 @@ html.imprimindo-doc #doc-saida { display: block; }
     ];
     series.sort(function (a, b) { return b.Q - a.Q; });   /* maior vazão primeiro (é a sombreada) */
 
+    var cotaTerreno = perfil.cotaTerreno;
+    var topoCanal = perfil.pontos.map(function (pt) { return pt.fundo + perfil.altCanal; });
+
     /* faixa vertical */
     var cotas = [];
-    perfil.pontos.forEach(function (pt) {
-      cotas.push(pt.fundo);
+    perfil.pontos.forEach(function (pt, i) {
+      cotas.push(pt.fundo, topoCanal[i]);
       series.forEach(function (s) { if (pt.na[s.key] !== null && pt.na[s.key] !== undefined) cotas.push(pt.na[s.key]); });
     });
     if (perfil.saida) { cotas.push(perfil.saida.crista); cotas.push(perfil.saida.fundoJusante); }
     cotas.push(p.naMax, p.naMin, p.cotaFundo);
     if (p.cotaLaje !== null) cotas.push(p.cotaLaje);
+    if (cotaTerreno !== null) cotas.push(cotaTerreno);
     var cMin = Math.min.apply(null, cotas), cMax = Math.max.apply(null, cotas);
     var amp = Math.max(cMax - cMin, 0.5);
-    var mT = 30, mB = 46, mE = 74, mD = 26;
+    var mT = 26, mB = 46, mE = 74, mD = 92;
     function py(c) { return mT + (cMax - c) / amp * (HH - mT - mB); }
 
-    /* régua de cotas na margem esquerda */
     var g = sv('g');
+
+    /* régua de cotas na margem esquerda */
     var passo = amp > 8 ? 2 : (amp > 4 ? 1 : (amp > 1.6 ? 0.5 : 0.2));
     for (var cc = Math.ceil(cMin / passo) * passo; cc <= cMax + 1e-9; cc += passo) {
       var yy = py(cc);
@@ -8510,9 +8623,21 @@ html.imprimindo-doc #doc-saida { display: block; }
     }
     g.appendChild(sv('line', { x1: mE - 2, x2: mE - 2, y1: py(cMax), y2: py(cMin), stroke: 'var(--texto-3)', 'stroke-width': 1 }));
 
+    /* seta de dimensão vertical entre duas cotas */
+    function dimV(x, c1, c2, txt, anc) {
+      var y1 = py(Math.max(c1, c2)), y2 = py(Math.min(c1, c2));
+      if (y2 - y1 < 12) return;
+      g.appendChild(sv('line', { class: 'cota', x1: x, x2: x, y1: y1, y2: y2 }));
+      g.appendChild(sv('path', { class: 'cota', fill: 'none', d: 'M' + (x - 3) + ' ' + (y1 + 4) + ' L' + x + ' ' + y1 + ' L' + (x + 3) + ' ' + (y1 + 4) }));
+      g.appendChild(sv('path', { class: 'cota', fill: 'none', d: 'M' + (x - 3) + ' ' + (y2 - 4) + ' L' + x + ' ' + y2 + ' L' + (x + 3) + ' ' + (y2 - 4) }));
+      g.appendChild(sv('text', { class: 'cota-t', x: x + (anc === 'end' ? -5 : 5), y: (y1 + y2) / 2 + 3,
+        'text-anchor': anc === 'end' ? 'end' : 'start' }, txt));
+    }
+
     /* segmentos horizontais: pontos do canal + parshall + poço */
     var nSeg = perfil.pontos.length;
-    var wParshall = perfil.saida ? 80 : 0, wPoco = 190, gap = 4;
+    var wPoco = Math.max(190, Math.min(300, 60 + p.nInst * 44 + (p.camaras - 1) * 8));
+    var wParshall = perfil.saida ? 80 : 0, gap = 4;
     var wCanal = (W - mE - mD - wParshall - wPoco - gap * 2) / Math.max(1, nSeg);
 
     function xIni(i) { return mE + i * wCanal; }
@@ -8542,25 +8667,39 @@ html.imprimindo-doc #doc-saida { display: block; }
         'stroke-dasharray': s.traco || null, 'stroke-linejoin': 'round' }));
     });
 
-    /* fundo do canal (degraus) + grades */
+    /* topo do canal (altura do canal) */
+    var dTopo = '';
+    perfil.pontos.forEach(function (pt, i) {
+      var y = py(topoCanal[i]);
+      dTopo += (i === 0 ? 'M' : 'L') + xIni(i) + ' ' + y + ' L' + (xIni(i) + wCanal) + ' ' + y + ' ';
+    });
+    g.appendChild(sv('path', { class: 'estrutura', d: dTopo, 'stroke-width': 1.2, 'stroke-dasharray': '6 3' }));
+
+    /* fundo do canal (degraus) + grades com rótulo manual/mec */
     var dF = '';
     perfil.pontos.forEach(function (pt, i) {
       var y = py(pt.fundo);
       var x = xIni(i);
       dF += (i === 0 ? 'M' : 'L') + x + ' ' + y + ' L' + (x + wCanal) + ' ' + y + ' ';
       if (pt.grade) {
-        var yTopo = py(pt.na[sTopo.key]) - 16;
+        var yTopo = py(topoCanal[i]);
         g.appendChild(sv('line', { class: 'estrutura', x1: x + wCanal * 0.58, y1: y,
           x2: x + wCanal * 0.38, y2: yTopo, 'stroke-width': 3 }));
         g.appendChild(sv('line', { class: 'estrutura', x1: x + wCanal * 0.58 + 5, y1: y,
           x2: x + wCanal * 0.38 + 5, y2: yTopo, 'stroke-width': 1 }));
+        /* selo manual/mecanizada junto ao topo da grade */
+        g.appendChild(sv('text', { x: x + wCanal * 0.38, y: py(topoCanal[i]) - 4,
+          'text-anchor': 'middle', class: 'rotulo' }, pt.grade.mec ? 'MEC.' : 'MAN.'));
       }
-      g.appendChild(sv('text', { x: x + wCanal / 2, y: HH - 26, 'text-anchor': 'middle' },
-        pt.rot.replace(/\s*\(.*\)/, '')));
+      var rot2 = pt.rot.replace(/\s*\(.*\)/, '');
+      g.appendChild(sv('text', { x: x + wCanal / 2, y: HH - 26, 'text-anchor': 'middle' }, rot2));
       g.appendChild(sv('text', { x: x + wCanal / 2, y: HH - 14, 'text-anchor': 'middle', class: 'cota-t' },
         'fundo ' + UI.num(pt.fundo, 2)));
     });
     g.appendChild(sv('path', { class: 'estrutura', d: dF, 'stroke-width': 2 }));
+
+    /* dimensão da altura do canal, no primeiro trecho */
+    dimV(xIni(0) + 12, perfil.pontos[0].fundo, topoCanal[0], 'H canal ' + UI.num(perfil.altCanal, 2) + ' m');
 
     /* Parshall */
     var xP = xIni(nSeg) + gap;
@@ -8576,37 +8715,87 @@ html.imprimindo-doc #doc-saida { display: block; }
         'crista ' + UI.num(perfil.saida.crista, 2)));
     }
 
-    /* poço */
+    /* ---- poço de sucção ---- */
     var xPo = xP + wParshall + gap;
     var yNAx = py(p.naMax), yNAn = py(p.naMin), yF = py(p.cotaFundo);
     var yLaje = py(p.cotaLaje !== null ? p.cotaLaje : cMax);
+
+    /* água */
     g.appendChild(sv('rect', { class: 'agua', x: xPo + 3, y: yNAx, width: wPoco - 6, height: Math.max(2, yF - yNAx) }));
+    /* paredes e fundo */
     g.appendChild(sv('path', { class: 'estrutura', 'stroke-width': 2,
       d: 'M' + xPo + ' ' + yLaje + ' L' + xPo + ' ' + yF + ' L' + (xPo + wPoco) + ' ' + yF +
          ' L' + (xPo + wPoco) + ' ' + yLaje }));
+
+    /* divisórias das câmaras (não chegam à laje: as câmaras se comunicam) */
+    var kCam;
+    if (p.camaras > 1) {
+      for (kCam = 1; kCam < p.camaras; kCam++) {
+        var xDiv = xPo + wPoco * kCam / p.camaras;
+        g.appendChild(sv('line', { class: 'estrutura', 'stroke-width': 3,
+          x1: xDiv, x2: xDiv, y1: yF, y2: yNAx - 8 }));
+      }
+      g.appendChild(sv('text', { x: xPo + wPoco / 2, y: yNAx - 12, 'text-anchor': 'middle', class: 'rotulo' },
+        p.camaras + ' câmaras · ' + UI.num(p.bombasPorCamara, p.bombasPorCamara % 1 ? 1 : 0) + ' bomba(s)/câmara'));
+    }
+
+    /* bombas lado a lado (distribuídas pelas câmaras) */
+    var rB = Math.min(11, (wPoco / p.nInst) * 0.28);
+    var yB = yF - rB - 3;
+    var iB;
+    for (iB = 0; iB < p.nInst; iB++) {
+      var cam = p.camaras > 1 ? Math.min(p.camaras - 1, Math.floor(iB / Math.ceil(p.nInst / p.camaras))) : 0;
+      var x0c = xPo + wPoco * cam / p.camaras;
+      var wc = wPoco / p.camaras;
+      var dentroCam = p.camaras > 1 ? (iB - cam * Math.ceil(p.nInst / p.camaras)) : iB;
+      var nNaCam = p.camaras > 1 ? Math.min(Math.ceil(p.nInst / p.camaras), p.nInst - cam * Math.ceil(p.nInst / p.camaras)) : p.nInst;
+      var xB = x0c + wc * (dentroCam + 0.5) / Math.max(1, nNaCam);
+      g.appendChild(sv('circle', { class: 'bomba', cx: xB, cy: yB, r: rB }));
+      g.appendChild(sv('path', { d: 'M' + (xB - rB * 0.45) + ' ' + (yB + rB * 0.5) + ' L' + (xB - rB * 0.45) + ' ' + (yB - rB * 0.5) +
+        ' L' + (xB + rB * 0.55) + ' ' + yB + ' Z', fill: 'var(--surface)' }));
+      g.appendChild(sv('text', { x: xB, y: yB - rB - 3, 'text-anchor': 'middle' }, 'B' + (iB + 1)));
+    }
+
+    /* níveis do poço */
     g.appendChild(sv('line', { class: 'agua-l', x1: xPo, x2: xPo + wPoco, y1: yNAx, y2: yNAx }));
     g.appendChild(sv('line', { class: 'agua-l', 'stroke-dasharray': '4 3', x1: xPo, x2: xPo + wPoco, y1: yNAn, y2: yNAn }));
+    g.appendChild(sv('text', { class: 'cota-t', x: xPo + 5, y: yNAx - 3 }, 'NA máx ' + UI.num(p.naMax, 2)));
+    g.appendChild(sv('text', { class: 'cota-t', x: xPo + 5, y: yNAn - 3 }, 'NA mín ' + UI.num(p.naMin, 2)));
+    g.appendChild(sv('text', { class: 'cota-t', x: xPo + 5, y: yF + 12 }, 'fundo ' + UI.num(p.cotaFundo, 2)));
     g.appendChild(sv('text', { x: xPo + wPoco / 2, y: HH - 26, 'text-anchor': 'middle' }, 'Poço de sucção'));
-    g.appendChild(sv('text', { class: 'cota-t', x: xPo + wPoco - 5, y: yNAx - 4, 'text-anchor': 'end' }, 'NA máx ' + UI.num(p.naMax, 2)));
-    g.appendChild(sv('text', { class: 'cota-t', x: xPo + wPoco - 5, y: yNAn + 11, 'text-anchor': 'end' }, 'NA mín ' + UI.num(p.naMin, 2)));
-    g.appendChild(sv('text', { class: 'cota-t', x: xPo + wPoco - 5, y: yF - 4, 'text-anchor': 'end' }, 'fundo ' + UI.num(p.cotaFundo, 2)));
+    g.appendChild(sv('text', { x: xPo + wPoco / 2, y: HH - 14, 'text-anchor': 'middle', class: 'cota-t' },
+      p.nInst + ' bombas (' + (p.nInst - Math.max(0, p.nInst - p.nOp)) + '+' + (p.nInst - p.nOp) + ' res.)'));
+
+    /* dimensões: submergência à direita do poço; profundidade terreno→fundo
+       dentro do poço, junto à parede esquerda (a faixa acima do NA máx é livre) */
+    var xDim = xPo + wPoco + 12;
+    dimV(xDim, p.naMin, p.cotaFundo, 'subm. ' + UI.num(p.submergencia, 2) + ' m');
+    if (cotaTerreno !== null) {
+      dimV(xPo + 16, cotaTerreno, p.cotaFundo, 'prof. ' + UI.num(cotaTerreno - p.cotaFundo, 2) + ' m');
+    }
+
+    /* linha do terreno */
+    if (cotaTerreno !== null) {
+      var yT = py(cotaTerreno);
+      g.appendChild(sv('line', { class: 'terreno', x1: mE, x2: W - mD + 22, y1: yT, y2: yT }));
+      g.appendChild(sv('text', { x: W - mD + 22, y: yT - 3, 'text-anchor': 'end' }, 'terreno ' + UI.num(cotaTerreno, 2)));
+    }
 
     /* legenda das séries, no canto superior esquerdo (área livre do desenho) */
     var lx = mE + 16, ly = mT + 6;
     g.appendChild(sv('rect', { x: lx - 8, y: ly - 12, width: 196, height: series.length * 15 + 14,
       fill: 'var(--surface)', stroke: 'var(--border)', rx: 4, opacity: 0.92 }));
     series.forEach(function (s, i) {
-      var yy = ly + i * 15;
-      g.appendChild(sv('line', { x1: lx, x2: lx + 24, y1: yy, y2: yy, stroke: s.cor, 'stroke-width': 2.4,
+      var yy2 = ly + i * 15;
+      g.appendChild(sv('line', { x1: lx, x2: lx + 24, y1: yy2, y2: yy2, stroke: s.cor, 'stroke-width': 2.4,
         'stroke-dasharray': s.traco || null }));
-      g.appendChild(sv('text', { x: lx + 30, y: yy + 3 },
+      g.appendChild(sv('text', { x: lx + 30, y: yy2 + 3 },
         (s.rotCurto || s.key) + ' — ' + UI.num(s.Q * 1000, 1) + ' L/s'));
     });
 
     svg.appendChild(g);
     return svg;
   };
-
   PDA.FE = FE;
 })(window.PDA = window.PDA || {});
 
@@ -9172,8 +9361,8 @@ html.imprimindo-doc #doc-saida { display: block; }
       linha('Conformidade normativa (NBR 12208/12209' +
         (cf.concessionaria !== 'nenhuma' ? ' + ' + (cf.concessionaria === 'sanepar' ? 'SANEPAR' : 'SABESP') : '') + ')',
         reprova === 0 ? (atencaoN === 0 ? true : null) : false,
-        cf.canais.n + ' canal(is) de gradeamento (' + cf.canais.oper + '+' + cf.canais.reserva + ')' +
-        (st.eee.bypass.canal === 'sim' ? ' + by-pass' : '') +
+        cf.canais.n + ' canal(is) de gradeamento (' + cf.canais.oper + '+' + cf.canais.reserva +
+        (cf.canais.reserva >= 1 ? ' — reserva é o by-pass' : (st.eee.bypass.canal === 'sim' ? ' + by-pass' : '')) + ')' +
         ' · ' + reprova + ' não conformidade(s) · ' + atencaoN + ' atenção(ões)');
     }
     if (r.residuos) {
@@ -10904,6 +11093,12 @@ html.imprimindo-doc #doc-saida { display: block; }
     App.st.succaoIndividual.tipo = 'succao';
     App.st.barrileteIndividual.tipo = 'barrilete';
     (App.st.adutoras || []).forEach(function (a) { a.tipo = 'adutora'; });
+    /* projetos antigos guardavam as câmaras como 'unica'/'porBomba' */
+    if (App.st.eee && App.st.eee.poco && App.st.eee.poco.camaras === 'porBomba' &&
+        !(Number(App.st.eee.poco.nCamaras) > 1)) {
+      App.st.eee.poco.nCamaras = Math.max(2, Number(App.st.bombas.instaladas) || 2);
+      App.st.eee.poco.camaras = 'unica';
+    }
   };
 
   App.autoPreencherPNTodos = function () {
@@ -12767,9 +12962,9 @@ html.imprimindo-doc #doc-saida { display: block; }
     D.secao('Canais, by-pass e conformidade normativa');
     var canaisTxt = cf.canais.n === 1 ? 'canal único de gradeamento'
       : cf.canais.n + ' canais de gradeamento em paralelo (' + cf.canais.oper + ' em operação e ' +
-        cf.canais.reserva + ' de reserva), isoláveis por comportas';
+        cf.canais.reserva + ' de reserva — a reserva cumpre a função de by-pass), isoláveis por comportas';
     D.p('O tratamento preliminar foi concebido com ' + canaisTxt +
-        (st.eee.bypass.canal === 'sim' ? ', além de canal de by-pass com grade de limpeza manual' : '') + '. ' +
+        (cf.canais.reserva === 0 && st.eee.bypass.canal === 'sim' ? ', além de canal de by-pass com grade de limpeza manual' : '') + '. ' +
         (cf.temMecanizada
           ? 'Havendo gradeamento mecanizado, a NBR 12209 exige no mínimo duas unidades — cada uma com capacidade ' +
             'para a vazão total afluente — admitindo que uma delas seja grade de limpeza manual usada como ' +
@@ -12810,7 +13005,10 @@ html.imprimindo-doc #doc-saida { display: block; }
       [{ rot: 'Grandeza', esq: true }, 'Valor'],
       [
         ['Forma em planta', p.rotForma],
-        ['Câmaras', p.camaras > 1 ? p.camaras + ' câmaras independentes (uma por conjunto)' : 'câmara única para todos os conjuntos'],
+        ['Câmaras', p.camaras > 1
+          ? p.camaras + ' câmaras comunicadas por válvulas (' +
+            n(p.bombasPorCamara, p.bombasPorCamara % 1 ? 1 : 0) + ' bomba(s) por câmara)'
+          : 'câmara única para todos os conjuntos'],
         ['Área útil em planta', n(p.areaUtil) + ' m²' + (p.camaras > 1 ? ' (' + n(p.areaCamara) + ' m² por câmara)' : '')],
         ['Altura útil (NA máx − NA mín)', n(p.hUtil) + ' m  (necessária ' + n(p.hNec) + ' m)'],
         ['Volume útil', n(p.volUtil) + ' m³  (mínimo de ciclo ' + n(p.volMinTotal) + ' m³)'],
@@ -12843,7 +13041,8 @@ html.imprimindo-doc #doc-saida { display: block; }
         ['Subida do NA na QMH de início de plano', p.tempos.subidaIni, 'enchimento mais lento'],
         ['Subida do NA na QMH de fim de plano', p.tempos.subidaFim, 'enchimento mais rápido'],
         ['Descida do NA com as bombas ligadas (Qméd afluindo)', p.tempos.descida, 'esvaziamento'],
-        ['Detenção na menor vazão do horizonte', p.tempos.detencaoIni, '≤ ' + crit.detencaoMaxMin + ' min (septicidade)'],
+        ['Detenção na Q média de início de plano', p.tempos.detencaoNorma, '≤ ' + crit.detencaoMaxMin + ' min (NBR 12208 — septicidade)'],
+        ['Detenção na menor vazão do horizonte', p.tempos.detencaoIni, 'informativo — condição mais severa'],
         ['Ciclo mínimo (afluência = Q_b/2)', p.tempos.cicloMin, '≥ ' + n(p.Tsistema / 60, 1) + ' min admissível']
       ].map(function (l) {
         return h('tr', {},
