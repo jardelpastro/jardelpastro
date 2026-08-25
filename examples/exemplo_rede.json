@@ -1,0 +1,343 @@
+{
+  "title": "Exemplo — Loteamento Jardim das Águas",
+  "criteria": {
+    "start": {
+      "population": 3500,
+      "per_capita": 150,
+      "return_coef": 0.8,
+      "k1": 1.2,
+      "k2": 1.5,
+      "k3": 0.5
+    },
+    "end": {
+      "population": 5200,
+      "per_capita": 160,
+      "return_coef": 0.8,
+      "k1": 1.2,
+      "k2": 1.5,
+      "k3": 0.5
+    },
+    "infiltration_rate": 0.1,
+    "auto_linear_rate": true,
+    "linear_rate_start": 0.0,
+    "linear_rate_end": 0.0
+  },
+  "design": {
+    "min_flow_lps": 1.5,
+    "min_diameter_mm": 150,
+    "min_cover_m": 0.9,
+    "min_cover_sidewalk_m": 0.65,
+    "max_depth_m": 5.0,
+    "min_tractive_pa": 1.0,
+    "min_velocity_ms": 0.0,
+    "max_velocity_ms": 5.0,
+    "max_yd": 0.75,
+    "min_slope_mm": 0.0,
+    "max_slope_mm": 0.0,
+    "min_drop_m": 0.0,
+    "trench_extra_width_m": 0.6,
+    "trench_min_width_m": 0.85
+  },
+  "options": {
+    "method": "manning",
+    "mode": "pessimista",
+    "use_material_n": true,
+    "n_fixed": 0.013,
+    "rename_nodes": false,
+    "rename_prefix": "PV-",
+    "elevation_source": "manual",
+    "default_material": "pvc_ocre"
+  },
+  "nodes": [
+    {
+      "name": "PV-01",
+      "node_type": "PV",
+      "coord_n": 7185000.0,
+      "coord_e": 672000.0,
+      "ground_elev": 812.5,
+      "q_point_start": 0.0,
+      "q_point_end": 0.0,
+      "network": "C1"
+    },
+    {
+      "name": "PV-02",
+      "node_type": "PV",
+      "coord_n": 7184920.0,
+      "coord_e": 672010.0,
+      "ground_elev": 811.2,
+      "q_point_start": 0.0,
+      "q_point_end": 0.0,
+      "network": "C1"
+    },
+    {
+      "name": "PV-03",
+      "node_type": "PV",
+      "coord_n": 7184840.0,
+      "coord_e": 672020.0,
+      "ground_elev": 810.1,
+      "q_point_start": 0.0,
+      "q_point_end": 0.0,
+      "network": "C1"
+    },
+    {
+      "name": "PV-04",
+      "node_type": "TIL",
+      "coord_n": 7185010.0,
+      "coord_e": 672090.0,
+      "ground_elev": 811.8,
+      "q_point_start": 0.0,
+      "q_point_end": 0.0,
+      "network": "C1"
+    },
+    {
+      "name": "PV-05",
+      "node_type": "PV",
+      "coord_n": 7184840.0,
+      "coord_e": 672110.0,
+      "ground_elev": 809.7,
+      "q_point_start": 0.5,
+      "q_point_end": 0.8,
+      "network": "C1"
+    },
+    {
+      "name": "PV-06",
+      "node_type": "PV",
+      "coord_n": 7184760.0,
+      "coord_e": 672060.0,
+      "ground_elev": 808.4,
+      "q_point_start": 0.0,
+      "q_point_end": 0.0,
+      "network": "C1"
+    },
+    {
+      "name": "PV-07",
+      "node_type": "PV",
+      "coord_n": 7184680.0,
+      "coord_e": 672070.0,
+      "ground_elev": 807.2,
+      "q_point_start": 0.0,
+      "q_point_end": 0.0,
+      "network": "C1"
+    },
+    {
+      "name": "EEE-01",
+      "node_type": "EEE",
+      "coord_n": 7184600.0,
+      "coord_e": 672080.0,
+      "ground_elev": 806.5,
+      "q_point_start": 0.0,
+      "q_point_end": 0.0,
+      "network": "C1"
+    }
+  ],
+  "pipes": [
+    {
+      "name": "T1",
+      "upstream": "PV-01",
+      "downstream": "PV-02",
+      "length": 0.0,
+      "material": "",
+      "diameter_mm": 0,
+      "slope": 0.0,
+      "status": "Rede Projetada",
+      "network": "C1"
+    },
+    {
+      "name": "T2",
+      "upstream": "PV-02",
+      "downstream": "PV-03",
+      "length": 0.0,
+      "material": "",
+      "diameter_mm": 0,
+      "slope": 0.0,
+      "status": "Rede Projetada",
+      "network": "C1"
+    },
+    {
+      "name": "T3",
+      "upstream": "PV-04",
+      "downstream": "PV-05",
+      "length": 0.0,
+      "material": "",
+      "diameter_mm": 0,
+      "slope": 0.0,
+      "status": "Rede Projetada",
+      "network": "C1"
+    },
+    {
+      "name": "T4",
+      "upstream": "PV-05",
+      "downstream": "PV-03",
+      "length": 0.0,
+      "material": "",
+      "diameter_mm": 0,
+      "slope": 0.0,
+      "status": "Rede Projetada",
+      "network": "C1"
+    },
+    {
+      "name": "T5",
+      "upstream": "PV-03",
+      "downstream": "PV-06",
+      "length": 0.0,
+      "material": "",
+      "diameter_mm": 0,
+      "slope": 0.0,
+      "status": "Rede Projetada",
+      "network": "C1"
+    },
+    {
+      "name": "T6",
+      "upstream": "PV-06",
+      "downstream": "PV-07",
+      "length": 0.0,
+      "material": "",
+      "diameter_mm": 0,
+      "slope": 0.0,
+      "status": "Rede Projetada",
+      "network": "C1"
+    },
+    {
+      "name": "T7",
+      "upstream": "PV-07",
+      "downstream": "EEE-01",
+      "length": 0.0,
+      "material": "",
+      "diameter_mm": 0,
+      "slope": 0.0,
+      "status": "Rede Projetada",
+      "network": "C1"
+    }
+  ],
+  "catalog": [
+    {
+      "key": "pvc_ocre",
+      "name": "PVC Ocre (NBR 7362 - JEI)",
+      "n_min": 0.009,
+      "n_default": 0.01,
+      "n_max": 0.013,
+      "diameters_mm": [
+        100,
+        150,
+        200,
+        250,
+        300,
+        350,
+        400
+      ],
+      "wall_mm": 4.7,
+      "notes": "Ponta e bolsa com junta elástica integrada; o mais usual em coletores até DN 400.",
+      "enabled": true
+    },
+    {
+      "key": "pead_corrugado",
+      "name": "PEAD Corrugado (dupla parede)",
+      "n_min": 0.009,
+      "n_default": 0.011,
+      "n_max": 0.013,
+      "diameters_mm": [
+        100,
+        150,
+        200,
+        250,
+        300,
+        400,
+        500,
+        600,
+        800,
+        1000,
+        1200
+      ],
+      "wall_mm": 8.0,
+      "notes": "Parede interna lisa; usado de coletores a emissários.",
+      "enabled": true
+    },
+    {
+      "key": "concreto",
+      "name": "Concreto Armado (NBR 8890)",
+      "n_min": 0.013,
+      "n_default": 0.013,
+      "n_max": 0.015,
+      "diameters_mm": [
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900,
+        1000,
+        1200,
+        1500,
+        2000
+      ],
+      "wall_mm": 60.0,
+      "notes": "Coletores-tronco, interceptores e emissários; exige verificação de agressividade (H2S).",
+      "enabled": true
+    },
+    {
+      "key": "ceramico",
+      "name": "Cerâmico Vidrado (manilha)",
+      "n_min": 0.011,
+      "n_default": 0.013,
+      "n_max": 0.015,
+      "diameters_mm": [
+        100,
+        150,
+        200,
+        250,
+        300,
+        375,
+        450,
+        600
+      ],
+      "wall_mm": 20.0,
+      "notes": "Alta resistência química; comum em redes antigas e reabilitação.",
+      "enabled": true
+    },
+    {
+      "key": "prfv",
+      "name": "PRFV (fibra de vidro)",
+      "n_min": 0.009,
+      "n_default": 0.01,
+      "n_max": 0.012,
+      "diameters_mm": [
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900,
+        1000,
+        1200,
+        1400,
+        1600,
+        2000
+      ],
+      "wall_mm": 12.0,
+      "notes": "Grandes diâmetros, alta resistência à corrosão.",
+      "enabled": true
+    },
+    {
+      "key": "ffd",
+      "name": "Ferro Fundido Dúctil (rev. interno)",
+      "n_min": 0.01,
+      "n_default": 0.012,
+      "n_max": 0.013,
+      "diameters_mm": [
+        150,
+        200,
+        250,
+        300,
+        400,
+        500,
+        600,
+        800
+      ],
+      "wall_mm": 8.0,
+      "notes": "Travessias, trechos com alta carga externa ou pressão.",
+      "enabled": true
+    }
+  ]
+}
