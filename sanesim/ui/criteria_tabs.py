@@ -383,9 +383,12 @@ class CalcTab(QWidget):
         self.elev_manual = QRadioButton(
             "Usar cota de terreno inserida manualmente")
         self.elev_interp = QRadioButton(
-            "Interpolar curvas de nível (disponível na versão com planta)")
+            "Interpolar curvas de nível (terreno carregado na aba Planta)")
+        self.elev_interp.setToolTip(
+            "Interpola a cota de cada nó a partir das curvas de nível ou "
+            "pontos cotados carregados em Planta > Terreno (DXF/CSV). "
+            "As cotas manuais são ignoradas na simulação.")
         self.elev_manual.setChecked(True)
-        self.elev_interp.setEnabled(False)
         form.addRow(self.elev_manual)
         form.addRow(self.elev_interp)
         layout.addWidget(nodes)
@@ -408,6 +411,7 @@ class CalcTab(QWidget):
         self.rename.setChecked(o.rename_nodes)
         self.rename_prefix.setText(o.rename_prefix)
         self.elev_manual.setChecked(o.elevation_source == "manual")
+        self.elev_interp.setChecked(o.elevation_source == "interpolar")
         self.default_material.clear()
         for m in project.catalog:
             self.default_material.addItem(m.name, m.key)

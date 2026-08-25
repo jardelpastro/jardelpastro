@@ -170,7 +170,10 @@ examples/            # projeto de exemplo
       (elevatória = triângulo rosa) e por nome de rede (diálogo
       "Cores das redes" — coletor/interceptor com cores próprias)
 - [x] Exportação do perfil para PDF (A3 paisagem) e PNG
-- [ ] Planta: imagem/DXF de fundo e interpolação de curvas de nível
-      (cota automática dos PVs)
+- [x] Terreno por curvas de nível: importação de DXF (polylines com
+      elevação) e CSV (E,N,Z), interpolação TIN (Delaunay, estilo
+      Civil 3D; IDW como reserva), curvas desenhadas na planta e cota
+      automática dos PVs (na simulação ou gravada nos nós)
+- [ ] Imagem/DXF de fundo na planta (arruamento, cadastro)
 - [ ] Exportação DXF (planta/perfil para CAD)
 - [ ] Desfazer/refazer no editor gráfico

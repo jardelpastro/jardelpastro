@@ -466,6 +466,27 @@ class PlanTab(QWidget):
             "uma cor, interceptor de outra).")
         colors_btn.clicked.connect(self.edit_network_colors)
         toolbar.addWidget(colors_btn)
+        terrain_btn = QToolButton()
+        terrain_btn.setText("Terreno ▾")
+        terrain_btn.setToolTip(
+            "Curvas de nível / pontos cotados (DXF ou CSV) para "
+            "interpolação automática das cotas dos PVs.")
+        terrain_menu = QMenu(terrain_btn)
+        terrain_menu.addAction("Carregar curvas de nível (DXF/CSV)…",
+                               self.load_terrain)
+        terrain_menu.addAction("Aplicar cotas do terreno aos nós",
+                               self.apply_terrain_elevations)
+        self.act_show_terrain = terrain_menu.addAction(
+            "Mostrar curvas de nível")
+        self.act_show_terrain.setCheckable(True)
+        self.act_show_terrain.setChecked(True)
+        self.act_show_terrain.toggled.connect(
+            lambda _checked: self._draw_terrain())
+        terrain_menu.addAction("Remover terreno do projeto",
+                               self.clear_terrain)
+        terrain_btn.setMenu(terrain_menu)
+        terrain_btn.setPopupMode(QToolButton.InstantPopup)
+        toolbar.addWidget(terrain_btn)
 
         self.btn_select.setChecked(True)
         toolbar.addStretch(1)
@@ -597,6 +618,8 @@ class PlanTab(QWidget):
             self.scene.addItem(item)
             self._pipe_items[pipe.id] = item
         self.scene.blockSignals(False)
+        self._terrain_items = []
+        self._draw_terrain()
         self.set_mode(self.mode)
         self.fit_view()
 
@@ -680,6 +703,92 @@ class PlanTab(QWidget):
         self.network_changed()
         if reload_scene:
             self.load_from(self.project)
+
+    # ------------------------------------------------------------ terreno
+    def load_terrain(self):
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        from ..core.terrain import TerrainError, load_csv, load_dxf
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Carregar curvas de nível / pontos cotados", "",
+            "Terreno (*.dxf *.csv *.txt);;DXF (*.dxf);;CSV (*.csv *.txt)")
+        if not path:
+            return
+        try:
+            if path.lower().endswith(".dxf"):
+                lines = load_dxf(path)
+            else:
+                lines = load_csv(path)
+        except TerrainError as exc:
+            QMessageBox.warning(self, "Terreno", str(exc))
+            return
+        self.project.terrain_lines = [
+            [[float(v[0]), float(v[1]), float(v[2])] for v in line]
+            for line in lines]
+        n_pts = sum(len(line) for line in lines)
+        self.status.setText(
+            f"Terreno carregado: {len(lines)} linha(s), {n_pts} pontos. "
+            "Ative 'interpolar curvas de nível' na aba 3 ou use "
+            "'Aplicar cotas do terreno aos nós'.")
+        self._draw_terrain()
+        self.fit_view()
+
+    def apply_terrain_elevations(self):
+        """Grava as cotas interpoladas no campo cota terreno dos nós."""
+        from PySide6.QtWidgets import QMessageBox
+        from ..core.terrain import TerrainError, TerrainModel, lines_to_points
+        if not self.project.terrain_lines:
+            QMessageBox.information(
+                self, "Terreno", "Carregue as curvas de nível primeiro "
+                "(Terreno > Carregar).")
+            return
+        try:
+            terrain = TerrainModel(lines_to_points(self.project.terrain_lines))
+        except TerrainError as exc:
+            QMessageBox.warning(self, "Terreno", str(exc))
+            return
+        for node in self.project.nodes:
+            node.ground_elev = round(
+                terrain.elevation_at(node.coord_e, node.coord_n), 3)
+        self.status.setText(
+            f"Cotas de {len(self.project.nodes)} nó(s) atualizadas a "
+            "partir do terreno.")
+        self.notify_network_changed(reload_scene=False)
+
+    def clear_terrain(self):
+        self.project.terrain_lines = []
+        self._draw_terrain()
+        self.status.setText("Terreno removido do projeto.")
+
+    def _draw_terrain(self):
+        for item in getattr(self, "_terrain_items", []):
+            try:
+                self.scene.removeItem(item)
+            except RuntimeError:
+                pass
+        self._terrain_items = []
+        if not self.act_show_terrain.isChecked():
+            return
+        pen = QPen(QColor(160, 120, 60, 90), 0)
+        pen.setCosmetic(True)
+        font = QFont()
+        font.setPointSizeF(3.5)
+        for line in self.project.terrain_lines:
+            if len(line) < 2:
+                continue
+            path = QPainterPath(QPointF(line[0][0], -line[0][1]))
+            for vertex in line[1:]:
+                path.lineTo(vertex[0], -vertex[1])
+            item = self.scene.addPath(path, pen)
+            item.setZValue(-1)
+            self._terrain_items.append(item)
+            # cota da curva junto ao primeiro vértice
+            label = QGraphicsSimpleTextItem(fmt.fmt(line[0][2], 1))
+            label.setFont(font)
+            label.setBrush(QBrush(QColor(160, 120, 60, 140)))
+            label.setPos(line[0][0] + 1.5, -line[0][1])
+            label.setZValue(-1)
+            self.scene.addItem(label)
+            self._terrain_items.append(label)
 
     def edit_network_colors(self):
         """Diálogo de cor por nome de rede (coletor, interceptor...)."""

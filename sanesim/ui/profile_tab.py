@@ -305,13 +305,10 @@ class ProfileTab(QWidget):
         y_grid_bot = Y(grid_bot)
 
         # ---------------------------------------------------------- grid
-        pen_minor = QPen(_GRID_MINOR, 0)
-        pen_minor.setCosmetic(True)
+        pen_minor = QPen(_GRID_MINOR, 0.7)
         pen_minor.setStyle(Qt.DashLine)
-        pen_master = QPen(_GRID_MASTER, 0)
-        pen_master.setCosmetic(True)
-        pen_border = QPen(_BAND_FRAME, 0)
-        pen_border.setCosmetic(True)
+        pen_master = QPen(_GRID_MASTER, 1.0)
+        pen_border = QPen(_BAND_FRAME, 1.1)
 
         e = grid_bot
         while e <= grid_top + 1e-6:
@@ -342,10 +339,8 @@ class ProfileTab(QWidget):
                            pen_border)
 
         # ------------------------------------------------------- perfil
-        pen_ground = QPen(_GROUND, 2)
-        pen_ground.setCosmetic(True)
+        pen_ground = QPen(_GROUND, 2.0)
         pen_pipe = QPen(_PIPE, 1.5)
-        pen_pipe.setCosmetic(True)
 
         for s in segments:
             water = QPolygonF([
@@ -362,10 +357,17 @@ class ProfileTab(QWidget):
             self.scene.addLine(X(s.x0), Y(s.ground0), X(s.x1), Y(s.ground1),
                                pen_ground)
 
-        pv_positions = [(s.x0, s.ground0, s.pipe.upstream) for s in segments]
-        pv_positions.append((segments[-1].x1, segments[-1].ground1,
-                             segments[-1].pipe.downstream))
-        for x_pv, ground, name in pv_positions:
+        # PVs: posição, cota do terreno, fundo (GI mais baixa) e nome
+        pv_info = []
+        for i, s in enumerate(segments):
+            bottom = s.invert0
+            if i > 0:
+                bottom = min(bottom, segments[i - 1].invert1)
+            pv_info.append((s.x0, s.ground0, bottom, s.pipe.upstream))
+        last = segments[-1]
+        pv_info.append((last.x1, last.ground1, last.invert1,
+                        last.pipe.downstream))
+        for x_pv, ground, _bottom, name in pv_info:
             self._text(name, X(x_pv), Y(ground) - 16, size=8, bold=True,
                        center_x=True)
 
@@ -375,15 +377,15 @@ class ProfileTab(QWidget):
                    size=8, bold=True, center_x=True, center_y=True)
 
         band_top = y_grid_bot + BANDS_GAP
-        # ticks: "pvs" = só nos PVs (textos horizontais/acumulada);
-        # "stations" = a cada 20 m; None = sem ticks (textos centralizados)
+        # ticks: "pvs" = só nos PVs; "stations" = a cada 20 m;
+        # "dividers" = linha cheia nos PVs dividindo a banda por trecho
         band_defs = [
             ("Distâncias (m)", 62, self._band_distances, "pvs"),
             ("Cota terreno (m)", 56, self._band_ground, "stations"),
             ("Cota coletor GI (m)", 56, self._band_invert, "stations"),
             ("Profundidade (m)", 56, self._band_depth, "stations"),
-            ("Declividade (m/m)", 24, self._band_slope, None),
-            ("Material / Vazão", 24, self._band_material, None),
+            ("Declividade (m/m)", 24, self._band_slope, "dividers"),
+            ("Material / Vazão", 24, self._band_material, "dividers"),
         ]
         stations = self._stations(total)
         pv_xs = self._pv_xs(segments)
@@ -396,24 +398,39 @@ class ProfileTab(QWidget):
             item.setPos(X(0) - br.width() - 10,
                         (y0 + y1) / 2 - br.height() / 2)
             self.scene.addItem(item)
-            tick_xs = (stations if ticks == "stations"
-                       else pv_xs if ticks == "pvs" else [])
-            for x_t in tick_xs:
-                self.scene.addLine(X(x_t), y0, X(x_t), y0 + TICK,
-                                   pen_border)
-                self.scene.addLine(X(x_t), y1 - TICK, X(x_t), y1,
-                                   pen_border)
+            if ticks == "dividers":
+                # divisão completa da banda no alinhamento dos PVs
+                for x_t in pv_xs:
+                    self.scene.addLine(X(x_t), y0, X(x_t), y1, pen_border)
+            else:
+                tick_xs = (stations if ticks == "stations" else pv_xs)
+                for x_t in tick_xs:
+                    self.scene.addLine(X(x_t), y0, X(x_t), y0 + TICK,
+                                       pen_border)
+                    self.scene.addLine(X(x_t), y1 - TICK, X(x_t), y1,
+                                       pen_border)
             renderer(segments, X, y0, y1, total)
             y0 = y1
         bands_bottom = y0
 
-        # linhas de chamada dos PVs: terminam no topo das bandas para não
-        # riscar os textos dos PVs dentro delas
-        pen_pv = QPen(_PV, 0, Qt.DashLine)
-        pen_pv.setCosmetic(True)
-        for x_pv, ground, _name in pv_positions:
-            self.scene.addLine(X(x_pv), Y(ground), X(x_pv), band_top,
+        # linhas de chamada dos PVs: do fundo do PV até o topo das bandas,
+        # sem riscar o desenho do PV nem os textos dentro das bandas
+        pen_pv = QPen(_PV, 0.7, Qt.DashLine)
+        for x_pv, _ground, bottom, _name in pv_info:
+            self.scene.addLine(X(x_pv), Y(bottom), X(x_pv), band_top,
                                pen_pv)
+
+        # desenho do PV: retângulo do terreno até a GI mais baixa
+        pv_pen = QPen(_PIPE, 1.0)
+        pv_brush = QBrush(QColor("#f4f4ee"))
+        half_w = max(0.6 * sx, 3.0)   # ~1,2 m de largura na escala H
+        for x_pv, ground, bottom, _name in pv_info:
+            rect = QRectF(X(x_pv) - half_w, Y(ground),
+                          2 * half_w, Y(bottom) - Y(ground))
+            self.scene.addRect(rect, pv_pen, pv_brush)
+            # tampa do PV
+            self.scene.addLine(X(x_pv) - half_w * 1.5, Y(ground),
+                               X(x_pv) + half_w * 1.5, Y(ground), pv_pen)
 
         # ------------------------------------------------ títulos e eixos
         self._text(f"PERFIL — {path.label}", cx, y_grid_top - 64,

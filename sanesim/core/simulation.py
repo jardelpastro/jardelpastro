@@ -170,6 +170,32 @@ def simulate(project: Project) -> SimulationResult:
     opts = project.options
     crit = project.criteria
 
+    # Cota do terreno por nó: manual, ou interpolada das curvas de nível
+    # quando a opção "interpolar" está ativa e há terreno carregado.
+    ground: dict[str, float] = {}
+    if opts.elevation_source == "interpolar":
+        if project.terrain_lines:
+            from .terrain import TerrainError, TerrainModel, lines_to_points
+            try:
+                terrain = TerrainModel(lines_to_points(project.terrain_lines))
+                for node in project.nodes:
+                    ground[node.name] = terrain.elevation_at(node.coord_e,
+                                                             node.coord_n)
+                res.messages.append(
+                    "Cotas de terreno interpoladas das curvas de nível "
+                    f"({sum(len(ln) for ln in project.terrain_lines)} "
+                    "pontos).")
+            except TerrainError as exc:
+                res.messages.append(
+                    f"Terreno: {exc} Usadas as cotas manuais.")
+        else:
+            res.messages.append(
+                "Opção 'interpolar curvas de nível' ativa, mas nenhum "
+                "terreno carregado (aba Planta > Terreno). Usadas as "
+                "cotas manuais.")
+    for node in project.nodes:
+        ground.setdefault(node.name, node.ground_elev)
+
     total_km = project.total_length_km()
     res.total_length_m = total_km * 1000.0
 
@@ -251,8 +277,8 @@ def simulate(project: Project) -> SimulationResult:
             upstream=display(pipe.upstream),
             downstream=display(pipe.downstream),
             length=length,
-            ground_up=up.ground_elev,
-            ground_down=down.ground_elev,
+            ground_up=ground[pipe.upstream],
+            ground_down=ground[pipe.downstream],
         )
         if length <= 0:
             r.violations.append("Extensão nula: informe extensão ou coordenadas.")
@@ -306,7 +332,7 @@ def simulate(project: Project) -> SimulationResult:
         r.n_manning = n
 
         # ------------------------------------------------ declividade
-        s_ground = (up.ground_elev - down.ground_elev) / length
+        s_ground = (r.ground_up - r.ground_down) / length
         s_min = hyd.min_slope_nbr9649(qi_dim)
         if design.min_slope_mm > 0:
             s_min = max(s_min, design.min_slope_mm)
@@ -353,7 +379,7 @@ def simulate(project: Project) -> SimulationResult:
 
         # ------------------------------------------------ cotas do coletor
         depth_min = design.min_cover_m + d_m   # terreno -> geratriz inferior
-        inv_start_default = up.ground_elev - depth_min
+        inv_start_default = r.ground_up - depth_min
         inv_upstream = invert_at_node.get(pipe.upstream)
         if inv_upstream is None:
             inv_up = inv_start_default
@@ -364,7 +390,7 @@ def simulate(project: Project) -> SimulationResult:
         inv_down = inv_up - slope * length
 
         # garante recobrimento na extremidade de jusante
-        max_inv_down = down.ground_elev - depth_min
+        max_inv_down = r.ground_down - depth_min
         if inv_down > max_inv_down:
             shift = inv_down - max_inv_down
             inv_up -= shift
@@ -374,10 +400,10 @@ def simulate(project: Project) -> SimulationResult:
 
         r.invert_up = inv_up
         r.invert_down = inv_down
-        r.cover_up = up.ground_elev - inv_up - d_m
-        r.cover_down = down.ground_elev - inv_down - d_m
-        r.depth_up = up.ground_elev - inv_up
-        r.depth_down = down.ground_elev - inv_down
+        r.cover_up = r.ground_up - inv_up - d_m
+        r.cover_down = r.ground_down - inv_down - d_m
+        r.depth_up = r.ground_up - inv_up
+        r.depth_down = r.ground_down - inv_down
         prev_inv = invert_at_node.get(pipe.downstream)
         invert_at_node[pipe.downstream] = (
             inv_down if prev_inv is None else min(prev_inv, inv_down))

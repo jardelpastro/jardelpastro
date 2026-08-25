@@ -13,7 +13,7 @@ NODE_TYPES = ["PV", "TIL", "TL", "CP", "TQ", "EEE", "Lançamento"]
 
 # Versão do esquema do arquivo de projeto (.json). Incrementar a cada
 # mudança incompatível e tratar a migração em Project.from_dict.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def new_id() -> str:
@@ -252,6 +252,9 @@ class Project:
     # Cores dos trechos na planta por nome de rede (ex.: coletor de uma
     # cor, interceptor de outra); "" = cor padrão dos trechos sem rede.
     network_colors: dict[str, str] = field(default_factory=dict)
+    # Curvas de nível / pontos cotados: lista de polylines, cada uma uma
+    # lista de vértices [E, N, Z]. Alimenta a interpolação de cotas.
+    terrain_lines: list[list[list[float]]] = field(default_factory=list)
 
     # ------------------------------------------------------------------
     def node_by_name(self, name: str) -> Node | None:
@@ -317,6 +320,9 @@ class Project:
             "catalog": [m.to_dict() for m in self.catalog],
             "oses": [asdict(o) for o in self.oses],
             "network_colors": dict(self.network_colors),
+            "terrain_lines": [[[round(v, 3) for v in vertex]
+                               for vertex in line]
+                              for line in self.terrain_lines],
         }
 
     @staticmethod
@@ -348,6 +354,7 @@ class Project:
             proj.catalog = [Material.from_dict(m) for m in d["catalog"]]
         proj.oses = [OseSheet(**o) for o in d.get("oses", [])]
         proj.network_colors = dict(d.get("network_colors", {}))
+        proj.terrain_lines = d.get("terrain_lines", [])
         # migração v1 -> v2: garante ids estáveis em nós e trechos
         for n in proj.nodes:
             if not n.id:
