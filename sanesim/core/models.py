@@ -4,11 +4,20 @@ from __future__ import annotations
 
 import json
 import math
+import uuid
 from dataclasses import dataclass, field, asdict
 
 from .materials import Material, default_catalog
 
 NODE_TYPES = ["PV", "TIL", "TL", "CP", "TQ", "EEE", "Lançamento"]
+
+# Versão do esquema do arquivo de projeto (.json). Incrementar a cada
+# mudança incompatível e tratar a migração em Project.from_dict.
+SCHEMA_VERSION = 2
+
+
+def new_id() -> str:
+    return uuid.uuid4().hex[:8]
 
 
 @dataclass
@@ -27,14 +36,66 @@ class PlanCriteria:
 
 
 @dataclass
+class ContributionZone:
+    """Zona de contribuição (adensamento / área de influência).
+
+    Permite que trechos de uma mesma rede atravessem regiões com ocupação
+    diferente (ex.: região nobre com consumo alto, região verticalizada
+    com alta densidade). Cada zona tem população e per capita próprios,
+    rateados apenas pela extensão dos trechos atribuídos a ela — ou taxas
+    lineares manuais. K1 e K2 são os globais do projeto.
+    """
+    key: str = "Z1"                  # identificador curto usado nos trechos
+    name: str = ""                   # descrição (ex.: "Região de prédios")
+    population_start: float = 0.0    # hab (início de plano)
+    population_end: float = 0.0      # hab (fim de plano)
+    per_capita_start: float = 150.0  # L/hab.dia
+    per_capita_end: float = 150.0
+    return_coef: float = 0.8
+    auto: bool = True                # False = usar taxas manuais abaixo
+    rate_start_manual: float = 0.0   # L/s.km
+    rate_end_manual: float = 0.0
+
+    def rate_start(self, zone_length_km: float, k2: float) -> float:
+        if not self.auto:
+            return self.rate_start_manual
+        if zone_length_km <= 0:
+            return 0.0
+        qmed = (self.return_coef * self.population_start
+                * self.per_capita_start / 86400.0)
+        return k2 * qmed / zone_length_km
+
+    def rate_end(self, zone_length_km: float, k1: float, k2: float) -> float:
+        if not self.auto:
+            return self.rate_end_manual
+        if zone_length_km <= 0:
+            return 0.0
+        qmed = (self.return_coef * self.population_end
+                * self.per_capita_end / 86400.0)
+        return k1 * k2 * qmed / zone_length_km
+
+
+@dataclass
 class ProjectCriteria:
-    """Aba 1 — critérios de projeto (início e fim de plano)."""
+    """Aba 1 — critérios de projeto (início e fim de plano).
+
+    Os critérios de início/fim de plano formam a "zona global", aplicada
+    aos trechos sem zona; zonas adicionais em `zones` sobrepõem taxa de
+    contribuição nos trechos atribuídos a elas.
+    """
     start: PlanCriteria = field(default_factory=PlanCriteria)
     end: PlanCriteria = field(default_factory=PlanCriteria)
     infiltration_rate: float = 0.1   # L/s.km
     auto_linear_rate: bool = True    # calcula taxa linear pela população
     linear_rate_start: float = 0.0   # L/s.km (manual, se auto=False)
     linear_rate_end: float = 0.0     # L/s.km (manual, se auto=False)
+    zones: list[ContributionZone] = field(default_factory=list)
+
+    def zone_by_key(self, key: str) -> ContributionZone | None:
+        for z in self.zones:
+            if z.key == key:
+                return z
+        return None
 
     def rate_start(self, total_length_km: float) -> float:
         """Taxa de contribuição linear inicial (L/s.km), Qmax = K2.Qmed."""
@@ -96,6 +157,10 @@ class Node:
     q_point_start: float = 0.0       # vazão pontual início (L/s)
     q_point_end: float = 0.0         # vazão pontual fim (L/s)
     network: str = ""                # nome da rede/coletor (opcional)
+    # Identificador interno estável: o nome é livre (o usuário pode
+    # renomear), mas o id nunca muda — é o que o editor gráfico e futuras
+    # referências cruzadas usarão.
+    id: str = field(default_factory=new_id)
 
 
 @dataclass
@@ -109,6 +174,8 @@ class Pipe:
     slope: float = 0.0               # m/m; 0 = calcular
     status: str = "Rede Projetada"   # ou "Rede Existente"
     network: str = ""
+    zone: str = ""                   # zona de contribuição ("" = global)
+    id: str = field(default_factory=new_id)
 
 
 @dataclass
@@ -145,6 +212,7 @@ class Project:
     # ------------------------------------------------------------------
     def to_dict(self) -> dict:
         return {
+            "schema_version": SCHEMA_VERSION,
             "title": self.title,
             "criteria": asdict(self.criteria),
             "design": asdict(self.design),
@@ -156,14 +224,22 @@ class Project:
 
     @staticmethod
     def from_dict(d: dict) -> "Project":
+        version = d.get("schema_version", 1)
+        if version > SCHEMA_VERSION:
+            raise ValueError(
+                f"Projeto salvo em versão mais nova ({version}) do que "
+                f"esta instalação suporta ({SCHEMA_VERSION}). Atualize o "
+                "SaneSim.")
         crit = d.get("criteria", {})
+        zones = [ContributionZone(**z) for z in crit.get("zones", [])]
         proj = Project(
             title=d.get("title", "Projeto sem título"),
             criteria=ProjectCriteria(
                 start=PlanCriteria(**crit.get("start", {})),
                 end=PlanCriteria(**crit.get("end", {})),
+                zones=zones,
                 **{k: v for k, v in crit.items()
-                   if k not in ("start", "end")},
+                   if k not in ("start", "end", "zones")},
             ),
             design=DesignCriteria(**d.get("design", {})),
             options=CalcOptions(**d.get("options", {})),
@@ -172,6 +248,13 @@ class Project:
         )
         if d.get("catalog"):
             proj.catalog = [Material.from_dict(m) for m in d["catalog"]]
+        # migração v1 -> v2: garante ids estáveis em nós e trechos
+        for n in proj.nodes:
+            if not n.id:
+                n.id = new_id()
+        for p in proj.pipes:
+            if not p.id:
+                p.id = new_id()
         return proj
 
     def save(self, path: str) -> None:

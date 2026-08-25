@@ -7,19 +7,14 @@ from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QPushButton,
                                QTableWidget, QTableWidgetItem, QVBoxLayout,
                                QWidget)
 
+from ..core import fmt
 from ..core.models import NODE_TYPES, Node, Pipe, Project
 
 
 def _num(item: QTableWidgetItem | None, default: float = 0.0) -> float:
     if item is None:
         return default
-    text = item.text().strip().replace(",", ".")
-    if not text:
-        return default
-    try:
-        return float(text)
-    except ValueError:
-        return default
+    return fmt.parse(item.text(), default)
 
 
 def _text(item: QTableWidgetItem | None) -> str:
@@ -63,9 +58,9 @@ class _TableTab(QWidget):
         for row in rows:
             self.table.removeRow(row)
 
-    def _set(self, row: int, col: int, value):
+    def _set(self, row: int, col: int, value, decimals: int = 3):
         if isinstance(value, float):
-            value = f"{value:.3f}".rstrip("0").rstrip(".")
+            value = fmt.fmt_edit(value, decimals)
         self.table.setItem(row, col, QTableWidgetItem(str(value)))
 
 
@@ -93,6 +88,8 @@ class NodesTab(_TableTab):
             row = self.table.rowCount()
             self.table.insertRow(row)
             self._set(row, 0, node.name)
+            # preserva o id estável através do ciclo load -> apply
+            self.table.item(row, 0).setData(Qt.UserRole, node.id)
             combo = QComboBox()
             combo.addItems(NODE_TYPES)
             if node.node_type in NODE_TYPES:
@@ -113,9 +110,12 @@ class NodesTab(_TableTab):
                 continue
             combo = self.table.cellWidget(row, 1)
             node_type = combo.currentText() if combo else "PV"
+            item0 = self.table.item(row, 0)
+            stable_id = item0.data(Qt.UserRole) if item0 else None
             nodes.append(Node(
                 name=name,
                 node_type=node_type,
+                **({"id": stable_id} if stable_id else {}),
                 coord_n=_num(self.table.item(row, 2)),
                 coord_e=_num(self.table.item(row, 3)),
                 ground_elev=_num(self.table.item(row, 4)),
@@ -130,12 +130,14 @@ class PipesTab(_TableTab):
     """Aba — trechos (tubulações) da rede."""
 
     columns = ["Nome", "Nó Montante", "Nó Jusante", "Extensão (m)",
-               "Material", "DN (mm)", "Declividade (m/m)", "Situação",
-               "Rede"]
+               "Material", "DN (mm)", "Declividade (m/m)", "Zona",
+               "Situação", "Rede"]
     help_text = ("Extensão 0 = calcular pelas coordenadas dos nós. "
                  "DN 0 = dimensionar automaticamente. Declividade 0 = "
                  "calcular (terreno / mínima da norma / tensão trativa). "
-                 "Material vazio = material padrão da aba Método de Cálculo.")
+                 "Material vazio = material padrão da aba Método de Cálculo. "
+                 "Zona vazia = zona global; use a chave cadastrada na aba "
+                 "Critérios de Projeto (ex.: Z1).")
 
     def __init__(self, parent=None):
         self._catalog = []
@@ -158,7 +160,7 @@ class PipesTab(_TableTab):
         self._set(row, 3, 0)
         self._set(row, 5, 0)
         self._set(row, 6, 0)
-        self._set(row, 7, "Rede Projetada")
+        self._set(row, 8, "Rede Projetada")
 
     def load_from(self, project: Project):
         self._catalog = project.catalog
@@ -167,15 +169,17 @@ class PipesTab(_TableTab):
             row = self.table.rowCount()
             self.table.insertRow(row)
             self._set(row, 0, pipe.name)
+            self.table.item(row, 0).setData(Qt.UserRole, pipe.id)
             self._set(row, 1, pipe.upstream)
             self._set(row, 2, pipe.downstream)
             self._set(row, 3, pipe.length)
             self.table.setCellWidget(row, 4,
                                      self._material_combo(pipe.material))
             self._set(row, 5, pipe.diameter_mm)
-            self._set(row, 6, pipe.slope)
-            self._set(row, 7, pipe.status)
-            self._set(row, 8, pipe.network)
+            self._set(row, 6, pipe.slope, decimals=5)
+            self._set(row, 7, pipe.zone)
+            self._set(row, 8, pipe.status)
+            self._set(row, 9, pipe.network)
 
     def apply_to(self, project: Project):
         self._catalog = project.catalog
@@ -188,16 +192,20 @@ class PipesTab(_TableTab):
                 continue
             combo = self.table.cellWidget(row, 4)
             material = combo.currentData() if combo else ""
+            item0 = self.table.item(row, 0)
+            stable_id = item0.data(Qt.UserRole) if item0 else None
             pipes.append(Pipe(
                 name=name,
+                **({"id": stable_id} if stable_id else {}),
                 upstream=up,
                 downstream=down,
                 length=_num(self.table.item(row, 3)),
                 material=material or "",
                 diameter_mm=int(_num(self.table.item(row, 5))),
                 slope=_num(self.table.item(row, 6)),
-                status=_text(self.table.item(row, 7)) or "Rede Projetada",
-                network=_text(self.table.item(row, 8)),
+                zone=_text(self.table.item(row, 7)),
+                status=_text(self.table.item(row, 8)) or "Rede Projetada",
+                network=_text(self.table.item(row, 9)),
             ))
         project.pipes = pipes
 

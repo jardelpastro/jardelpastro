@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (QFileDialog, QMainWindow, QMessageBox,
 
 from ..core.memorial import export_memorial
 from ..core.models import Project
+from ..core.ose import export_ose
 from ..core.simulation import SimulationError, simulate
 from .criteria_tabs import CalcTab, CriteriaTab, DesignTab
 from .network_tabs import MaterialsTab, NodesTab, PipesTab
@@ -73,6 +74,8 @@ class MainWindow(QMainWindow):
                "Roda a simulação com os dados atuais (de qualquer aba).")
         action("Exportar Memorial…", self.export_memorial, "Ctrl+E",
                "Gera o memorial de cálculo em Excel (.xlsx).")
+        action("Exportar OSE…", self.export_ose, "Ctrl+Shift+E",
+               "Gera a planilha da OSE (estaqueamento a cada 20 m).")
 
     # ------------------------------------------------------------------
     def _load_all(self):
@@ -168,3 +171,21 @@ class MainWindow(QMainWindow):
                                  f"Não foi possível gravar o memorial:\n{exc}")
             return
         self.statusBar().showMessage(f"Memorial exportado: {path}")
+
+    def export_ose(self):
+        if self.last_result is None:
+            self.run_simulation()
+            if self.last_result is None:
+                return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exportar planilha da OSE", "ose_planilha.xlsx",
+            "Planilha Excel (*.xlsx)")
+        if not path:
+            return
+        try:
+            export_ose(self.project, self.last_result, path)
+        except Exception as exc:
+            QMessageBox.critical(self, "Erro ao exportar",
+                                 f"Não foi possível gravar a OSE:\n{exc}")
+            return
+        self.statusBar().showMessage(f"Planilha da OSE exportada: {path}")

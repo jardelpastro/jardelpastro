@@ -128,6 +128,34 @@ def export_memorial(project: Project, result: SimulationResult,
     ws["F14"] = f"Manning  ({n_txt})"
     ws["F15"] = f"Modo de cálculo: {o.mode}"
 
+    if c.zones:
+        row = 14 + len(general_rows) + 1
+        ws.cell(row=row, column=1,
+                value="Zonas de Contribuição (adensamento)").font = \
+            Font(bold=True)
+        row += 1
+        for col, label in enumerate(
+                ["Zona", "Descrição", "Pop. Ini (hab)", "Pop. Fim (hab)",
+                 "q Ini (l/hab.dia)", "q Fim (l/hab.dia)", "C",
+                 "Taxa Ini (l/s/km)", "Taxa Fim (l/s/km)"], start=1):
+            cell = ws.cell(row=row, column=col, value=label)
+            cell.font = _HEAD_FONT
+            cell.fill = _HEAD_FILL
+            cell.border = _BORDER
+        zone_rates = getattr(result, "zone_rates", {})
+        for z in c.zones:
+            row += 1
+            rs, re_ = zone_rates.get(z.key, (None, None))
+            values = [z.key, z.name, z.population_start, z.population_end,
+                      z.per_capita_start, z.per_capita_end, z.return_coef,
+                      rs if rs is not None else "-",
+                      re_ if re_ is not None else "-"]
+            for col, value in enumerate(values, start=1):
+                cell = ws.cell(row=row, column=col, value=value)
+                cell.border = _BORDER
+                if isinstance(value, float):
+                    cell.number_format = "#,##0.000"
+
     # ---------------------------------------------------------- Trechos
     ws = wb.create_sheet("Trechos")
     _sheet_title(ws, "TRECHOS", project.title, 8)
@@ -139,11 +167,11 @@ def export_memorial(project: Project, result: SimulationResult,
         _cell(ws, i, 1, r.network)
         _cell(ws, i, 2, r.upstream)
         _cell(ws, i, 3, r.downstream)
-        _cell(ws, i, 4, round(r.length, 2), "0.00")
+        _cell(ws, i, 4, round(r.length, 2), "#,##0.00")
         _cell(ws, i, 5, r.pipe)
         _cell(ws, i, 6, r.diameter_mm)
-        _cell(ws, i, 7, round(r.invert_up, 3), "0.000")
-        _cell(ws, i, 8, round(r.invert_down, 3), "0.000")
+        _cell(ws, i, 7, round(r.invert_up, 3), "#,##0.000")
+        _cell(ws, i, 8, round(r.invert_down, 3), "#,##0.000")
 
     # -------------------------------------------------------------- Nós
     ws = wb.create_sheet("Nós")
@@ -156,11 +184,11 @@ def export_memorial(project: Project, result: SimulationResult,
         name = result.renamed.get(node.name, node.name)
         _cell(ws, i, 1, node.network)
         _cell(ws, i, 2, name)
-        _cell(ws, i, 3, node.coord_n, "0.00")
-        _cell(ws, i, 4, node.coord_e, "0.00")
-        _cell(ws, i, 5, node.ground_elev, "0.000")
-        _cell(ws, i, 6, node.q_point_start, "0.00")
-        _cell(ws, i, 7, node.q_point_end, "0.00")
+        _cell(ws, i, 3, node.coord_n, "#,##0.00")
+        _cell(ws, i, 4, node.coord_e, "#,##0.00")
+        _cell(ws, i, 5, node.ground_elev, "#,##0.000")
+        _cell(ws, i, 6, node.q_point_start, "#,##0.00")
+        _cell(ws, i, 7, node.q_point_end, "#,##0.00")
         _cell(ws, i, 8, node.node_type)
 
     # -------------------------------------------------- Dimensionamento
@@ -176,12 +204,12 @@ def export_memorial(project: Project, result: SimulationResult,
         _cell(ws, i, 1, r.network)
         _cell(ws, i, 2, r.upstream)
         _cell(ws, i, 3, r.downstream)
-        _cell(ws, i, 4, round(r.length, 2), "0.00")
+        _cell(ws, i, 4, round(r.length, 2), "#,##0.00")
         _cell(ws, i, 5, r.pipe)
-        _cell(ws, i, 6, project.design.min_cover_m, "0.00")
-        _cell(ws, i, 7, project.design.max_depth_m, "0.00")
+        _cell(ws, i, 6, project.design.min_cover_m, "#,##0.00")
+        _cell(ws, i, 7, project.design.max_depth_m, "#,##0.00")
         _cell(ws, i, 8, p.status if p else "Rede Projetada")
-        _cell(ws, i, 9, "Global")
+        _cell(ws, i, 9, r.zone or "Global")
 
     # ------------------------------------------------------- Resultados
     ws = wb.create_sheet("Resultados")
@@ -204,44 +232,44 @@ def export_memorial(project: Project, result: SimulationResult,
         _cell(ws, row, 1, r.network, fill=fill)
         _cell(ws, row, 2, r.pipe, fill=fill)
         _cell(ws, row, 3, r.upstream, fill=fill)
-        _cell(ws, row, 4, round(r.length, 2), "0.00", fill)
-        _cell(ws, row, 5, round(r.rate_start, 2), "0.00", fill)
-        _cell(ws, row, 6, round(r.q_reach_start, 3), "0.000", fill)
-        _cell(ws, row, 7, round(r.q_point, 2), "0.00", fill)
-        _cell(ws, row, 8, round(r.q_up_start, 3), "0.000", fill)
-        _cell(ws, row, 9, round(r.q_down_start, 3), "0.000", fill)
+        _cell(ws, row, 4, round(r.length, 2), "#,##0.00", fill)
+        _cell(ws, row, 5, round(r.rate_start, 2), "#,##0.00", fill)
+        _cell(ws, row, 6, round(r.q_reach_start, 3), "#,##0.000", fill)
+        _cell(ws, row, 7, round(r.q_point, 2), "#,##0.00", fill)
+        _cell(ws, row, 8, round(r.q_up_start, 3), "#,##0.000", fill)
+        _cell(ws, row, 9, round(r.q_down_start, 3), "#,##0.000", fill)
         _cell(ws, row, 10, r.diameter_mm, fill=fill)
         _cell(ws, row, 11, round(r.slope, 4), "0.0000", fill)
-        _cell(ws, row, 12, round(r.ground_up, 3), "0.000", fill)
-        _cell(ws, row, 13, round(r.invert_up, 3), "0.000", fill)
-        _cell(ws, row, 14, round(r.cover_up, 3), "0.000", fill)
-        _cell(ws, row, 15, round(r.depth_up, 3), "0.000", fill)
-        _cell(ws, row, 16, round(r.yd_start, 2), "0.00", fill)
-        _cell(ws, row, 17, round(r.v_start, 2), "0.00", fill)
-        _cell(ws, row, 18, round(r.tractive_pa, 2), "0.00", fill)
-        _cell(ws, row, 19, r.n_manning, "0.000", fill)
-        _cell(ws, row, 20, round(r.trench_width, 2), "0.00", fill)
+        _cell(ws, row, 12, round(r.ground_up, 3), "#,##0.000", fill)
+        _cell(ws, row, 13, round(r.invert_up, 3), "#,##0.000", fill)
+        _cell(ws, row, 14, round(r.cover_up, 3), "#,##0.000", fill)
+        _cell(ws, row, 15, round(r.depth_up, 3), "#,##0.000", fill)
+        _cell(ws, row, 16, round(r.yd_start, 2), "#,##0.00", fill)
+        _cell(ws, row, 17, round(r.v_start, 2), "#,##0.00", fill)
+        _cell(ws, row, 18, round(r.tractive_pa, 2), "#,##0.00", fill)
+        _cell(ws, row, 19, r.n_manning, "#,##0.000", fill)
+        _cell(ws, row, 20, round(r.trench_width, 2), "#,##0.00", fill)
         # linha de jusante / valores finais
         row += 1
         _cell(ws, row, 1, "", fill=fill)
         _cell(ws, row, 2, "", fill=fill)
         _cell(ws, row, 3, r.downstream, fill=fill)
         _cell(ws, row, 4, "", fill=fill)
-        _cell(ws, row, 5, round(r.rate_end, 2), "0.00", fill)
-        _cell(ws, row, 6, round(r.q_reach_end, 3), "0.000", fill)
+        _cell(ws, row, 5, round(r.rate_end, 2), "#,##0.00", fill)
+        _cell(ws, row, 6, round(r.q_reach_end, 3), "#,##0.000", fill)
         _cell(ws, row, 7, "", fill=fill)
-        _cell(ws, row, 8, round(r.q_up_end, 3), "0.000", fill)
-        _cell(ws, row, 9, round(r.q_down_end, 3), "0.000", fill)
+        _cell(ws, row, 8, round(r.q_up_end, 3), "#,##0.000", fill)
+        _cell(ws, row, 9, round(r.q_down_end, 3), "#,##0.000", fill)
         _cell(ws, row, 10, "", fill=fill)
         _cell(ws, row, 11, "", fill=fill)
-        _cell(ws, row, 12, round(r.ground_down, 3), "0.000", fill)
-        _cell(ws, row, 13, round(r.invert_down, 3), "0.000", fill)
-        _cell(ws, row, 14, round(r.cover_down, 3), "0.000", fill)
-        _cell(ws, row, 15, round(r.depth_down, 3), "0.000", fill)
-        _cell(ws, row, 16, round(r.yd_end, 2), "0.00", fill)
-        _cell(ws, row, 17, round(r.v_end, 2), "0.00", fill)
-        _cell(ws, row, 18, round(r.v_critical, 2), "0.00", fill)
-        _cell(ws, row, 19, r.n_manning, "0.000", fill)
+        _cell(ws, row, 12, round(r.ground_down, 3), "#,##0.000", fill)
+        _cell(ws, row, 13, round(r.invert_down, 3), "#,##0.000", fill)
+        _cell(ws, row, 14, round(r.cover_down, 3), "#,##0.000", fill)
+        _cell(ws, row, 15, round(r.depth_down, 3), "#,##0.000", fill)
+        _cell(ws, row, 16, round(r.yd_end, 2), "#,##0.00", fill)
+        _cell(ws, row, 17, round(r.v_end, 2), "#,##0.00", fill)
+        _cell(ws, row, 18, round(r.v_critical, 2), "#,##0.00", fill)
+        _cell(ws, row, 19, r.n_manning, "#,##0.000", fill)
         _cell(ws, row, 20, "", fill=fill)
         row += 1
 

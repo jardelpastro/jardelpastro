@@ -10,6 +10,7 @@ import sys
 
 from .core.memorial import export_memorial
 from .core.models import Project
+from .core.ose import export_ose
 from .core.simulation import SimulationError, simulate
 
 
@@ -19,6 +20,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("project", help="arquivo de projeto (.json)")
     parser.add_argument("-o", "--output", default="memorial.xlsx",
                         help="memorial de cálculo de saída (.xlsx)")
+    parser.add_argument("--ose", default=None, metavar="ARQUIVO",
+                        help="também gera a planilha da OSE (.xlsx)")
     args = parser.parse_args(argv)
 
     project = Project.load(args.project)
@@ -30,8 +33,10 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Rede: {len(project.nodes)} nós, {len(project.pipes)} trechos, "
           f"{result.total_length_m:.1f} m")
-    print(f"Taxa linear (c/ infiltração): {result.rate_start:.3f} / "
+    print(f"Taxa linear global (c/ infiltração): {result.rate_start:.3f} / "
           f"{result.rate_end:.3f} l/s.km (ini/fim)")
+    for key, (rs, re_) in result.zone_rates.items():
+        print(f"Taxa linear zona {key}: {rs:.3f} / {re_:.3f} l/s.km")
     for msg in result.messages:
         print(f"AVISO: {msg}")
     for r in result.pipes:
@@ -45,6 +50,9 @@ def main(argv: list[str] | None = None) -> int:
 
     export_memorial(project, result, args.output)
     print(f"Memorial gravado em: {args.output}")
+    if args.ose:
+        export_ose(project, result, args.ose)
+        print(f"Planilha da OSE gravada em: {args.ose}")
     return 0
 
 

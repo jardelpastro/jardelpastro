@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "title": "Exemplo — Loteamento Jardim das Águas",
   "criteria": {
     "start": {
@@ -20,7 +21,21 @@
     "infiltration_rate": 0.1,
     "auto_linear_rate": true,
     "linear_rate_start": 0.0,
-    "linear_rate_end": 0.0
+    "linear_rate_end": 0.0,
+    "zones": [
+      {
+        "key": "Z1",
+        "name": "Região verticalizada (alta densidade)",
+        "population_start": 1800,
+        "population_end": 3000,
+        "per_capita_start": 180,
+        "per_capita_end": 180,
+        "return_coef": 0.8,
+        "auto": true,
+        "rate_start_manual": 0.0,
+        "rate_end_manual": 0.0
+      }
+    ]
   },
   "design": {
     "min_flow_lps": 1.5,
@@ -57,7 +72,8 @@
       "ground_elev": 812.5,
       "q_point_start": 0.0,
       "q_point_end": 0.0,
-      "network": "C1"
+      "network": "C1",
+      "id": "beb1d86f"
     },
     {
       "name": "PV-02",
@@ -67,7 +83,8 @@
       "ground_elev": 811.2,
       "q_point_start": 0.0,
       "q_point_end": 0.0,
-      "network": "C1"
+      "network": "C1",
+      "id": "af0392cf"
     },
     {
       "name": "PV-03",
@@ -77,7 +94,8 @@
       "ground_elev": 810.1,
       "q_point_start": 0.0,
       "q_point_end": 0.0,
-      "network": "C1"
+      "network": "C1",
+      "id": "9fd99436"
     },
     {
       "name": "PV-04",
@@ -87,7 +105,8 @@
       "ground_elev": 811.8,
       "q_point_start": 0.0,
       "q_point_end": 0.0,
-      "network": "C1"
+      "network": "C1",
+      "id": "502c85fb"
     },
     {
       "name": "PV-05",
@@ -97,7 +116,8 @@
       "ground_elev": 809.7,
       "q_point_start": 0.5,
       "q_point_end": 0.8,
-      "network": "C1"
+      "network": "C1",
+      "id": "08e3a7c2"
     },
     {
       "name": "PV-06",
@@ -107,7 +127,8 @@
       "ground_elev": 808.4,
       "q_point_start": 0.0,
       "q_point_end": 0.0,
-      "network": "C1"
+      "network": "C1",
+      "id": "ca6b6b64"
     },
     {
       "name": "PV-07",
@@ -117,7 +138,8 @@
       "ground_elev": 807.2,
       "q_point_start": 0.0,
       "q_point_end": 0.0,
-      "network": "C1"
+      "network": "C1",
+      "id": "47a29321"
     },
     {
       "name": "EEE-01",
@@ -127,7 +149,8 @@
       "ground_elev": 806.5,
       "q_point_start": 0.0,
       "q_point_end": 0.0,
-      "network": "C1"
+      "network": "C1",
+      "id": "f441f64a"
     }
   ],
   "pipes": [
@@ -140,7 +163,9 @@
       "diameter_mm": 0,
       "slope": 0.0,
       "status": "Rede Projetada",
-      "network": "C1"
+      "network": "C1",
+      "zone": "",
+      "id": "556974db"
     },
     {
       "name": "T2",
@@ -151,7 +176,9 @@
       "diameter_mm": 0,
       "slope": 0.0,
       "status": "Rede Projetada",
-      "network": "C1"
+      "network": "C1",
+      "zone": "",
+      "id": "d3df0596"
     },
     {
       "name": "T3",
@@ -162,7 +189,9 @@
       "diameter_mm": 0,
       "slope": 0.0,
       "status": "Rede Projetada",
-      "network": "C1"
+      "network": "C1",
+      "zone": "",
+      "id": "aa53b505"
     },
     {
       "name": "T4",
@@ -173,7 +202,9 @@
       "diameter_mm": 0,
       "slope": 0.0,
       "status": "Rede Projetada",
-      "network": "C1"
+      "network": "C1",
+      "zone": "",
+      "id": "38c9e7ae"
     },
     {
       "name": "T5",
@@ -184,7 +215,9 @@
       "diameter_mm": 0,
       "slope": 0.0,
       "status": "Rede Projetada",
-      "network": "C1"
+      "network": "C1",
+      "zone": "Z1",
+      "id": "126155bc"
     },
     {
       "name": "T6",
@@ -195,7 +228,9 @@
       "diameter_mm": 0,
       "slope": 0.0,
       "status": "Rede Projetada",
-      "network": "C1"
+      "network": "C1",
+      "zone": "Z1",
+      "id": "ee7aaad2"
     },
     {
       "name": "T7",
@@ -206,7 +241,9 @@
       "diameter_mm": 0,
       "slope": 0.0,
       "status": "Rede Projetada",
-      "network": "C1"
+      "network": "C1",
+      "zone": "",
+      "id": "ff5e1c18"
     }
   ],
   "catalog": [

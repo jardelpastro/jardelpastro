@@ -29,7 +29,11 @@ aba**, sem precisar passar por todas:
 1. **Critérios de Projeto** — início e fim de plano: população, consumo
    per capita, coeficiente de retorno (C), K1, K2, K3; taxa de
    infiltração; taxas de contribuição linear automáticas (população ÷
-   extensão da rede) ou manuais.
+   extensão da rede) ou manuais; **zonas de contribuição** (adensamento /
+   áreas de influência): regiões com população, per capita e C próprios,
+   rateados apenas pela extensão dos trechos atribuídos à zona — para
+   redes que atravessam regiões de ocupação diferente (região nobre,
+   região verticalizada etc.).
 2. **Dimensionamento** — vazão mínima, DN mínimo, recobrimento mínimo
    (rua e passeio), profundidade máxima, tensão trativa mínima,
    velocidades mínima/máxima, lâmina máxima (y/D), declividades
@@ -43,7 +47,7 @@ aba**, sem precisar passar por todas:
    coordenadas N/E, cota do terreno, vazões pontuais início/fim.
 5. **Trechos** — nó de montante/jusante, extensão (ou automática pelas
    coordenadas), material, DN (fixo ou automático), declividade (fixa ou
-   automática), situação (projetada/existente).
+   automática), zona de contribuição, situação (projetada/existente).
 6. **Materiais e Tubos** — catálogo com PVC Ocre, PEAD corrugado,
    Concreto, Cerâmico, PRFV e Ferro Fundido; rugosidade de Manning
    mín/adotada/máx visível e editável; DNs comerciais de cada material.
@@ -74,9 +78,29 @@ aba**, sem precisar passar por todas:
 
 ## Memorial de cálculo
 
-`Exportar Memorial` gera um `.xlsx` com as abas **Capa** (critérios),
-**Trechos**, **Nós**, **Dimensionamento** e **Resultados** — no mesmo
-layout do memorial modelo, pronto para alimentar a planilha da OSE.
+`Exportar Memorial` gera um `.xlsx` com as abas **Capa** (critérios e
+zonas), **Trechos**, **Nós**, **Dimensionamento** e **Resultados** — no
+mesmo layout do memorial modelo. `Exportar OSE` gera a planilha da Ordem
+de Serviço para Execução (estilo folha 3 do modelo SANEPAR): um bloco por
+trecho com estaqueamento a cada 20 m — distâncias, cota do terreno
+(interpolada linearmente entre PVs), cota da geratriz inferior, altura e
+bordo da régua (gabarito 3,00 m), profundidade da vala e recobrimento.
+
+Números são exibidos no padrão brasileiro (ponto de milhar e vírgula
+decimal) na interface, e no Excel via formato nativo (`#.##0,00`), que
+acompanha o idioma do usuário. As células de edição aceitam tanto
+`1.234,56` quanto `1234.56`.
+
+## Decisões estruturais (para o crescimento do software)
+
+- **IDs estáveis**: todo nó e trecho tem um `id` interno imutável além do
+  nome (renomear um PV não quebra referências) — base para o editor
+  gráfico e futuras referências cruzadas.
+- **Versionamento do projeto**: o `.json` grava `schema_version`;
+  projetos antigos migram automaticamente na abertura e versões futuras
+  são detectadas.
+- **SI no núcleo, formatação na borda**: o motor calcula tudo em float/SI
+  e a formatação pt-BR só acontece na apresentação.
 
 ## Estrutura do código
 
@@ -98,7 +122,8 @@ examples/            # projeto de exemplo
 
 - [x] Motor de cálculo + memorial em Excel
 - [x] Interface com abas e simulação de qualquer aba
-- [ ] Planilha da OSE (folha 3 do modelo — estaqueamento a cada 20 m)
+- [x] Zonas de contribuição (adensamento / áreas de influência)
+- [x] Planilha da OSE (folha 3 do modelo — estaqueamento a cada 20 m)
 - [ ] Perfil longitudinal (folha 1) — desenho terreno × coletor
 - [ ] Planta da rede (folha 2) + interpolação de curvas de nível
 - [ ] Editor gráfico com mouse: inserir PVs/estruturas clicando na tela,

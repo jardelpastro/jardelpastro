@@ -21,6 +21,7 @@ from .models import Project, Pipe
 class PipeResult:
     pipe: str
     network: str = ""
+    zone: str = ""               # zona de contribuição ("" = global)
     upstream: str = ""
     downstream: str = ""
     length: float = 0.0
@@ -61,10 +62,12 @@ class SimulationResult:
     ok: bool = True
     messages: list[str] = field(default_factory=list)
     pipes: list[PipeResult] = field(default_factory=list)
-    rate_start: float = 0.0      # taxa linear de esgoto ini (L/s.km)
+    rate_start: float = 0.0      # taxa linear global ini (L/s.km)
     rate_end: float = 0.0
     total_length_m: float = 0.0
     renamed: dict[str, str] = field(default_factory=dict)
+    # taxas por zona de contribuição: key -> (ini, fim), c/ infiltração
+    zone_rates: dict[str, tuple[float, float]] = field(default_factory=dict)
 
     @property
     def has_violations(self) -> bool:
@@ -169,10 +172,36 @@ def simulate(project: Project) -> SimulationResult:
 
     total_km = project.total_length_km()
     res.total_length_m = total_km * 1000.0
-    rate_start = crit.rate_start(total_km)
-    rate_end = crit.rate_end(total_km)
-    res.rate_start = rate_start + crit.infiltration_rate
-    res.rate_end = rate_end + crit.infiltration_rate
+
+    # Extensão por zona de contribuição; os trechos sem zona formam a
+    # "zona global", que rateia a população dos critérios de projeto.
+    zone_length_km: dict[str, float] = {}
+    global_length_km = 0.0
+    for p in project.pipes:
+        lk = project.pipe_length(p) / 1000.0
+        if p.zone and crit.zone_by_key(p.zone):
+            zone_length_km[p.zone] = zone_length_km.get(p.zone, 0.0) + lk
+        else:
+            global_length_km += lk
+
+    global_rate_start = crit.rate_start(global_length_km)
+    global_rate_end = crit.rate_end(global_length_km)
+    res.rate_start = global_rate_start + crit.infiltration_rate
+    res.rate_end = global_rate_end + crit.infiltration_rate
+
+    k1 = crit.end.k1
+    k2_start, k2_end = crit.start.k2, crit.end.k2
+    zone_rates = res.zone_rates
+    for z in crit.zones:
+        lk = zone_length_km.get(z.key, 0.0)
+        zone_rates[z.key] = (
+            z.rate_start(lk, k2_start) + crit.infiltration_rate,
+            z.rate_end(lk, k1, k2_end) + crit.infiltration_rate,
+        )
+        if z.auto and (z.population_start or z.population_end) and lk <= 0:
+            res.messages.append(
+                f"Zona '{z.key}' tem população definida mas nenhum trecho "
+                "atribuído a ela.")
 
     pessimistic = opts.mode == "pessimista"
 
@@ -213,10 +242,18 @@ def simulate(project: Project) -> SimulationResult:
             continue
 
         # ------------------------------------------------ vazões
-        r.rate_start = res.rate_start
-        r.rate_end = res.rate_end
-        r.q_reach_start = res.rate_start * length / 1000.0
-        r.q_reach_end = res.rate_end * length / 1000.0
+        if pipe.zone and pipe.zone in zone_rates:
+            r.zone = pipe.zone
+            r.rate_start, r.rate_end = zone_rates[pipe.zone]
+        else:
+            if pipe.zone and pipe.zone not in zone_rates:
+                r.violations.append(
+                    f"Zona '{pipe.zone}' não cadastrada nos critérios; "
+                    "usada a taxa global.")
+            r.rate_start = res.rate_start
+            r.rate_end = res.rate_end
+        r.q_reach_start = r.rate_start * length / 1000.0
+        r.q_reach_end = r.rate_end * length / 1000.0
         r.q_point = up.q_point_start
         r.q_up_start = q_in_start.get(pipe.upstream, 0.0) + up.q_point_start
         r.q_up_end = q_in_end.get(pipe.upstream, 0.0) + up.q_point_end

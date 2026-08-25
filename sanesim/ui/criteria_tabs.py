@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
                                QFormLayout, QGroupBox, QHBoxLayout, QLabel,
-                               QLineEdit, QRadioButton, QSpinBox, QVBoxLayout,
-                               QWidget)
+                               QLineEdit, QPushButton, QRadioButton,
+                               QSpinBox, QTableWidget, QTableWidgetItem,
+                               QVBoxLayout, QWidget)
 
-from ..core.models import Project
+from ..core import fmt
+from ..core.models import ContributionZone, Project
 
 
 def _dspin(minimum=0.0, maximum=1e9, decimals=3, step=0.1) -> QDoubleSpinBox:
@@ -57,7 +59,37 @@ class CriteriaTab(QWidget):
         self.auto_rate.toggled.connect(self._toggle_rates)
         self._toggle_rates(True)
         layout.addWidget(infil)
-        layout.addStretch(1)
+
+        zones = QGroupBox("Zonas de contribuição (adensamento / áreas de "
+                          "influência)")
+        zlayout = QVBoxLayout(zones)
+        zhint = QLabel(
+            "Os critérios acima formam a zona global (trechos sem zona). "
+            "Cadastre aqui regiões com ocupação diferente — ex.: região "
+            "nobre com consumo maior, região verticalizada com alta "
+            "densidade — e atribua a chave da zona aos trechos na aba "
+            "Trechos. A população de cada zona é rateada apenas pela "
+            "extensão dos trechos dela (K1/K2 globais).")
+        zhint.setWordWrap(True)
+        zlayout.addWidget(zhint)
+        self.zones_table = QTableWidget(0, 10)
+        self.zones_table.setHorizontalHeaderLabels(
+            ["Zona", "Descrição", "Pop. Ini\n(hab)", "Pop. Fim\n(hab)",
+             "q Ini\n(l/hab.dia)", "q Fim\n(l/hab.dia)", "C", "Modo",
+             "Taxa Ini\n(l/s/km)", "Taxa Fim\n(l/s/km)"])
+        self.zones_table.horizontalHeader().setStretchLastSection(True)
+        self.zones_table.setAlternatingRowColors(True)
+        zlayout.addWidget(self.zones_table)
+        zbuttons = QHBoxLayout()
+        zadd = QPushButton("Adicionar zona")
+        zadd.clicked.connect(self._add_zone_row)
+        zrem = QPushButton("Remover selecionada(s)")
+        zrem.clicked.connect(self._remove_zone_rows)
+        zbuttons.addWidget(zadd)
+        zbuttons.addWidget(zrem)
+        zbuttons.addStretch(1)
+        zlayout.addLayout(zbuttons)
+        layout.addWidget(zones, stretch=1)
 
     def _plan_group(self, title: str, has_k1: bool) -> dict:
         group = QGroupBox(title)
@@ -86,6 +118,65 @@ class CriteriaTab(QWidget):
         self.rate_start.setEnabled(not auto)
         self.rate_end.setEnabled(not auto)
 
+    # ------------------------------------------------ zonas
+    def _mode_combo(self, auto: bool = True) -> QComboBox:
+        combo = QComboBox()
+        combo.addItem("Automático (população)", True)
+        combo.addItem("Manual (taxas)", False)
+        combo.setCurrentIndex(0 if auto else 1)
+        return combo
+
+    def _add_zone_row(self, zone: ContributionZone | None = None):
+        if zone is None or isinstance(zone, bool):
+            zone = ContributionZone(
+                key=f"Z{self.zones_table.rowCount() + 1}")
+        row = self.zones_table.rowCount()
+        self.zones_table.insertRow(row)
+        values = [zone.key, zone.name,
+                  fmt.fmt_edit(zone.population_start, 0),
+                  fmt.fmt_edit(zone.population_end, 0),
+                  fmt.fmt_edit(zone.per_capita_start, 1),
+                  fmt.fmt_edit(zone.per_capita_end, 1),
+                  fmt.fmt_edit(zone.return_coef, 2)]
+        for col, value in enumerate(values):
+            self.zones_table.setItem(row, col, QTableWidgetItem(str(value)))
+        self.zones_table.setCellWidget(row, 7, self._mode_combo(zone.auto))
+        self.zones_table.setItem(
+            row, 8, QTableWidgetItem(fmt.fmt_edit(zone.rate_start_manual)))
+        self.zones_table.setItem(
+            row, 9, QTableWidgetItem(fmt.fmt_edit(zone.rate_end_manual)))
+
+    def _remove_zone_rows(self):
+        rows = sorted({i.row() for i in self.zones_table.selectedIndexes()},
+                      reverse=True)
+        for row in rows:
+            self.zones_table.removeRow(row)
+
+    def _zones_from_table(self) -> list[ContributionZone]:
+        zones = []
+        for row in range(self.zones_table.rowCount()):
+            def cell(col):
+                item = self.zones_table.item(row, col)
+                return item.text().strip() if item else ""
+            key = cell(0)
+            if not key:
+                continue
+            combo = self.zones_table.cellWidget(row, 7)
+            auto = combo.currentData() if combo else True
+            zones.append(ContributionZone(
+                key=key,
+                name=cell(1),
+                population_start=fmt.parse(cell(2)),
+                population_end=fmt.parse(cell(3)),
+                per_capita_start=fmt.parse(cell(4), 150.0),
+                per_capita_end=fmt.parse(cell(5), 150.0),
+                return_coef=fmt.parse(cell(6), 0.8),
+                auto=bool(auto),
+                rate_start_manual=fmt.parse(cell(8)),
+                rate_end_manual=fmt.parse(cell(9)),
+            ))
+        return zones
+
     # ------------------------------------------------------------------
     def load_from(self, project: Project):
         self.title_edit.setText(project.title)
@@ -101,6 +192,9 @@ class CriteriaTab(QWidget):
         self.auto_rate.setChecked(c.auto_linear_rate)
         self.rate_start.setValue(c.linear_rate_start)
         self.rate_end.setValue(c.linear_rate_end)
+        self.zones_table.setRowCount(0)
+        for zone in c.zones:
+            self._add_zone_row(zone)
 
     def apply_to(self, project: Project):
         project.title = self.title_edit.text().strip() or project.title
@@ -116,6 +210,7 @@ class CriteriaTab(QWidget):
         c.auto_linear_rate = self.auto_rate.isChecked()
         c.linear_rate_start = self.rate_start.value()
         c.linear_rate_end = self.rate_end.value()
+        c.zones = self._zones_from_table()
 
 
 class DesignTab(QWidget):
