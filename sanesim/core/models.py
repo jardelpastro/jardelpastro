@@ -13,7 +13,7 @@ NODE_TYPES = ["PV", "TIL", "TL", "CP", "TQ", "EEE", "Lançamento"]
 
 # Versão do esquema do arquivo de projeto (.json). Incrementar a cada
 # mudança incompatível e tratar a migração em Project.from_dict.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def new_id() -> str:
@@ -177,6 +177,7 @@ class Node:
     q_point_start: float = 0.0       # vazão pontual início (L/s)
     q_point_end: float = 0.0         # vazão pontual fim (L/s)
     network: str = ""                # nome da rede/coletor (opcional)
+    color: str = ""                  # cor individual na planta ("" = padrão)
     # Identificador interno estável: o nome é livre (o usuário pode
     # renomear), mas o id nunca muda — é o que o editor gráfico e futuras
     # referências cruzadas usarão.
@@ -195,6 +196,7 @@ class Pipe:
     status: str = "Rede Projetada"   # ou "Rede Existente"
     network: str = ""
     zone: str = ""                   # zona de contribuição ("" = global)
+    color: str = ""                  # cor individual na planta ("" = padrão)
     id: str = field(default_factory=new_id)
 
 
@@ -247,6 +249,9 @@ class Project:
     pipes: list[Pipe] = field(default_factory=list)
     catalog: list[Material] = field(default_factory=default_catalog)
     oses: list[OseSheet] = field(default_factory=list)
+    # Cores dos trechos na planta por nome de rede (ex.: coletor de uma
+    # cor, interceptor de outra); "" = cor padrão dos trechos sem rede.
+    network_colors: dict[str, str] = field(default_factory=dict)
 
     # ------------------------------------------------------------------
     def node_by_name(self, name: str) -> Node | None:
@@ -311,6 +316,7 @@ class Project:
             "pipes": [asdict(p) for p in self.pipes],
             "catalog": [m.to_dict() for m in self.catalog],
             "oses": [asdict(o) for o in self.oses],
+            "network_colors": dict(self.network_colors),
         }
 
     @staticmethod
@@ -341,6 +347,7 @@ class Project:
         if d.get("catalog"):
             proj.catalog = [Material.from_dict(m) for m in d["catalog"]]
         proj.oses = [OseSheet(**o) for o in d.get("oses", [])]
+        proj.network_colors = dict(d.get("network_colors", {}))
         # migração v1 -> v2: garante ids estáveis em nós e trechos
         for n in proj.nodes:
             if not n.id:

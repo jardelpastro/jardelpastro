@@ -166,7 +166,10 @@ examples/            # projeto de exemplo
 - [x] Perfil longitudinal na tela: lâmina d'água, escalas, grid e bandas
 - [x] Editor gráfico de planta com mouse (inserir PV/trecho, mover,
       botão direito para propriedades, seleção mostra resultados)
-- [ ] Exportação do perfil (folha 1 da OSE) para PDF/imagem
+- [x] Cores na planta: individual (propriedades), por tipo de nó
+      (elevatória = triângulo rosa) e por nome de rede (diálogo
+      "Cores das redes" — coletor/interceptor com cores próprias)
+- [x] Exportação do perfil para PDF (A3 paisagem) e PNG
 - [ ] Planta: imagem/DXF de fundo e interpolação de curvas de nível
       (cota automática dos PVs)
 - [ ] Exportação DXF (planta/perfil para CAD)

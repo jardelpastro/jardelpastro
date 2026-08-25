@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import math
 
-from PySide6.QtCore import Qt, QPointF, QRectF
-from PySide6.QtGui import (QBrush, QColor, QFont, QPainter, QPen,
-                           QPolygonF)
-from PySide6.QtWidgets import (QButtonGroup, QComboBox, QDoubleSpinBox,
-                               QFormLayout, QGraphicsEllipseItem,
-                               QGraphicsItem, QGraphicsLineItem,
+from PySide6.QtCore import Qt, QPointF, QRectF, QSize
+from PySide6.QtGui import (QBrush, QColor, QFont, QIcon, QPainter,
+                           QPainterPath, QPen, QPixmap, QPolygonF,
+                           QTransform)
+from PySide6.QtWidgets import (QButtonGroup, QColorDialog, QComboBox,
+                               QDialog, QDialogButtonBox, QDoubleSpinBox,
+                               QFormLayout, QFrame, QGraphicsItem,
+                               QGraphicsLineItem, QGraphicsPathItem,
                                QGraphicsScene, QGraphicsSimpleTextItem,
                                QGraphicsView, QGroupBox, QHBoxLayout,
                                QLabel, QLineEdit, QMenu, QPushButton,
@@ -34,6 +36,7 @@ from ..core.models import NODE_TYPES, Node, Pipe, Project
 from ..core.simulation import SimulationResult
 
 NODE_RADIUS = 4.0        # raio do símbolo do PV (m de desenho)
+# cores padrão por tipo de nó (PV branco; elevatória no rosinha padrão)
 _NODE_COLORS = {
     "PV": QColor("#ffffff"), "TIL": QColor("#d9ead3"),
     "TL": QColor("#d9ead3"), "CP": QColor("#fff2cc"),
@@ -43,12 +46,81 @@ _NODE_COLORS = {
 _PIPE_OK = QColor("#1f6fb2")
 _PIPE_VIOL = QColor("#cc0000")
 _SELECT = QColor("#ff8c00")
+_ICON_FG = QColor("#333333")
+_GRID = QColor(0, 0, 0, 22)
+_GRID_TEXT = QColor(0, 0, 0, 70)
 
 
-class NodeItem(QGraphicsEllipseItem):
+def _node_path(node_type: str, r: float = NODE_RADIUS) -> QPainterPath:
+    """Símbolo do nó em planta: círculo (padrão) ou triângulo (EEE)."""
+    path = QPainterPath()
+    if node_type == "EEE":
+        path.moveTo(0.0, -1.35 * r)
+        path.lineTo(1.25 * r, r)
+        path.lineTo(-1.25 * r, r)
+        path.closeSubpath()
+    else:
+        path.addEllipse(-r, -r, 2 * r, 2 * r)
+    return path
+
+
+def _make_icon(kind: str) -> QIcon:
+    """Ícones da barra de ferramentas, desenhados programaticamente."""
+    pix = QPixmap(24, 24)
+    pix.fill(Qt.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.Antialiasing)
+    pen = QPen(_ICON_FG, 1.6)
+    p.setPen(pen)
+    if kind == "select":                       # seta de cursor
+        poly = QPolygonF([QPointF(6, 3), QPointF(6, 19), QPointF(10.5, 14.5),
+                          QPointF(13.5, 20.5), QPointF(16, 19.2),
+                          QPointF(13, 13.3), QPointF(19, 13)])
+        p.setBrush(QBrush(_ICON_FG))
+        p.drawPolygon(poly)
+    elif kind == "pan":                        # mãozinha
+        p.setBrush(QBrush(QColor("#f6dcb8")))
+        pen.setWidthF(1.2)
+        p.setPen(pen)
+        # dedos
+        for i, (x, top) in enumerate([(8, 6.5), (11, 4.5), (14, 5),
+                                      (17, 7)]):
+            p.drawRoundedRect(QRectF(x - 1.2, top, 2.6, 9), 1.2, 1.2)
+        # polegar
+        p.drawRoundedRect(QRectF(4.2, 11, 2.8, 6.5), 1.3, 1.3)
+        # palma
+        p.drawRoundedRect(QRectF(6.4, 11.5, 12, 8.5), 3.5, 3.5)
+    elif kind == "node":                       # PV (círculo)
+        p.setBrush(QBrush(QColor("#ffffff")))
+        p.drawEllipse(QRectF(5, 5, 14, 14))
+        p.drawPoint(QPointF(12, 12))
+    elif kind == "pipe":                       # trecho com seta de fluxo
+        p.drawLine(QPointF(4, 19), QPointF(20, 5))
+        p.setBrush(QBrush(_ICON_FG))
+        p.drawPolygon(QPolygonF([QPointF(20, 5), QPointF(13.5, 7.5),
+                                 QPointF(17.5, 11.5)]))
+        p.setBrush(QBrush(QColor("#ffffff")))
+        p.drawEllipse(QRectF(1.5, 16.5, 5, 5))
+    elif kind == "fit":                        # lupa (ajustar zoom)
+        p.drawEllipse(QRectF(4, 4, 11, 11))
+        pen.setWidthF(2.2)
+        p.setPen(pen)
+        p.drawLine(QPointF(14, 14), QPointF(20, 20))
+    elif kind == "colors":                     # paleta de cores
+        p.setBrush(QBrush(QColor("#ffffff")))
+        p.drawEllipse(QRectF(3, 4, 18, 16))
+        p.setPen(Qt.NoPen)
+        for color, (x, y) in [("#cc3333", (7, 8)), ("#3366cc", (12, 6.5)),
+                              ("#33aa55", (16, 9)), ("#e6b422", (9.5, 13))]:
+            p.setBrush(QBrush(QColor(color)))
+            p.drawEllipse(QRectF(x, y, 3.4, 3.4))
+    p.end()
+    return QIcon(pix)
+
+
+class NodeItem(QGraphicsPathItem):
     def __init__(self, node: Node, tab: "PlanTab"):
-        r = NODE_RADIUS
-        super().__init__(-r, -r, 2 * r, 2 * r)
+        super().__init__(_node_path(node.node_type))
         self.node = node
         self.tab = tab
         self.setPos(node.coord_e, -node.coord_n)
@@ -56,20 +128,24 @@ class NodeItem(QGraphicsEllipseItem):
         self.setFlag(QGraphicsItem.ItemIsSelectable)
         self.setFlag(QGraphicsItem.ItemSendsScenePositionChanges)
         self.setZValue(2)
-        self.setBrush(QBrush(_NODE_COLORS.get(node.node_type,
-                                              QColor("#ffffff"))))
         self.setPen(QPen(QColor("#222222"), 0.8))
         self.label = QGraphicsSimpleTextItem(node.name, self)
         font = QFont()
         font.setPointSizeF(4.5)
         font.setBold(True)
         self.label.setFont(font)
-        self.label.setPos(r * 0.9, -r * 2.4)
+        self.label.setPos(NODE_RADIUS * 0.9, -NODE_RADIUS * 2.4)
+        self.refresh()
+
+    def fill_color(self) -> QColor:
+        if self.node.color:
+            return QColor(self.node.color)
+        return _NODE_COLORS.get(self.node.node_type, QColor("#ffffff"))
 
     def refresh(self):
         self.label.setText(self.node.name)
-        self.setBrush(QBrush(_NODE_COLORS.get(self.node.node_type,
-                                              QColor("#ffffff"))))
+        self.setPath(_node_path(self.node.node_type))
+        self.setBrush(QBrush(self.fill_color()))
         self.setPos(self.node.coord_e, -self.node.coord_n)
 
     def itemChange(self, change, value):
@@ -103,6 +179,18 @@ class PipeItem(QGraphicsLineItem):
         self.violated = False
         self.update_geometry()
 
+    def base_color(self) -> QColor:
+        """Cor do trecho: violação > cor individual > cor da rede > padrão."""
+        if self.violated:
+            return _PIPE_VIOL
+        if self.pipe.color:
+            return QColor(self.pipe.color)
+        net_color = self.tab.project.network_colors.get(
+            self.pipe.network or "")
+        if net_color:
+            return QColor(net_color)
+        return _PIPE_OK
+
     def update_geometry(self):
         up = self.tab.project.node_by_name(self.pipe.upstream)
         down = self.tab.project.node_by_name(self.pipe.downstream)
@@ -111,8 +199,7 @@ class PipeItem(QGraphicsLineItem):
         x1, y1 = up.coord_e, -up.coord_n
         x2, y2 = down.coord_e, -down.coord_n
         self.setLine(x1, y1, x2, y2)
-        color = _PIPE_VIOL if self.violated else _PIPE_OK
-        pen = QPen(color, 1.6)
+        pen = QPen(self.base_color(), 1.6)
         pen.setCosmetic(False)
         self.setPen(pen)
         # rótulo no meio, deslocado da linha
@@ -139,8 +226,7 @@ class PipeItem(QGraphicsLineItem):
     def paint(self, painter, option, widget=None):
         super().paint(painter, option, widget)
         if self.arrow_poly is not None:
-            color = _SELECT if self.isSelected() else \
-                (_PIPE_VIOL if self.violated else _PIPE_OK)
+            color = _SELECT if self.isSelected() else self.base_color()
             painter.setBrush(QBrush(color))
             painter.setPen(Qt.NoPen)
             painter.drawPolygon(self.arrow_poly)
@@ -177,28 +263,135 @@ class PlanView(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing)
         self.setDragMode(QGraphicsView.RubberBandDrag)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self._mid_panning = False
+        self._pan_start = None
 
     def wheelEvent(self, event):
         factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
         self.scale(factor, factor)
 
+    # botão do meio (rodinha pressionada) funciona como pan em qualquer modo
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            self._mid_panning = True
+            self._pan_start = event.position().toPoint()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._mid_panning and self._pan_start is not None:
+            delta = event.position().toPoint() - self._pan_start
+            self._pan_start = event.position().toPoint()
+            self.horizontalScrollBar().setValue(
+                self.horizontalScrollBar().value() - delta.x())
+            self.verticalScrollBar().setValue(
+                self.verticalScrollBar().value() - delta.y())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MiddleButton and self._mid_panning:
+            self._mid_panning = False
+            self.unsetCursor()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def _grid_step(self) -> float:
+        """Passo do grid adaptado ao zoom (espaçamento >= ~80 px)."""
+        scale = self.transform().m11() or 1e-9
+        for step in (1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000,
+                     10000, 20000, 50000):
+            if step * scale >= 80.0:
+                return float(step)
+        return 100000.0
+
     def drawBackground(self, painter, rect: QRectF):
         super().drawBackground(painter, rect)
         painter.fillRect(rect, QColor("#fbfbf8"))
-        pen = QPen(QColor(0, 0, 0, 18), 0)
+        step = self._grid_step()
+        pen = QPen(_GRID, 0)
         pen.setCosmetic(True)
         painter.setPen(pen)
-        step = 100.0
+        xs, ys = [], []
         x = math.floor(rect.left() / step) * step
         while x < rect.right():
             painter.drawLine(QPointF(x, rect.top()),
                              QPointF(x, rect.bottom()))
+            xs.append(x)
             x += step
         y = math.floor(rect.top() / step) * step
         while y < rect.bottom():
             painter.drawLine(QPointF(rect.left(), y),
                              QPointF(rect.right(), y))
+            ys.append(y)
             y += step
+
+        # rótulos discretos das coordenadas (E nas verticais, N nas
+        # horizontais), desenhados em tamanho fixo de tela
+        painter.save()
+        painter.setWorldTransform(QTransform())
+        font = QFont()
+        font.setPointSizeF(7.0)
+        painter.setFont(font)
+        painter.setPen(QPen(_GRID_TEXT, 0))
+        decimals = 0 if step >= 1 else 2
+        for x in xs:
+            device = self.mapFromScene(QPointF(x, rect.top()))
+            painter.drawText(device.x() + 3, 12,
+                             f"E {fmt.fmt(x, decimals)}")
+        for y in ys:
+            device = self.mapFromScene(QPointF(rect.left(), y))
+            painter.drawText(3, device.y() - 3,
+                             f"N {fmt.fmt(-y, decimals)}")
+        painter.restore()
+
+
+class _ColorPicker(QWidget):
+    """Botão de cor com opção de voltar ao padrão ('' = cor padrão)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.color = ""
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self.btn = QPushButton()
+        self.btn.setFixedSize(48, 22)
+        self.btn.clicked.connect(self._pick)
+        reset = QPushButton("Padrão")
+        reset.setToolTip("Volta à cor padrão (por tipo ou por rede).")
+        reset.clicked.connect(self._reset)
+        lay.addWidget(self.btn)
+        lay.addWidget(reset)
+        lay.addStretch(1)
+        self._update()
+
+    def set_color(self, color: str):
+        self.color = color or ""
+        self._update()
+
+    def _update(self):
+        if self.color:
+            self.btn.setStyleSheet(
+                f"background: {self.color}; border: 1px solid #666;")
+            self.btn.setText("")
+        else:
+            self.btn.setStyleSheet("")
+            self.btn.setText("auto")
+
+    def _pick(self):
+        initial = QColor(self.color) if self.color else QColor("#1f6fb2")
+        chosen = QColorDialog.getColor(initial, self, "Cor na planta")
+        if chosen.isValid():
+            self.color = chosen.name()
+            self._update()
+
+    def _reset(self):
+        self.color = ""
+        self._update()
 
 
 class PlanTab(QWidget):
@@ -216,9 +409,12 @@ class PlanTab(QWidget):
         toolbar = QHBoxLayout()
         self.mode_group = QButtonGroup(self)
 
-        def mode_button(text, mode, tip):
+        def mode_button(icon_kind, text, mode, tip):
             btn = QToolButton()
+            btn.setIcon(_make_icon(icon_kind))
+            btn.setIconSize(QSize(22, 22))
             btn.setText(text)
+            btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
             btn.setCheckable(True)
             btn.setToolTip(tip)
             btn.clicked.connect(lambda: self.set_mode(mode))
@@ -226,23 +422,52 @@ class PlanTab(QWidget):
             toolbar.addWidget(btn)
             return btn
 
+        def separator():
+            sep = QFrame()
+            sep.setFrameShape(QFrame.VLine)
+            sep.setFrameShadow(QFrame.Sunken)
+            toolbar.addWidget(sep)
+
+        # grupo navegação/seleção
         self.btn_select = mode_button(
-            "Selecionar", "select",
+            "select", "Selecionar", "select",
             "Clique para selecionar; arraste PVs para movê-los.")
-        self.btn_pan = mode_button("Pan", "pan", "Arraste para mover a vista.")
+        self.btn_pan = mode_button(
+            "pan", "Pan", "pan",
+            "Arraste para mover a vista (o botão do meio do mouse também "
+            "faz pan em qualquer modo).")
+        separator()
+        # grupo inserção
         self.btn_add_node = mode_button(
-            "Inserir PV", "add_node",
+            "node", "Inserir PV", "add_node",
             "Clique na planta para criar um nó do tipo escolhido ao lado.")
         self.node_type_combo = QComboBox()
         self.node_type_combo.addItems(NODE_TYPES)
         toolbar.addWidget(self.node_type_combo)
         self.btn_add_pipe = mode_button(
-            "Inserir Trecho", "add_pipe",
+            "pipe", "Inserir Trecho", "add_pipe",
             "Clique no nó de montante e depois no de jusante.")
-        self.btn_select.setChecked(True)
-        fit = QPushButton("Ajustar zoom")
+        separator()
+        # grupo vista/aparência
+        fit = QToolButton()
+        fit.setIcon(_make_icon("fit"))
+        fit.setIconSize(QSize(22, 22))
+        fit.setText("Ajustar zoom")
+        fit.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         fit.clicked.connect(self.fit_view)
         toolbar.addWidget(fit)
+        colors_btn = QToolButton()
+        colors_btn.setIcon(_make_icon("colors"))
+        colors_btn.setIconSize(QSize(22, 22))
+        colors_btn.setText("Cores das redes…")
+        colors_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        colors_btn.setToolTip(
+            "Define uma cor de trecho por nome de rede (ex.: coletor de "
+            "uma cor, interceptor de outra).")
+        colors_btn.clicked.connect(self.edit_network_colors)
+        toolbar.addWidget(colors_btn)
+
+        self.btn_select.setChecked(True)
         toolbar.addStretch(1)
         self.status = QLabel("")
         toolbar.addWidget(self.status)
@@ -292,6 +517,8 @@ class PlanTab(QWidget):
         form.addRow("Q pontual ini (l/s):", self.n_qini)
         form.addRow("Q pontual fim (l/s):", self.n_qfim)
         form.addRow("Rede:", self.n_network)
+        self.n_color = _ColorPicker()
+        form.addRow("Cor na planta:", self.n_color)
         v.addWidget(self.node_box)
 
         # --- formulário de trecho
@@ -319,6 +546,8 @@ class PlanTab(QWidget):
         form.addRow("Declividade (m/m):", self.p_slope)
         form.addRow("Zona:", self.p_zone)
         form.addRow("Rede:", self.p_network)
+        self.p_color = _ColorPicker()
+        form.addRow("Cor na planta:", self.p_color)
         v.addWidget(self.pipe_box)
 
         apply_btn = QPushButton("Aplicar alterações")
@@ -452,6 +681,43 @@ class PlanTab(QWidget):
         if reload_scene:
             self.load_from(self.project)
 
+    def edit_network_colors(self):
+        """Diálogo de cor por nome de rede (coletor, interceptor...)."""
+        networks = sorted({p.network or "" for p in self.project.pipes})
+        if not networks:
+            networks = [""]
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Cores das redes")
+        v = QVBoxLayout(dialog)
+        hint = QLabel("Cor dos trechos por nome de rede. 'auto' usa a cor "
+                      "padrão. A cor individual de um trecho (propriedades) "
+                      "tem prioridade sobre a da rede.")
+        hint.setWordWrap(True)
+        v.addWidget(hint)
+        form = QFormLayout()
+        pickers: dict[str, _ColorPicker] = {}
+        for net in networks:
+            picker = _ColorPicker()
+            picker.set_color(self.project.network_colors.get(net, ""))
+            pickers[net] = picker
+            form.addRow(f"Rede '{net}':" if net else "(trechos sem rede):",
+                        picker)
+        v.addLayout(form)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok
+                                   | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        v.addWidget(buttons)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        for net, picker in pickers.items():
+            if picker.color:
+                self.project.network_colors[net] = picker.color
+            else:
+                self.project.network_colors.pop(net, None)
+        for item in self._pipe_items.values():
+            item.update_geometry()
+
     # ------------------------------------------------------- menus de contexto
     def show_node_menu(self, item: NodeItem, screen_pos):
         menu = QMenu()
@@ -529,6 +795,7 @@ class PlanTab(QWidget):
             self.n_qini.setText(fmt.fmt_edit(node.q_point_start, 2))
             self.n_qfim.setText(fmt.fmt_edit(node.q_point_end, 2))
             self.n_network.setText(node.network)
+            self.n_color.set_color(node.color)
             self._show_node_results(node)
         elif pipe_item is not None:
             pipe = pipe_item.pipe
@@ -550,6 +817,7 @@ class PlanTab(QWidget):
             self.p_slope.setValue(pipe.slope)
             self.p_zone.setText(pipe.zone)
             self.p_network.setText(pipe.network)
+            self.p_color.set_color(pipe.color)
             self._show_pipe_results(pipe)
         else:
             self.sel_title.setText("Nada selecionado")
@@ -629,6 +897,7 @@ class PlanTab(QWidget):
             node.q_point_start = fmt.parse(self.n_qini.text())
             node.q_point_end = fmt.parse(self.n_qfim.text())
             node.network = self.n_network.text().strip()
+            node.color = self.n_color.color
             if new_name != old_name:
                 # os trechos referenciam o nó pelo nome: renomeia junto
                 for p in self.project.pipes:
@@ -646,6 +915,7 @@ class PlanTab(QWidget):
             pipe.slope = self.p_slope.value()
             pipe.zone = self.p_zone.text().strip()
             pipe.network = self.p_network.text().strip()
+            pipe.color = self.p_color.color
             pipe_item.refresh()
         else:
             return

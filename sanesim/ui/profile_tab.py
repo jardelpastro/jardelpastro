@@ -9,12 +9,14 @@ textos centralizados e tratamento de sobreposição.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QPointF
-from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPolygonF
-from PySide6.QtWidgets import (QComboBox, QFormLayout, QGraphicsScene,
-                               QGraphicsSimpleTextItem, QGraphicsView,
-                               QHBoxLayout, QLabel, QSpinBox, QVBoxLayout,
-                               QWidget)
+from PySide6.QtCore import Qt, QPointF, QRectF
+from PySide6.QtGui import (QBrush, QColor, QFont, QImage, QPageLayout,
+                           QPageSize, QPainter, QPdfWriter, QPen, QPolygonF)
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout,
+                               QGraphicsScene, QGraphicsSimpleTextItem,
+                               QGraphicsView, QHBoxLayout, QLabel,
+                               QMessageBox, QPushButton, QSpinBox,
+                               QVBoxLayout, QWidget)
 
 from ..core import fmt
 from ..core.models import Project
@@ -101,6 +103,11 @@ class ProfileTab(QWidget):
         scales.addRow("Escala horizontal:", self.scale_h)
         scales.addRow("Escala vertical:", self.scale_v)
         controls.addLayout(scales)
+        export_btn = QPushButton("Exportar perfil…")
+        export_btn.setToolTip("Exporta o perfil atual para PDF (A3 "
+                              "paisagem) ou imagem PNG.")
+        export_btn.clicked.connect(self._export_dialog)
+        controls.addWidget(export_btn)
         layout.addLayout(controls)
 
         self.hint = QLabel("Rode a simulação para desenhar o perfil. "
@@ -126,6 +133,61 @@ class ProfileTab(QWidget):
         if self._paths:
             self.path_combo.setCurrentIndex(0)
         self._redraw()
+
+    # ------------------------------------------------------- exportação
+    def _export_dialog(self):
+        if not self._paths:
+            QMessageBox.information(self, "Perfil", "Rode a simulação "
+                                    "antes de exportar o perfil.")
+            return
+        path, selected = QFileDialog.getSaveFileName(
+            self, "Exportar perfil", "perfil.pdf",
+            "PDF A3 paisagem (*.pdf);;Imagem PNG (*.png)")
+        if not path:
+            return
+        try:
+            if path.lower().endswith(".png"):
+                self.export_png(path)
+            else:
+                self.export_pdf(path)
+        except Exception as exc:
+            QMessageBox.critical(self, "Erro ao exportar",
+                                 f"Não foi possível exportar:\n{exc}")
+            return
+        QMessageBox.information(self, "Perfil", f"Perfil exportado:\n{path}")
+
+    def export_png(self, path: str, scale: float = 2.0):
+        """Exporta a cena atual do perfil como imagem PNG."""
+        rect = self.scene.sceneRect()
+        image = QImage(int(rect.width() * scale),
+                       int(rect.height() * scale),
+                       QImage.Format_ARGB32)
+        image.fill(Qt.white)
+        painter = QPainter(image)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.TextAntialiasing)
+        self.scene.render(painter, QRectF(image.rect()), rect)
+        painter.end()
+        if not image.save(path):
+            raise OSError(f"falha ao gravar {path}")
+
+    def export_pdf(self, path: str):
+        """Exporta a cena atual do perfil em PDF A3 paisagem."""
+        writer = QPdfWriter(path)
+        writer.setPageSize(QPageSize(QPageSize.A3))
+        writer.setPageOrientation(QPageLayout.Landscape)
+        writer.setResolution(300)
+        painter = QPainter(writer)
+        painter.setRenderHint(QPainter.Antialiasing)
+        rect = self.scene.sceneRect()
+        page = QRectF(0, 0, writer.width(), writer.height())
+        # ajusta mantendo a proporção do desenho
+        ratio = min(page.width() / rect.width(),
+                    page.height() / rect.height())
+        target = QRectF(0, 0, rect.width() * ratio, rect.height() * ratio)
+        target.moveCenter(page.center())
+        self.scene.render(painter, target, rect)
+        painter.end()
 
     # ---------------------------------------------------------- helpers
     def _make_text(self, text: str, size: float,
@@ -313,17 +375,20 @@ class ProfileTab(QWidget):
                    size=8, bold=True, center_x=True, center_y=True)
 
         band_top = y_grid_bot + BANDS_GAP
+        # ticks: "pvs" = só nos PVs (textos horizontais/acumulada);
+        # "stations" = a cada 20 m; None = sem ticks (textos centralizados)
         band_defs = [
-            ("Distâncias (m)", 62, self._band_distances),
-            ("Cota terreno (m)", 56, self._band_ground),
-            ("Cota coletor GI (m)", 56, self._band_invert),
-            ("Profundidade (m)", 56, self._band_depth),
-            ("Declividade (m/m)", 24, self._band_slope),
-            ("Material / Vazão", 24, self._band_material),
+            ("Distâncias (m)", 62, self._band_distances, "pvs"),
+            ("Cota terreno (m)", 56, self._band_ground, "stations"),
+            ("Cota coletor GI (m)", 56, self._band_invert, "stations"),
+            ("Profundidade (m)", 56, self._band_depth, "stations"),
+            ("Declividade (m/m)", 24, self._band_slope, None),
+            ("Material / Vazão", 24, self._band_material, None),
         ]
         stations = self._stations(total)
+        pv_xs = self._pv_xs(segments)
         y0 = band_top
-        for label, height, renderer in band_defs:
+        for label, height, renderer, ticks in band_defs:
             y1 = y0 + height
             self.scene.addRect(X(0), y0, X(total), height, pen_border)
             item = self._make_text(label, 7, bold=True)
@@ -331,21 +396,23 @@ class ProfileTab(QWidget):
             item.setPos(X(0) - br.width() - 10,
                         (y0 + y1) / 2 - br.height() / 2)
             self.scene.addItem(item)
-            # ticks nas estacas de 20 em 20 m (topo e base da banda)
-            for x_st in stations:
-                self.scene.addLine(X(x_st), y0, X(x_st), y0 + TICK,
+            tick_xs = (stations if ticks == "stations"
+                       else pv_xs if ticks == "pvs" else [])
+            for x_t in tick_xs:
+                self.scene.addLine(X(x_t), y0, X(x_t), y0 + TICK,
                                    pen_border)
-                self.scene.addLine(X(x_st), y1 - TICK, X(x_st), y1,
+                self.scene.addLine(X(x_t), y1 - TICK, X(x_t), y1,
                                    pen_border)
             renderer(segments, X, y0, y1, total)
             y0 = y1
         bands_bottom = y0
 
-        # linhas de chamada dos PVs (atravessam perfil e bandas)
+        # linhas de chamada dos PVs: terminam no topo das bandas para não
+        # riscar os textos dos PVs dentro delas
         pen_pv = QPen(_PV, 0, Qt.DashLine)
         pen_pv.setCosmetic(True)
         for x_pv, ground, _name in pv_positions:
-            self.scene.addLine(X(x_pv), Y(ground), X(x_pv), bands_bottom,
+            self.scene.addLine(X(x_pv), Y(ground), X(x_pv), band_top,
                                pen_pv)
 
         # ------------------------------------------------ títulos e eixos
