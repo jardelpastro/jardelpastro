@@ -12,10 +12,12 @@ from PySide6.QtWidgets import (QFileDialog, QMainWindow, QMessageBox,
 
 from ..core.memorial import export_memorial
 from ..core.models import Project
-from ..core.ose import export_ose
+from ..core.ose import OseError, export_oses
 from ..core.simulation import SimulationError, simulate
 from .criteria_tabs import CalcTab, CriteriaTab, DesignTab
 from .network_tabs import MaterialsTab, NodesTab, PipesTab
+from .ose_tab import OseTab
+from .profile_tab import ProfileTab
 from .results_tab import ResultsTab
 
 
@@ -36,6 +38,9 @@ class MainWindow(QMainWindow):
         self.pipes_tab = PipesTab()
         self.materials_tab = MaterialsTab()
         self.results_tab = ResultsTab()
+        self.ose_tab = OseTab()
+        self.ose_tab.result_provider = lambda: self.last_result
+        self.profile_tab = ProfileTab()
         self.tabs.addTab(self.criteria_tab, "1. Critérios de Projeto")
         self.tabs.addTab(self.design_tab, "2. Dimensionamento")
         self.tabs.addTab(self.calc_tab, "3. Método de Cálculo")
@@ -43,6 +48,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.pipes_tab, "5. Trechos")
         self.tabs.addTab(self.materials_tab, "6. Materiais e Tubos")
         self.tabs.addTab(self.results_tab, "7. Resultados")
+        self.tabs.addTab(self.ose_tab, "8. OSEs")
+        self.tabs.addTab(self.profile_tab, "9. Perfil")
         self.setCentralWidget(self.tabs)
 
         self._build_toolbar()
@@ -74,8 +81,9 @@ class MainWindow(QMainWindow):
                "Roda a simulação com os dados atuais (de qualquer aba).")
         action("Exportar Memorial…", self.export_memorial, "Ctrl+E",
                "Gera o memorial de cálculo em Excel (.xlsx).")
-        action("Exportar OSE…", self.export_ose, "Ctrl+Shift+E",
-               "Gera a planilha da OSE (estaqueamento a cada 20 m).")
+        action("Exportar OSEs…", self.export_ose, "Ctrl+Shift+E",
+               "Gera as OSEs do projeto (uma folha por OSE, estaqueamento "
+               "a cada 20 m).")
 
     # ------------------------------------------------------------------
     def _load_all(self):
@@ -85,6 +93,7 @@ class MainWindow(QMainWindow):
         self.nodes_tab.load_from(self.project)
         self.pipes_tab.load_from(self.project)
         self.materials_tab.load_from(self.project)
+        self.ose_tab.load_from(self.project)
 
     def _apply_all(self):
         # o catálogo primeiro: os combos de material dependem dele
@@ -94,6 +103,7 @@ class MainWindow(QMainWindow):
         self.calc_tab.apply_to(self.project)
         self.nodes_tab.apply_to(self.project)
         self.pipes_tab.apply_to(self.project)
+        self.ose_tab.apply_to(self.project)
 
     # ------------------------------------------------------------------
     def new_project(self):
@@ -145,7 +155,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Simulação", str(exc))
             return
         self.results_tab.show_result(self.last_result)
-        self.tabs.setCurrentWidget(self.results_tab)
+        self.ose_tab._refresh_preview()
+        self.profile_tab.show_result(self.project, self.last_result)
+        if self.tabs.currentWidget() not in (self.ose_tab,
+                                             self.profile_tab):
+            self.tabs.setCurrentWidget(self.results_tab)
         n_viol = sum(1 for r in self.last_result.pipes if r.violations)
         if n_viol:
             self.statusBar().showMessage(
@@ -177,15 +191,27 @@ class MainWindow(QMainWindow):
             self.run_simulation()
             if self.last_result is None:
                 return
+        self._apply_all()
+        if not self.project.oses:
+            created = self.project.ensure_oses()
+            if created:
+                self.ose_tab.load_from(self.project)
+                self.statusBar().showMessage(
+                    f"{created} OSE(s) gerada(s) automaticamente — revise "
+                    "os dados na aba OSEs.")
         path, _ = QFileDialog.getSaveFileName(
-            self, "Exportar planilha da OSE", "ose_planilha.xlsx",
+            self, "Exportar OSEs (uma folha por OSE)", "oses.xlsx",
             "Planilha Excel (*.xlsx)")
         if not path:
             return
         try:
-            export_ose(self.project, self.last_result, path)
+            export_oses(self.project, self.last_result, path)
+        except OseError as exc:
+            QMessageBox.warning(self, "OSEs", str(exc))
+            return
         except Exception as exc:
             QMessageBox.critical(self, "Erro ao exportar",
-                                 f"Não foi possível gravar a OSE:\n{exc}")
+                                 f"Não foi possível gravar as OSEs:\n{exc}")
             return
-        self.statusBar().showMessage(f"Planilha da OSE exportada: {path}")
+        self.statusBar().showMessage(
+            f"{len(self.project.oses)} OSE(s) exportada(s): {path}")

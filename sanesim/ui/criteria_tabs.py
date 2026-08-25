@@ -64,14 +64,24 @@ class CriteriaTab(QWidget):
                           "influência)")
         zlayout = QVBoxLayout(zones)
         zhint = QLabel(
-            "Os critérios acima formam a zona global (trechos sem zona). "
-            "Cadastre aqui regiões com ocupação diferente — ex.: região "
-            "nobre com consumo maior, região verticalizada com alta "
-            "densidade — e atribua a chave da zona aos trechos na aba "
-            "Trechos. A população de cada zona é rateada apenas pela "
-            "extensão dos trechos dela (K1/K2 globais).")
+            "Cadastre regiões com ocupação diferente — ex.: região nobre "
+            "com consumo maior, região verticalizada com alta densidade — "
+            "e atribua a chave da zona aos trechos na aba Trechos. A "
+            "população de cada zona é rateada apenas pela extensão dos "
+            "trechos dela (K1/K2 globais).")
         zhint.setWordWrap(True)
         zlayout.addWidget(zhint)
+        self.zones_included = QCheckBox(
+            "As populações das zonas já fazem parte da população global "
+            "(descontar do rateio dos trechos sem zona)")
+        self.zones_included.setChecked(True)
+        self.zones_included.setToolTip(
+            "Marcado (padrão): você informa a população TOTAL do projeto "
+            "acima e as zonas indicam onde parte dela está concentrada — "
+            "o rateio global distribui apenas o restante nos trechos sem "
+            "zona.\nDesmarcado: as populações das zonas são somadas à "
+            "população global (contribuição adicional).")
+        zlayout.addWidget(self.zones_included)
         self.zones_table = QTableWidget(0, 10)
         self.zones_table.setHorizontalHeaderLabels(
             ["Zona", "Descrição", "Pop. Ini\n(hab)", "Pop. Fim\n(hab)",
@@ -192,6 +202,7 @@ class CriteriaTab(QWidget):
         self.auto_rate.setChecked(c.auto_linear_rate)
         self.rate_start.setValue(c.linear_rate_start)
         self.rate_end.setValue(c.linear_rate_end)
+        self.zones_included.setChecked(c.zones_included_in_global)
         self.zones_table.setRowCount(0)
         for zone in c.zones:
             self._add_zone_row(zone)
@@ -211,6 +222,7 @@ class CriteriaTab(QWidget):
         c.linear_rate_start = self.rate_start.value()
         c.linear_rate_end = self.rate_end.value()
         c.zones = self._zones_from_table()
+        c.zones_included_in_global = self.zones_included.isChecked()
 
 
 class DesignTab(QWidget):

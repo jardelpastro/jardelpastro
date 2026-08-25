@@ -13,7 +13,7 @@ NODE_TYPES = ["PV", "TIL", "TL", "CP", "TQ", "EEE", "Lançamento"]
 
 # Versão do esquema do arquivo de projeto (.json). Incrementar a cada
 # mudança incompatível e tratar a migração em Project.from_dict.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def new_id() -> str:
@@ -90,6 +90,11 @@ class ProjectCriteria:
     linear_rate_start: float = 0.0   # L/s.km (manual, se auto=False)
     linear_rate_end: float = 0.0     # L/s.km (manual, se auto=False)
     zones: list[ContributionZone] = field(default_factory=list)
+    # True (padrão): a população das zonas JÁ faz parte da população
+    # global — o rateio global desconta a soma das populações das zonas e
+    # distribui o restante nos trechos sem zona. False: as populações das
+    # zonas são adicionais à global.
+    zones_included_in_global: bool = True
 
     def zone_by_key(self, key: str) -> ContributionZone | None:
         for z in self.zones:
@@ -97,22 +102,37 @@ class ProjectCriteria:
                 return z
         return None
 
-    def rate_start(self, total_length_km: float) -> float:
-        """Taxa de contribuição linear inicial (L/s.km), Qmax = K2.Qmed."""
+    def zone_population_start(self) -> float:
+        return sum(z.population_start for z in self.zones)
+
+    def zone_population_end(self) -> float:
+        return sum(z.population_end for z in self.zones)
+
+    def rate_start(self, total_length_km: float,
+                   pop_deduction: float = 0.0) -> float:
+        """Taxa de contribuição linear inicial (L/s.km), Qmax = K2.Qmed.
+
+        pop_deduction: população já contabilizada nas zonas (descontada do
+        rateio global quando zones_included_in_global=True).
+        """
         if not self.auto_linear_rate:
             return self.linear_rate_start
         if total_length_km <= 0:
             return 0.0
-        return self.start.k2 * self.start.qmed_lps() / total_length_km
+        pop = max(0.0, self.start.population - pop_deduction)
+        qmed = self.start.return_coef * pop * self.start.per_capita / 86400.0
+        return self.start.k2 * qmed / total_length_km
 
-    def rate_end(self, total_length_km: float) -> float:
+    def rate_end(self, total_length_km: float,
+                 pop_deduction: float = 0.0) -> float:
         """Taxa de contribuição linear final (L/s.km), Qmax = K1.K2.Qmed."""
         if not self.auto_linear_rate:
             return self.linear_rate_end
         if total_length_km <= 0:
             return 0.0
-        return (self.end.k1 * self.end.k2 * self.end.qmed_lps()
-                / total_length_km)
+        pop = max(0.0, self.end.population - pop_deduction)
+        qmed = self.end.return_coef * pop * self.end.per_capita / 86400.0
+        return self.end.k1 * self.end.k2 * qmed / total_length_km
 
 
 @dataclass
@@ -179,14 +199,54 @@ class Pipe:
 
 
 @dataclass
+class ProjectInfo:
+    """Informações gerais do projeto (usadas como padrão nas OSEs)."""
+    city: str = ""
+    system: str = ""          # nome do sistema (ex.: SES Campo Largo)
+    designer: str = ""        # responsável técnico
+    registration: str = ""    # CREA/registro
+    client: str = ""          # contratante/concessionária
+
+
+@dataclass
+class OseSheet:
+    """Uma Ordem de Serviço para Execução (OSE).
+
+    Agrupa um conjunto de trechos (por id estável) e carrega os dados
+    NÃO hidráulicos, editáveis pelo usuário: ruas, número, observações,
+    responsáveis e o gabarito da régua (ajustável por OSE — redes muito
+    profundas podem exigir régua maior). É a MESMA entidade que a futura
+    planta e o perfil usarão: alterar aqui altera lá, e vice-versa.
+    """
+    number: str = ""              # número da O.S.E.
+    street: str = ""              # rua
+    side: str = ""                # lado (esquerdo/direito/eixo)
+    between_street: str = ""      # entre rua...
+    and_street: str = ""          # ...e rua
+    city: str = ""                # cidade ("" = usa a do projeto)
+    location: str = ""            # locação
+    cadastre_sheet: str = ""      # número da folha de cadastro
+    gauge_height: float = 3.0     # gabarito da régua/cruzeta (m)
+    observations: str = ""        # observações gerais da OSE
+    resp_proposal: str = ""       # proposição
+    resp_approval: str = ""       # aprovação
+    resp_release: str = ""        # liberação para execução
+    resp_execution: str = ""      # execução/cadastramento
+    pipe_ids: list[str] = field(default_factory=list)  # trechos (ids)
+    id: str = field(default_factory=new_id)
+
+
+@dataclass
 class Project:
     title: str = "Projeto sem título"
+    info: ProjectInfo = field(default_factory=ProjectInfo)
     criteria: ProjectCriteria = field(default_factory=ProjectCriteria)
     design: DesignCriteria = field(default_factory=DesignCriteria)
     options: CalcOptions = field(default_factory=CalcOptions)
     nodes: list[Node] = field(default_factory=list)
     pipes: list[Pipe] = field(default_factory=list)
     catalog: list[Material] = field(default_factory=default_catalog)
+    oses: list[OseSheet] = field(default_factory=list)
 
     # ------------------------------------------------------------------
     def node_by_name(self, name: str) -> Node | None:
@@ -194,6 +254,35 @@ class Project:
             if n.name == name:
                 return n
         return None
+
+    def pipe_by_id(self, pipe_id: str) -> Pipe | None:
+        for p in self.pipes:
+            if p.id == pipe_id:
+                return p
+        return None
+
+    def ensure_oses(self) -> int:
+        """Cria OSEs para trechos ainda não cobertos (uma por rede).
+
+        Retorna quantas OSEs foram criadas. Não altera OSEs existentes.
+        """
+        covered = {pid for ose in self.oses for pid in ose.pipe_ids}
+        by_network: dict[str, list[str]] = {}
+        for p in self.pipes:
+            if p.id in covered:
+                continue
+            net = p.network or "Geral"
+            by_network.setdefault(net, []).append(p.id)
+        created = 0
+        for net, pipe_ids in by_network.items():
+            created += 1
+            self.oses.append(OseSheet(
+                number=str(len(self.oses) + 1),
+                city=self.info.city,
+                observations="",
+                pipe_ids=pipe_ids,
+            ))
+        return created
 
     def pipe_length(self, pipe: Pipe) -> float:
         """Extensão informada ou calculada pelas coordenadas dos nós."""
@@ -214,12 +303,14 @@ class Project:
         return {
             "schema_version": SCHEMA_VERSION,
             "title": self.title,
+            "info": asdict(self.info),
             "criteria": asdict(self.criteria),
             "design": asdict(self.design),
             "options": asdict(self.options),
             "nodes": [asdict(n) for n in self.nodes],
             "pipes": [asdict(p) for p in self.pipes],
             "catalog": [m.to_dict() for m in self.catalog],
+            "oses": [asdict(o) for o in self.oses],
         }
 
     @staticmethod
@@ -234,6 +325,7 @@ class Project:
         zones = [ContributionZone(**z) for z in crit.get("zones", [])]
         proj = Project(
             title=d.get("title", "Projeto sem título"),
+            info=ProjectInfo(**d.get("info", {})),
             criteria=ProjectCriteria(
                 start=PlanCriteria(**crit.get("start", {})),
                 end=PlanCriteria(**crit.get("end", {})),
@@ -248,6 +340,7 @@ class Project:
         )
         if d.get("catalog"):
             proj.catalog = [Material.from_dict(m) for m in d["catalog"]]
+        proj.oses = [OseSheet(**o) for o in d.get("oses", [])]
         # migração v1 -> v2: garante ids estáveis em nós e trechos
         for n in proj.nodes:
             if not n.id:

@@ -32,21 +32,52 @@ def zoned_project() -> Project:
     return proj
 
 
-def test_zone_rate_differs_from_global():
+def test_zone_population_included_in_global_by_default():
+    """Padrão: a população da zona É parte da global (desconto no rateio).
+
+    Global 1000 hab com zona de 2000 hab -> o rateio global fica com
+    max(0, 1000-2000) = 0 hab (e a simulação avisa o excesso).
+    """
     proj = zoned_project()
+    assert proj.criteria.zones_included_in_global is True
     res = simulate(proj)
     t1, t2 = res.pipes
-    # global: pop 1000 rateada só na extensão sem zona (100 m)
-    qmed_g = 0.8 * 1000 * 150 / 86400
-    rate_g = 1.5 * qmed_g / 0.1 + 0.1
-    assert t1.rate_start == pytest.approx(rate_g, rel=1e-9)
+    # global zerado (só infiltração), pois a zona concentra mais que o total
+    assert t1.rate_start == pytest.approx(0.1, rel=1e-9)
+    assert any("excede" in m for m in res.messages)
     # Z1: pop 2000, q=200, C=0,85 rateada nos 100 m da zona
     qmed_z = 0.85 * 2000 * 200 / 86400
     rate_z = 1.5 * qmed_z / 0.1 + 0.1
     assert t2.rate_start == pytest.approx(rate_z, rel=1e-9)
-    assert t2.rate_start > t1.rate_start
     assert t2.zone == "Z1"
     assert res.zone_rates["Z1"][0] == pytest.approx(rate_z, rel=1e-9)
+
+
+def test_zone_population_discount():
+    """Global 5000 hab, zona concentra 2000 -> restante 3000 fora da zona."""
+    proj = zoned_project()
+    proj.criteria.start.population = 5000
+    proj.criteria.end.population = 6000
+    res = simulate(proj)
+    t1 = res.pipes[0]
+    qmed_g = 0.8 * (5000 - 2000) * 150 / 86400
+    rate_g = 1.5 * qmed_g / 0.1 + 0.1
+    assert t1.rate_start == pytest.approx(rate_g, rel=1e-9)
+    assert not any("excede" in m for m in res.messages)
+
+
+def test_zone_population_additional_mode():
+    """zones_included_in_global=False: zona é contribuição adicional."""
+    proj = zoned_project()
+    proj.criteria.zones_included_in_global = False
+    res = simulate(proj)
+    t1, t2 = res.pipes
+    qmed_g = 0.8 * 1000 * 150 / 86400
+    rate_g = 1.5 * qmed_g / 0.1 + 0.1
+    assert t1.rate_start == pytest.approx(rate_g, rel=1e-9)
+    qmed_z = 0.85 * 2000 * 200 / 86400
+    rate_z = 1.5 * qmed_z / 0.1 + 0.1
+    assert t2.rate_start == pytest.approx(rate_z, rel=1e-9)
 
 
 def test_zone_accumulation_continues_downstream():

@@ -10,7 +10,7 @@ import sys
 
 from .core.memorial import export_memorial
 from .core.models import Project
-from .core.ose import export_ose
+from .core.ose import export_oses
 from .core.simulation import SimulationError, simulate
 
 
@@ -51,8 +51,12 @@ def main(argv: list[str] | None = None) -> int:
     export_memorial(project, result, args.output)
     print(f"Memorial gravado em: {args.output}")
     if args.ose:
-        export_ose(project, result, args.ose)
-        print(f"Planilha da OSE gravada em: {args.ose}")
+        created = 0 if project.oses else project.ensure_oses()
+        if created:
+            print(f"{created} OSE(s) gerada(s) automaticamente (uma por "
+                  "rede) — edite os dados na aba OSEs.")
+        export_oses(project, result, args.ose)
+        print(f"{len(project.oses)} OSE(s) gravada(s) em: {args.ose}")
     return 0
 
 

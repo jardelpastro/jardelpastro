@@ -33,7 +33,11 @@ aba**, sem precisar passar por todas:
    áreas de influência): regiões com população, per capita e C próprios,
    rateados apenas pela extensão dos trechos atribuídos à zona — para
    redes que atravessam regiões de ocupação diferente (região nobre,
-   região verticalizada etc.).
+   região verticalizada etc.). Por padrão, a população das zonas **já é
+   parte da população global** (você informa o total do projeto e as
+   zonas indicam onde ele está concentrado; o rateio global distribui o
+   restante nos trechos sem zona) — um checkbox permite tratá-las como
+   contribuição adicional.
 2. **Dimensionamento** — vazão mínima, DN mínimo, recobrimento mínimo
    (rua e passeio), profundidade máxima, tensão trativa mínima,
    velocidades mínima/máxima, lâmina máxima (y/D), declividades
@@ -54,6 +58,23 @@ aba**, sem precisar passar por todas:
 7. **Resultados** — planilha no padrão do memorial (duas linhas por
    trecho: montante/jusante e início/fim de plano), com violações de
    critério destacadas em vermelho.
+8. **OSEs** — as OSEs são entidades do projeto (a planta e o perfil usam
+   as mesmas: alterar aqui reflete lá). Cada OSE agrupa trechos e carrega
+   os dados **não hidráulicos, editáveis**: número, locação, folha de
+   cadastro, cidade, rua, lado, entre/e rua, observações, responsáveis
+   (proposição, aprovação, liberação, execução) e o **gabarito da régua
+   ajustável por OSE** (redes profundas podem exigir régua maior). A aba
+   mostra a **prévia da planilha** de estaqueamento em tempo real e o
+   botão "Gerar p/ trechos sem OSE" cria OSEs automaticamente (uma por
+   rede). Informações do projeto (cidade, sistema, responsável técnico)
+   servem de padrão.
+9. **Perfil** — perfil longitudinal desenhado **sempre de montante
+   (esquerda) para jusante (direita)**, com terreno, tubo (geratrizes
+   inferior e superior), **lâmina d'água calculada de fim de plano
+   preenchida em azul dentro do tubo**, PVs com cotas (CT/CF), rótulos
+   por trecho (DN, I, y/D, V), régua de estaqueamento e exagero vertical
+   configurável; zoom com a roda do mouse. Caminhos por OSE (um por
+   ramal contínuo) ou por cabeceira da rede.
 
 ## Metodologia de cálculo (NBR 9649)
 
@@ -80,11 +101,14 @@ aba**, sem precisar passar por todas:
 
 `Exportar Memorial` gera um `.xlsx` com as abas **Capa** (critérios e
 zonas), **Trechos**, **Nós**, **Dimensionamento** e **Resultados** — no
-mesmo layout do memorial modelo. `Exportar OSE` gera a planilha da Ordem
-de Serviço para Execução (estilo folha 3 do modelo SANEPAR): um bloco por
-trecho com estaqueamento a cada 20 m — distâncias, cota do terreno
-(interpolada linearmente entre PVs), cota da geratriz inferior, altura e
-bordo da régua (gabarito 3,00 m), profundidade da vala e recobrimento.
+mesmo layout do memorial modelo. `Exportar OSEs` gera **uma folha por
+OSE** no formato do modelo SANEPAR (folha 3): cabeçalho com número da
+O.S.E., locação e folha de cadastro; identificação de cidade, rua, lado,
+extensão, diâmetro e material; estaqueamento a cada 20 m contínuo por
+ramal — distâncias, cota do terreno (interpolada linearmente entre PVs),
+declividade, cota da geratriz inferior, régua (gabarito ajustável por
+OSE), profundidade da vala e recobrimento; observações e bloco de
+assinaturas (proposição/aprovação/liberação/execução).
 
 Números são exibidos no padrão brasileiro (ponto de milhar e vírgula
 decimal) na interface, e no Excel via formato nativo (`#.##0,00`), que
@@ -123,8 +147,9 @@ examples/            # projeto de exemplo
 - [x] Motor de cálculo + memorial em Excel
 - [x] Interface com abas e simulação de qualquer aba
 - [x] Zonas de contribuição (adensamento / áreas de influência)
-- [x] Planilha da OSE (folha 3 do modelo — estaqueamento a cada 20 m)
-- [ ] Perfil longitudinal (folha 1) — desenho terreno × coletor
+- [x] OSEs editáveis no programa + exportação no formato do modelo
+- [x] Perfil longitudinal na tela, com lâmina d'água calculada
+- [ ] Exportação do perfil (folha 1 da OSE) para Excel/PDF/DXF
 - [ ] Planta da rede (folha 2) + interpolação de curvas de nível
 - [ ] Editor gráfico com mouse: inserir PVs/estruturas clicando na tela,
       botão direito para editar propriedades, botão esquerdo para

@@ -1,6 +1,13 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "title": "Exemplo — Loteamento Jardim das Águas",
+  "info": {
+    "city": "Campo Largo",
+    "system": "SES Jardim das Águas",
+    "designer": "Eng. Responsável",
+    "registration": "",
+    "client": ""
+  },
   "criteria": {
     "start": {
       "population": 3500,
@@ -35,7 +42,8 @@
         "rate_start_manual": 0.0,
         "rate_end_manual": 0.0
       }
-    ]
+    ],
+    "zones_included_in_global": true
   },
   "design": {
     "min_flow_lps": 1.5,
@@ -375,6 +383,34 @@
       "wall_mm": 8.0,
       "notes": "Travessias, trechos com alta carga externa ou pressão.",
       "enabled": true
+    }
+  ],
+  "oses": [
+    {
+      "number": "142",
+      "street": "RUA DAS ÁGUAS",
+      "side": "ESQUERDO",
+      "between_street": "RUA A",
+      "and_street": "RUA B",
+      "city": "Campo Largo",
+      "location": "Jardim das Águas",
+      "cadastre_sheet": "12",
+      "gauge_height": 3.0,
+      "observations": "Escoramento contínuo nos trechos com profundidade > 3,0 m.",
+      "resp_proposal": "",
+      "resp_approval": "",
+      "resp_release": "",
+      "resp_execution": "",
+      "pipe_ids": [
+        "556974db",
+        "d3df0596",
+        "aa53b505",
+        "38c9e7ae",
+        "126155bc",
+        "ee7aaad2",
+        "ff5e1c18"
+      ],
+      "id": "8f8c5809"
     }
   ]
 }

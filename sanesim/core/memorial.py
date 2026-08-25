@@ -134,6 +134,12 @@ def export_memorial(project: Project, result: SimulationResult,
                 value="Zonas de Contribuição (adensamento)").font = \
             Font(bold=True)
         row += 1
+        note = ("Populações das zonas descontadas da global (o rateio "
+                "global usa apenas a população restante)"
+                if c.zones_included_in_global else
+                "Populações das zonas ADICIONAIS à população global")
+        ws.cell(row=row, column=1, value=note).font = _CELL_FONT
+        row += 1
         for col, label in enumerate(
                 ["Zona", "Descrição", "Pop. Ini (hab)", "Pop. Fim (hab)",
                  "q Ini (l/hab.dia)", "q Fim (l/hab.dia)", "C",

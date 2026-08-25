@@ -184,8 +184,26 @@ def simulate(project: Project) -> SimulationResult:
         else:
             global_length_km += lk
 
-    global_rate_start = crit.rate_start(global_length_km)
-    global_rate_end = crit.rate_end(global_length_km)
+    # Quando as populações das zonas já fazem parte da população global
+    # (padrão), o rateio global desconta essa parcela e distribui apenas
+    # o restante nos trechos sem zona.
+    pop_ded_start = pop_ded_end = 0.0
+    if crit.zones_included_in_global and crit.zones:
+        pop_ded_start = crit.zone_population_start()
+        pop_ded_end = crit.zone_population_end()
+        if pop_ded_start > crit.start.population + 1e-9:
+            res.messages.append(
+                f"Soma das populações iniciais das zonas "
+                f"({pop_ded_start:.0f} hab) excede a população global "
+                f"({crit.start.population:.0f} hab).")
+        if pop_ded_end > crit.end.population + 1e-9:
+            res.messages.append(
+                f"Soma das populações finais das zonas "
+                f"({pop_ded_end:.0f} hab) excede a população global "
+                f"({crit.end.population:.0f} hab).")
+
+    global_rate_start = crit.rate_start(global_length_km, pop_ded_start)
+    global_rate_end = crit.rate_end(global_length_km, pop_ded_end)
     res.rate_start = global_rate_start + crit.infiltration_rate
     res.rate_end = global_rate_end + crit.infiltration_rate
 
