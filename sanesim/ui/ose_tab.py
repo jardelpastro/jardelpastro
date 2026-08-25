@@ -1,23 +1,258 @@
-"""Aba OSEs: criação, edição dos dados não hidráulicos e prévia da planilha.
+"""Aba OSEs: prévia editável no formato da folha exportada.
 
-Os campos aqui editados (número, ruas, observações, responsáveis, régua)
-pertencem à entidade OseSheet do projeto — a mesma que a planta e o
-perfil usam. Alterar aqui reflete em todas as vistas e na exportação.
+A prévia (painel direito) reproduz a "cara" da OSE exportada e os campos
+não hidráulicos são editados ali mesmo, clicando no campo: número,
+locação, folha de cadastro, cidade, rua, lado, entre/e rua, observações
+e responsáveis. Os três painéis (lista | parâmetros | prévia) são
+redimensionáveis arrastando os divisores.
 """
 
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QDoubleSpinBox, QFormLayout, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QPlainTextEdit, QPushButton,
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (QDoubleSpinBox, QFormLayout, QFrame,
+                               QGridLayout, QGroupBox, QHBoxLayout, QLabel,
+                               QLineEdit, QListWidget, QListWidgetItem,
+                               QPlainTextEdit, QPushButton, QScrollArea,
                                QSplitter, QTableWidget, QTableWidgetItem,
                                QVBoxLayout, QWidget)
 
 from ..core import fmt
 from ..core.models import OseSheet, Project
 from ..core.ose import HEADERS as OSE_HEADERS
-from ..core.ose import build_ose_rows
+from ..core.ose import build_ose_rows, ose_pipe_results
+
+
+class _SheetField(QLineEdit):
+    """Campo editável com aparência de campo de formulário impresso."""
+
+    def __init__(self, placeholder: str = ""):
+        super().__init__()
+        self.setPlaceholderText(placeholder)
+        self.setStyleSheet(
+            "QLineEdit { background: #fffef5; border: 1px solid #b0b0b0; "
+            "padding: 1px 4px; }")
+
+
+def _boxed(widget: QWidget) -> QFrame:
+    frame = QFrame()
+    frame.setFrameShape(QFrame.Box)
+    frame.setLineWidth(1)
+    lay = QVBoxLayout(frame)
+    lay.setContentsMargins(4, 2, 4, 2)
+    lay.addWidget(widget)
+    return frame
+
+
+class OsePreview(QWidget):
+    """Folha da OSE: cabeçalho e assinaturas editáveis + planilha."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("OsePreview { background: white; }")
+        self.setAutoFillBackground(True)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(14, 10, 14, 10)
+
+        # linha 1: número / locação / folha de cadastro
+        top = QGridLayout()
+        self.f_number = _SheetField()
+        self.f_location = _SheetField()
+        self.f_cadastre = _SheetField()
+        for col, (label, widget) in enumerate(
+                [("Número da O.S.E.", self.f_number),
+                 ("Locação", self.f_location),
+                 ("Número da Folha de Cadastro", self.f_cadastre)]):
+            cell = QWidget()
+            v = QVBoxLayout(cell)
+            v.setContentsMargins(2, 0, 2, 0)
+            lab = QLabel(label)
+            lab.setAlignment(Qt.AlignCenter)
+            font = lab.font()
+            font.setBold(True)
+            font.setPointSize(8)
+            lab.setFont(font)
+            v.addWidget(lab)
+            v.addWidget(widget)
+            top.addWidget(_boxed(cell), 0, col)
+        outer.addLayout(top)
+
+        # título
+        self.title_label = QLabel("ORDEM DE SERVIÇO PARA EXECUÇÃO")
+        self.title_label.setAlignment(Qt.AlignCenter)
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(13)
+        self.title_label.setFont(font)
+        outer.addWidget(self.title_label)
+        self.system_label = QLabel("")
+        self.system_label.setAlignment(Qt.AlignCenter)
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(10)
+        self.system_label.setFont(font)
+        outer.addWidget(self.system_label)
+
+        # identificação da rua
+        ident = QGridLayout()
+        self.f_city = _SheetField("(cidade do projeto)")
+        self.f_street = _SheetField()
+        self.f_side = _SheetField()
+        self.ro_length = QLabel("-")
+        self.ro_diameter = QLabel("-")
+        self.f_between = _SheetField()
+        self.f_and = _SheetField()
+        self.ro_material = QLabel("-")
+
+        def add(row, col, label, widget, span=1):
+            h = QHBoxLayout()
+            lab = QLabel(label)
+            font = lab.font()
+            font.setBold(True)
+            font.setPointSize(8)
+            lab.setFont(font)
+            h.addWidget(lab)
+            h.addWidget(widget, stretch=1)
+            w = QWidget()
+            w.setLayout(h)
+            ident.addWidget(w, row, col, 1, span)
+
+        add(0, 0, "Cidade:", self.f_city)
+        add(0, 1, "Rua:", self.f_street, span=2)
+        add(0, 3, "Lado:", self.f_side)
+        add(1, 0, "Extensão:", self.ro_length)
+        add(1, 1, "Diâmetro:", self.ro_diameter)
+        add(1, 2, "Material:", self.ro_material, span=2)
+        add(2, 0, "Entre Rua:", self.f_between, span=2)
+        add(2, 2, "e Rua:", self.f_and, span=2)
+        outer.addLayout(ident)
+
+        # planilha de estaqueamento (hidráulica — somente leitura)
+        self.table = QTableWidget(0, len(OSE_HEADERS))
+        self.table.setHorizontalHeaderLabels(OSE_HEADERS)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        outer.addWidget(self.table)
+
+        # observações
+        obs_row = QHBoxLayout()
+        obs_lab = QLabel("(*) OBSERVAÇÃO:")
+        font = obs_lab.font()
+        font.setBold(True)
+        font.setPointSize(8)
+        obs_lab.setFont(font)
+        obs_row.addWidget(obs_lab, alignment=Qt.AlignTop)
+        self.f_obs = QPlainTextEdit()
+        self.f_obs.setMaximumHeight(48)
+        self.f_obs.setStyleSheet(
+            "QPlainTextEdit { background: #fffef5; "
+            "border: 1px solid #b0b0b0; }")
+        obs_row.addWidget(self.f_obs)
+        outer.addLayout(obs_row)
+
+        # assinaturas
+        signs = QGridLayout()
+        self.f_prop = _SheetField()
+        self.f_appr = _SheetField()
+        self.f_rel = _SheetField()
+        self.f_exec = _SheetField()
+        blocks = [("Proposição", self.f_prop),
+                  ("Aprovação", self.f_appr),
+                  ("Liberação para Execução", self.f_rel),
+                  ("Execução/Cadastramento", self.f_exec)]
+        for col, (label, widget) in enumerate(blocks):
+            cell = QWidget()
+            v = QVBoxLayout(cell)
+            v.setContentsMargins(2, 0, 2, 0)
+            lab = QLabel(label)
+            lab.setAlignment(Qt.AlignCenter)
+            font = lab.font()
+            font.setBold(True)
+            font.setPointSize(8)
+            lab.setFont(font)
+            v.addWidget(lab)
+            v.addWidget(widget)
+            signs.addWidget(_boxed(cell), 0, col)
+        outer.addLayout(signs)
+        outer.addStretch(1)
+
+    # ------------------------------------------------------------------
+    def edit_fields(self) -> dict[str, QWidget]:
+        """Campos editáveis, mapeados para os atributos de OseSheet."""
+        return {
+            "number": self.f_number, "location": self.f_location,
+            "cadastre_sheet": self.f_cadastre, "city": self.f_city,
+            "street": self.f_street, "side": self.f_side,
+            "between_street": self.f_between, "and_street": self.f_and,
+            "resp_proposal": self.f_prop, "resp_approval": self.f_appr,
+            "resp_release": self.f_rel, "resp_execution": self.f_exec,
+        }
+
+    def load(self, project: Project, ose: OseSheet | None):
+        enabled = ose is not None
+        for widget in self.edit_fields().values():
+            widget.setEnabled(enabled)
+            widget.blockSignals(True)
+        self.f_obs.setEnabled(enabled)
+        system = project.info.system or project.title
+        self.system_label.setText(system.upper())
+        if ose is None:
+            for widget in self.edit_fields().values():
+                widget.clear()
+                widget.blockSignals(False)
+            self.f_obs.setPlainText("")
+            self.table.setRowCount(0)
+            self.ro_length.setText("-")
+            self.ro_diameter.setText("-")
+            self.ro_material.setText("-")
+            return
+        for attr, widget in self.edit_fields().items():
+            widget.setText(getattr(ose, attr))
+            widget.blockSignals(False)
+        self.f_city.setPlaceholderText(project.info.city or "(cidade)")
+        self.f_obs.setPlainText(ose.observations)
+
+    def save_into(self, ose: OseSheet):
+        for attr, widget in self.edit_fields().items():
+            setattr(ose, attr, widget.text().strip())
+        ose.observations = self.f_obs.toPlainText().strip()
+
+    def fill_table(self, project: Project, result, ose: OseSheet):
+        self.table.setRowCount(0)
+        if result is None:
+            self._fit_table()
+            return
+        pipes = ose_pipe_results(project, result, ose)
+        length = sum(r.length for r in pipes)
+        self.ro_length.setText(f"{fmt.fmt(length, 2)} m")
+        self.ro_diameter.setText(" / ".join(sorted(
+            {str(r.diameter_mm) for r in pipes}, key=int)) or "-")
+        self.ro_material.setText(" / ".join(dict.fromkeys(
+            r.material.split("(")[0].strip() for r in pipes)) or "-")
+        f = fmt.fmt
+        for r in build_ose_rows(project, result, ose):
+            i = self.table.rowCount()
+            self.table.insertRow(i)
+            values = [r.stake_label, f(r.dist_prev), f(r.dist_accum),
+                      f(r.ground, 3), f"{r.slope:.5f}".replace(".", ","),
+                      f(r.invert, 3), f(r.gauge, 2), f(r.board, 3),
+                      f(r.ruler, 3), str(r.diameter_mm), f(r.depth, 3),
+                      f(r.cover, 3), r.obs]
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                item.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(i, col, item)
+        self.table.resizeColumnsToContents()
+        self._fit_table()
+
+    def _fit_table(self):
+        rows = self.table.rowCount()
+        header = self.table.horizontalHeader().height()
+        row_h = self.table.verticalHeader().defaultSectionSize()
+        self.table.setFixedHeight(header + rows * row_h + 6)
 
 
 class OseTab(QWidget):
@@ -29,6 +264,11 @@ class OseTab(QWidget):
 
         layout = QVBoxLayout(self)
         splitter = QSplitter(Qt.Horizontal)
+        splitter.setHandleWidth(8)
+        splitter.setChildrenCollapsible(False)
+        splitter.setStyleSheet(
+            "QSplitter::handle { background: #c8c8c8; }"
+            "QSplitter::handle:hover { background: #8ab4dd; }")
         layout.addWidget(splitter)
 
         # ------------------------------------------------- lista (esquerda)
@@ -43,13 +283,13 @@ class OseTab(QWidget):
         new_btn.clicked.connect(self._new_ose)
         del_btn = QPushButton("Remover")
         del_btn.clicked.connect(self._remove_ose)
+        buttons.addWidget(new_btn)
+        buttons.addWidget(del_btn)
+        lv.addLayout(buttons)
         gen_btn = QPushButton("Gerar p/ trechos sem OSE")
         gen_btn.setToolTip("Cria uma OSE por rede para os trechos que "
                            "ainda não pertencem a nenhuma OSE.")
         gen_btn.clicked.connect(self._generate)
-        buttons.addWidget(new_btn)
-        buttons.addWidget(del_btn)
-        lv.addLayout(buttons)
         lv.addWidget(gen_btn)
 
         info_box = QGroupBox("Informações do projeto (padrão das OSEs)")
@@ -67,20 +307,11 @@ class OseTab(QWidget):
         lv.addWidget(info_box)
         splitter.addWidget(left)
 
-        # -------------------------------------------------- edição (meio)
+        # -------------------------------------------- parâmetros (meio)
         mid = QWidget()
         mv = QVBoxLayout(mid)
-        ose_box = QGroupBox("Dados da OSE selecionada (editáveis — não "
-                            "alteram o dimensionamento)")
-        form = QFormLayout(ose_box)
-        self.f_number = QLineEdit()
-        self.f_location = QLineEdit()
-        self.f_cadastre = QLineEdit()
-        self.f_city = QLineEdit()
-        self.f_street = QLineEdit()
-        self.f_side = QLineEdit()
-        self.f_between = QLineEdit()
-        self.f_and = QLineEdit()
+        params = QGroupBox("Parâmetros da OSE")
+        form = QFormLayout(params)
         self.f_gauge = QDoubleSpinBox()
         self.f_gauge.setRange(0.5, 20.0)
         self.f_gauge.setDecimals(2)
@@ -90,53 +321,36 @@ class OseTab(QWidget):
         self.f_gauge.setToolTip(
             "Gabarito da régua/cruzeta. Redes profundas (ex.: 5 m) podem "
             "exigir régua maior nesta OSE específica.")
-        self.f_obs = QPlainTextEdit()
-        self.f_obs.setMaximumHeight(70)
-        self.f_prop = QLineEdit()
-        self.f_appr = QLineEdit()
-        self.f_rel = QLineEdit()
-        self.f_exec = QLineEdit()
-        form.addRow("Número da O.S.E.:", self.f_number)
-        form.addRow("Locação:", self.f_location)
-        form.addRow("Nº folha de cadastro:", self.f_cadastre)
-        form.addRow("Cidade (vazio = do projeto):", self.f_city)
-        form.addRow("Rua:", self.f_street)
-        form.addRow("Lado:", self.f_side)
-        form.addRow("Entre rua:", self.f_between)
-        form.addRow("E rua:", self.f_and)
+        self.f_gauge.valueChanged.connect(self._gauge_changed)
         form.addRow("Gabarito da régua:", self.f_gauge)
-        form.addRow("Observações:", self.f_obs)
-        form.addRow("Proposição:", self.f_prop)
-        form.addRow("Aprovação:", self.f_appr)
-        form.addRow("Liberação p/ execução:", self.f_rel)
-        form.addRow("Execução/cadastramento:", self.f_exec)
-        mv.addWidget(ose_box)
-
-        mv.addWidget(QLabel("Trechos desta OSE (a ordem segue a aba "
-                            "Trechos):"))
+        mv.addWidget(params)
+        mv.addWidget(QLabel("Trechos desta OSE\n(ordem da aba Trechos):"))
         self.pipe_list = QListWidget()
+        self.pipe_list.itemChanged.connect(self._pipes_changed)
         mv.addWidget(self.pipe_list)
         splitter.addWidget(mid)
 
-        # ------------------------------------------------ prévia (direita)
-        right = QWidget()
-        rv = QVBoxLayout(right)
-        self.preview_label = QLabel(
-            "Prévia da planilha (rode a simulação para preencher):")
-        self.preview_label.setWordWrap(True)
-        rv.addWidget(self.preview_label)
-        self.preview = QTableWidget(0, len(OSE_HEADERS))
-        self.preview.setHorizontalHeaderLabels(OSE_HEADERS)
-        self.preview.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.preview.setAlternatingRowColors(True)
-        rv.addWidget(self.preview)
-        refresh = QPushButton("Atualizar prévia")
-        refresh.clicked.connect(self._refresh_preview)
-        rv.addWidget(refresh)
-        splitter.addWidget(right)
-        splitter.setSizes([260, 380, 640])
+        # ---------------------------------------- prévia editável (direita)
+        right = QVBoxLayout()
+        right_w = QWidget()
+        right_w.setLayout(right)
+        hint = QLabel("Prévia da OSE — clique nos campos amarelados para "
+                      "editar (rua, número, observações, responsáveis...). "
+                      "A planilha reflete a última simulação.")
+        hint.setWordWrap(True)
+        right.addWidget(hint)
+        self.preview = OsePreview()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self.preview)
+        right.addWidget(scroll)
+        splitter.addWidget(right_w)
+        splitter.setSizes([230, 240, 800])
+        self.splitter = splitter
 
-        self.f_gauge.valueChanged.connect(self._refresh_preview_soft)
+        for widget in self.preview.edit_fields().values():
+            widget.editingFinished.connect(self._preview_edited)
+        self.preview.f_obs.textChanged.connect(self._obs_edited)
 
     # ------------------------------------------------------------------
     def load_from(self, project: Project):
@@ -155,6 +369,7 @@ class OseTab(QWidget):
         self.ose_list.blockSignals(False)
         if project.oses:
             self.ose_list.setCurrentRow(0)
+            self._on_select(0)
         else:
             self._load_form(None)
 
@@ -180,39 +395,16 @@ class OseTab(QWidget):
             self._load_form(self._project.oses[row])
         else:
             self._load_form(None)
-        self._refresh_preview()
 
     def _load_form(self, ose: OseSheet | None):
-        self._current = ose
-        widgets = [self.f_number, self.f_location, self.f_cadastre,
-                   self.f_city, self.f_street, self.f_side, self.f_between,
-                   self.f_and, self.f_obs, self.f_prop, self.f_appr,
-                   self.f_rel, self.f_exec, self.f_gauge, self.pipe_list]
-        for w in widgets:
-            w.setEnabled(ose is not None)
-        if ose is None:
-            for w in widgets[:13]:
-                if isinstance(w, QLineEdit):
-                    w.clear()
-            self.f_obs.setPlainText("")
-            self.pipe_list.clear()
-            return
-        self.f_number.setText(ose.number)
-        self.f_location.setText(ose.location)
-        self.f_cadastre.setText(ose.cadastre_sheet)
-        self.f_city.setText(ose.city)
-        self.f_street.setText(ose.street)
-        self.f_side.setText(ose.side)
-        self.f_between.setText(ose.between_street)
-        self.f_and.setText(ose.and_street)
-        self.f_gauge.setValue(ose.gauge_height)
-        self.f_obs.setPlainText(ose.observations)
-        self.f_prop.setText(ose.resp_proposal)
-        self.f_appr.setText(ose.resp_approval)
-        self.f_rel.setText(ose.resp_release)
-        self.f_exec.setText(ose.resp_execution)
+        self._current = None    # evita gravações durante o carregamento
+        self.f_gauge.blockSignals(True)
+        self.f_gauge.setValue(ose.gauge_height if ose else 3.0)
+        self.f_gauge.blockSignals(False)
+        self.f_gauge.setEnabled(ose is not None)
+        self.pipe_list.blockSignals(True)
         self.pipe_list.clear()
-        if self._project:
+        if ose is not None and self._project:
             selected = set(ose.pipe_ids)
             for pipe in self._project.pipes:
                 item = QListWidgetItem(
@@ -222,25 +414,19 @@ class OseTab(QWidget):
                 item.setCheckState(Qt.Checked if pipe.id in selected
                                    else Qt.Unchecked)
                 self.pipe_list.addItem(item)
+        self.pipe_list.blockSignals(False)
+        self.pipe_list.setEnabled(ose is not None)
+        if self._project:
+            self.preview.load(self._project, ose)
+        self._current = ose
+        self._refresh_preview()
 
     def _save_current(self):
         ose = self._current
-        if ose is None:
+        if ose is None or self._project is None:
             return
-        ose.number = self.f_number.text().strip()
-        ose.location = self.f_location.text().strip()
-        ose.cadastre_sheet = self.f_cadastre.text().strip()
-        ose.city = self.f_city.text().strip()
-        ose.street = self.f_street.text().strip()
-        ose.side = self.f_side.text().strip()
-        ose.between_street = self.f_between.text().strip()
-        ose.and_street = self.f_and.text().strip()
+        self.preview.save_into(ose)
         ose.gauge_height = self.f_gauge.value()
-        ose.observations = self.f_obs.toPlainText().strip()
-        ose.resp_proposal = self.f_prop.text().strip()
-        ose.resp_approval = self.f_appr.text().strip()
-        ose.resp_release = self.f_rel.text().strip()
-        ose.resp_execution = self.f_exec.text().strip()
         pipe_ids = []
         for i in range(self.pipe_list.count()):
             item = self.pipe_list.item(i)
@@ -248,7 +434,7 @@ class OseTab(QWidget):
                 pipe_ids.append(item.data(Qt.UserRole))
         ose.pipe_ids = pipe_ids
         row = self.ose_list.currentRow()
-        if self._project and 0 <= row < len(self._project.oses):
+        if 0 <= row < len(self._project.oses):
             self.ose_list.item(row).setText(self._ose_label(ose))
 
     # ------------------------------------------------------------------
@@ -281,33 +467,32 @@ class OseTab(QWidget):
             self.ose_list.setCurrentRow(max(0, row))
 
     # ------------------------------------------------------------------
-    def _refresh_preview_soft(self, *_):
+    def _preview_edited(self):
         if self._current is not None:
-            self._current.gauge_height = self.f_gauge.value()
+            self.preview.save_into(self._current)
+            row = self.ose_list.currentRow()
+            if self._project and 0 <= row < len(self._project.oses):
+                self.ose_list.item(row).setText(
+                    self._ose_label(self._current))
+
+    def _obs_edited(self):
+        if self._current is not None:
+            self._current.observations = \
+                self.preview.f_obs.toPlainText().strip()
+
+    def _gauge_changed(self, value: float):
+        if self._current is not None:
+            self._current.gauge_height = value
+            self._refresh_preview()
+
+    def _pipes_changed(self, _item):
+        if self._current is not None:
+            self._save_current()
             self._refresh_preview()
 
     def _refresh_preview(self):
-        self.preview.setRowCount(0)
-        result = self.result_provider()
-        ose = self._current
-        if result is None or ose is None or self._project is None:
-            self.preview_label.setText(
-                "Prévia da planilha (rode a simulação para preencher):")
+        if self._project is None or self._current is None:
+            self.preview.table.setRowCount(0)
             return
-        self._save_current()
-        rows = build_ose_rows(self._project, result, ose)
-        self.preview_label.setText(
-            f"Prévia da planilha — {len(rows)} estacas, régua "
-            f"{fmt.fmt(ose.gauge_height, 2)} m:")
-        f = fmt.fmt
-        for r in rows:
-            i = self.preview.rowCount()
-            self.preview.insertRow(i)
-            values = [r.stake_label, f(r.dist_prev), f(r.dist_accum),
-                      f(r.ground, 3), f"{r.slope:.5f}".replace(".", ","),
-                      f(r.invert, 3), f(r.gauge, 2), f(r.board, 3),
-                      f(r.ruler, 3), str(r.diameter_mm), f(r.depth, 3),
-                      f(r.cover, 3), r.obs]
-            for col, value in enumerate(values):
-                self.preview.setItem(i, col, QTableWidgetItem(value))
-        self.preview.resizeColumnsToContents()
+        self.preview.fill_table(self._project, self.result_provider(),
+                                self._current)

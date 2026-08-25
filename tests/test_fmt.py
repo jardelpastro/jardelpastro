@@ -33,6 +33,20 @@ def test_parse_invalid_returns_default():
     assert fmt.parse(None, 2.0) == 2.0
 
 
+def test_parse_single_thousands_group_ptbr():
+    # convenção pt-BR: grupos de 3 com ponto são milhar (como a própria
+    # interface formata coordenadas); decimal escreve-se com vírgula
+    assert fmt.parse("672.110") == pytest.approx(672110.0)
+    assert fmt.parse("812.500") == pytest.approx(812500.0)
+    assert fmt.parse("672,11") == pytest.approx(672.11)
+
+
+def test_fmt_edit_parse_roundtrip_coordinates():
+    # regressão: coordenadas formatadas com milhar devem reidratar iguais
+    for value in (672110.0, 672020.0, 7184840.0, 812.5, 0.5, 90.0):
+        assert fmt.parse(fmt.fmt_edit(value)) == pytest.approx(value)
+
+
 def test_roundtrip():
     for value in (0.0035, 1.5, 812.5, 7185000.0, 1234567.891):
         assert fmt.parse(fmt.fmt(value, 4)) == pytest.approx(value, rel=1e-6)

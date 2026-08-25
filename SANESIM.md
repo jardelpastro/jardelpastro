@@ -59,22 +59,28 @@ aba**, sem precisar passar por todas:
    trecho: montante/jusante e início/fim de plano), com violações de
    critério destacadas em vermelho.
 8. **OSEs** — as OSEs são entidades do projeto (a planta e o perfil usam
-   as mesmas: alterar aqui reflete lá). Cada OSE agrupa trechos e carrega
-   os dados **não hidráulicos, editáveis**: número, locação, folha de
-   cadastro, cidade, rua, lado, entre/e rua, observações, responsáveis
-   (proposição, aprovação, liberação, execução) e o **gabarito da régua
-   ajustável por OSE** (redes profundas podem exigir régua maior). A aba
-   mostra a **prévia da planilha** de estaqueamento em tempo real e o
-   botão "Gerar p/ trechos sem OSE" cria OSEs automaticamente (uma por
-   rede). Informações do projeto (cidade, sistema, responsável técnico)
-   servem de padrão.
+   as mesmas: alterar aqui reflete lá). A **prévia é a própria folha da
+   OSE**, no layout da exportação, com os campos não hidráulicos
+   **editáveis clicando neles**: número, locação, folha de cadastro,
+   cidade, rua, lado, entre/e rua, observações e responsáveis
+   (proposição, aprovação, liberação, execução). O **gabarito da régua é
+   ajustável por OSE** (redes profundas podem exigir régua maior) e a
+   planilha de estaqueamento recalcula na hora. Os três painéis (lista |
+   parâmetros | prévia) são **redimensionáveis arrastando os divisores**.
+   "Gerar p/ trechos sem OSE" cria OSEs automaticamente (uma por rede).
 9. **Perfil** — perfil longitudinal desenhado **sempre de montante
-   (esquerda) para jusante (direita)**, com terreno, tubo (geratrizes
-   inferior e superior), **lâmina d'água calculada de fim de plano
-   preenchida em azul dentro do tubo**, PVs com cotas (CT/CF), rótulos
-   por trecho (DN, I, y/D, V), régua de estaqueamento e exagero vertical
-   configurável; zoom com a roda do mouse. Caminhos por OSE (um por
-   ramal contínuo) ou por cabeceira da rede.
+   (esquerda) para jusante (direita)**, com **escalas independentes**
+   (padrão horizontal 1:1000, vertical 1:100, ambas editáveis), grid com
+   linhas mestras (100 m na horizontal, 5 m na vertical) e secundárias
+   tracejadas mais fracas, terreno, tubo (geratrizes inferior e
+   superior), **lâmina d'água de fim de plano preenchida em azul dentro
+   do tubo**, PVs com linhas de chamada, título centralizado e títulos
+   dos eixos. Sob o perfil, **bandas estilo Civil 3D**: distâncias
+   (entre PVs no centro do vão + acumulada na vertical em cada PV), cota
+   do terreno, cota da geratriz inferior e profundidade (a cada 20 m e
+   nos PVs, textos na vertical), declividade e material/vazão por
+   trecho. Zoom com a roda do mouse. Caminhos por OSE (um por ramal
+   contínuo) ou por cabeceira da rede.
 
 ## Metodologia de cálculo (NBR 9649)
 

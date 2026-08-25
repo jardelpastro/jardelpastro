@@ -26,10 +26,16 @@ def test_window_roundtrip(app, tmp_path):
     window._load_all()
 
     # os dados carregados devem sobreviver ao ciclo load -> apply
+    lengths_before = [round(window.project.pipe_length(p), 3)
+                      for p in window.project.pipes]
     window._apply_all()
     assert len(window.project.nodes) == 8
     assert len(window.project.pipes) == 7
     assert window.project.criteria.end.population == 5200
+    # regressão: coordenadas com milhar não podem corromper as extensões
+    lengths_after = [round(window.project.pipe_length(p), 3)
+                     for p in window.project.pipes]
+    assert lengths_after == lengths_before
 
     # simulação disparada como na barra de ferramentas
     window.run_simulation()

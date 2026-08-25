@@ -168,7 +168,8 @@ def _run_rows(pipes: list[PipeResult], ose: OseSheet,
             obs_parts.append(f"PV {segments[-1][2].downstream}")
 
         is_multiple = abs(pos / step - round(pos / step)) < 1e-6
-        label = str(stake) if is_multiple else f"+{pos % step:.2f}"
+        label = (str(stake) if is_multiple
+                 else f"+{pos % step:.2f}".replace(".", ","))
         rows.append(OseRow(
             stake_label=label,
             dist_prev=pos - prev_x,

@@ -8,6 +8,11 @@ idioma do usuário — aqui ficam os helpers para a interface Qt.
 
 from __future__ import annotations
 
+import re
+
+_THOUSANDS_DOTS = re.compile(r"^-?\d{1,3}(\.\d{3})+$")
+_THOUSANDS_COMMAS = re.compile(r"^-?\d{1,3}(,\d{3}){2,}$")
+
 
 def fmt(value: float, decimals: int = 2, thousands: bool = True) -> str:
     """1234567.891 -> '1.234.567,89' (pt-BR)."""
@@ -37,8 +42,10 @@ def parse(text: str, default: float = 0.0) -> float:
 
     '1.234,56' -> 1234.56 | '1234.56' -> 1234.56 | '1,5' -> 1.5
     Com ponto e vírgula presentes, o último separador é o decimal.
-    Apenas ponto: tratado como decimal ('812.500' -> 812.5), pois as
-    células de edição gravam vírgula como decimal.
+    Convenção pt-BR para separador único: grupos de exatamente 3 dígitos
+    com ponto são MILHAR ('672.110' -> 672110, como a própria interface
+    formata); decimal escreve-se com vírgula. Um ponto que não forma
+    grupos de 3 continua decimal ('812.5' -> 812.5).
     """
     if text is None:
         return default
@@ -52,12 +59,13 @@ def parse(text: str, default: float = 0.0) -> float:
         else:
             text = text.replace(",", "")                     # en-US
     elif has_comma:
-        if text.count(",") > 1:
-            text = text.replace(",", "")     # só vírgulas: milhar en-US
+        if _THOUSANDS_COMMAS.match(text):
+            text = text.replace(",", "")     # '1,234,567': milhar en-US
         else:
-            text = text.replace(",", ".")
-    elif has_dot and text.count(".") > 1:
-        text = text.replace(".", "")         # só pontos: milhar pt-BR
+            text = text.replace(",", ".")    # vírgula única: decimal pt-BR
+    elif has_dot:
+        if _THOUSANDS_DOTS.match(text):
+            text = text.replace(".", "")     # '672.110': milhar pt-BR
     try:
         return float(text)
     except ValueError:
