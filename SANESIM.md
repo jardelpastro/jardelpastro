@@ -178,7 +178,11 @@ examples/            # projeto de exemplo
       arcos, textos e blocos explodidos, em cinza atrás da rede) e
       imagem raster georreferenciada (world file .jgw/.pgw/.tfw lido
       automaticamente, ou posicionamento manual E/N + m/pixel)
-- [ ] Exportação DXF (planta/perfil para CAD)
+- [x] Exportação DXF para CAD: planta em coordenadas reais (layers
+      SANESIM-* — rede por nome de rede com as cores configuradas, PVs
+      por tipo, textos com DN/extensão/declividade, setas de fluxo e
+      curvas de nível em polylines 3D) e perfil (layers PERFIL-* — grid,
+      terreno, tubo, lâmina, PVs, bandas completas com textos)
 - [x] Desfazer/refazer no editor gráfico (Ctrl+Z / Ctrl+Y, até 60
       passos: inserir/mover/excluir/editar/dividir/inverter)
 - [x] Snap ao PV mais próximo ao inserir trechos; "Inserir PV neste

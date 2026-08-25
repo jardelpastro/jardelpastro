@@ -601,6 +601,14 @@ class PlanTab(QWidget):
         bg_btn.setMenu(bg_menu)
         bg_btn.setPopupMode(QToolButton.InstantPopup)
         toolbar.addWidget(bg_btn)
+        dxf_btn = QToolButton()
+        dxf_btn.setText("Exportar DXF…")
+        dxf_btn.setToolTip(
+            "Exporta a planta para CAD: rede (um layer por nome de rede, "
+            "com as cores configuradas), PVs, textos, setas de fluxo e "
+            "curvas de nível em 3D.")
+        dxf_btn.clicked.connect(self.export_dxf)
+        toolbar.addWidget(dxf_btn)
 
         self.btn_select.setChecked(True)
         toolbar.addStretch(1)
@@ -881,6 +889,24 @@ class PlanTab(QWidget):
         if reload_scene:
             self.load_from(self.project)
         self._update_undo_buttons()
+
+    def export_dxf(self):
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        from ..core.dxf_export import DxfExportError, export_plan_dxf
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exportar planta para DXF", "planta.dxf", "DXF (*.dxf)")
+        if not path:
+            return
+        try:
+            export_plan_dxf(self.project, self.result_provider(), path)
+        except DxfExportError as exc:
+            QMessageBox.warning(self, "DXF", str(exc))
+            return
+        except Exception as exc:
+            QMessageBox.critical(self, "Erro ao exportar",
+                                 f"Não foi possível gravar o DXF:\n{exc}")
+            return
+        self.status.setText(f"Planta exportada: {path}")
 
     # ------------------------------------------------------------ terreno
     def load_terrain(self):

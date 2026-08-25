@@ -93,6 +93,42 @@ class ProfileSegment:
     water1: float
 
 
+def interpolate_at(segments: list[ProfileSegment],
+                   x: float) -> tuple[float, float]:
+    """(terreno, geratriz inferior) interpolados na posição x do caminho."""
+    for s in segments:
+        if s.x0 - 1e-6 <= x <= s.x1 + 1e-6 and s.x1 > s.x0:
+            f = (x - s.x0) / (s.x1 - s.x0)
+            return (s.ground0 + (s.ground1 - s.ground0) * f,
+                    s.invert0 + (s.invert1 - s.invert0) * f)
+    s = segments[-1]
+    return s.ground1, s.invert1
+
+
+def stations(total: float, step: float = 20.0) -> list[float]:
+    """Posições de estaqueamento: 0, step, 2*step..., extremidade final."""
+    xs = []
+    x = 0.0
+    while x <= total + 1e-6:
+        xs.append(min(x, total))
+        x += step
+    return xs
+
+
+def pv_positions(segments: list[ProfileSegment]) -> list[tuple]:
+    """(x, terreno, fundo do PV, nome) para cada PV do caminho."""
+    info = []
+    for i, s in enumerate(segments):
+        bottom = s.invert0
+        if i > 0:
+            bottom = min(bottom, segments[i - 1].invert1)
+        info.append((s.x0, s.ground0, bottom, s.pipe.upstream))
+    last = segments[-1]
+    info.append((last.x1, last.ground1, last.invert1,
+                 last.pipe.downstream))
+    return info
+
+
 def build_geometry(path: ProfilePath) -> list[ProfileSegment]:
     segments: list[ProfileSegment] = []
     x = 0.0

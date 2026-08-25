@@ -142,12 +142,15 @@ class ProfileTab(QWidget):
             return
         path, selected = QFileDialog.getSaveFileName(
             self, "Exportar perfil", "perfil.pdf",
-            "PDF A3 paisagem (*.pdf);;Imagem PNG (*.png)")
+            "PDF A3 paisagem (*.pdf);;Imagem PNG (*.png);;"
+            "DXF para CAD (*.dxf)")
         if not path:
             return
         try:
             if path.lower().endswith(".png"):
                 self.export_png(path)
+            elif path.lower().endswith(".dxf"):
+                self.export_dxf(path)
             else:
                 self.export_pdf(path)
         except Exception as exc:
@@ -155,6 +158,16 @@ class ProfileTab(QWidget):
                                  f"Não foi possível exportar:\n{exc}")
             return
         QMessageBox.information(self, "Perfil", f"Perfil exportado:\n{path}")
+
+    def export_dxf(self, path: str):
+        """Exporta o caminho atual do perfil em DXF (layers PERFIL-*)."""
+        from ..core.dxf_export import export_profile_dxf
+        idx = self.path_combo.currentIndex()
+        if not self._paths or idx < 0:
+            raise RuntimeError("Rode a simulação antes de exportar.")
+        export_profile_dxf(self._paths[idx], path,
+                           scale_h=self.scale_h.value(),
+                           scale_v=self.scale_v.value())
 
     def export_png(self, path: str, scale: float = 2.0):
         """Exporta a cena atual do perfil como imagem PNG."""
