@@ -81,6 +81,15 @@ aba**, sem precisar passar por todas:
    nos PVs, textos na vertical), declividade e material/vazão por
    trecho. Zoom com a roda do mouse. Caminhos por OSE (um por ramal
    contínuo) ou por cabeceira da rede.
+10. **Planta** — editor gráfico da rede: **Inserir PV** (clique cria o
+    nó do tipo escolhido), **Inserir Trecho** (clique no montante e no
+    jusante), arrastar PVs move e atualiza coordenadas, **botão direito**
+    abre menu (Propriedades / Inverter sentido / Excluir), **clique
+    esquerdo** seleciona e o painel lateral mostra as propriedades
+    editáveis e os **resultados da simulação** (DN, lâmina, velocidade,
+    trativa, cotas, recobrimentos); trechos com violação ficam
+    vermelhos. Zoom com a roda, Pan, Delete exclui. A planta edita os
+    mesmos objetos das tabelas/OSEs/perfil — tudo sincronizado.
 
 ## Metodologia de cálculo (NBR 9649)
 
@@ -154,13 +163,11 @@ examples/            # projeto de exemplo
 - [x] Interface com abas e simulação de qualquer aba
 - [x] Zonas de contribuição (adensamento / áreas de influência)
 - [x] OSEs editáveis no programa + exportação no formato do modelo
-- [x] Perfil longitudinal na tela, com lâmina d'água calculada
-- [ ] Exportação do perfil (folha 1 da OSE) para Excel/PDF/DXF
-- [ ] Planta da rede (folha 2) + interpolação de curvas de nível
-- [ ] Editor gráfico com mouse: inserir PVs/estruturas clicando na tela,
-      botão direito para editar propriedades, botão esquerdo para
-      inspecionar resultados (lâmina, vazões...). A base já está
-      preparada: a interface usa Qt, cujo `QGraphicsScene/QGraphicsView`
-      oferece exatamente esse modelo de interação (itens clicáveis com
-      menu de contexto, zoom/pan, snapping).
+- [x] Perfil longitudinal na tela: lâmina d'água, escalas, grid e bandas
+- [x] Editor gráfico de planta com mouse (inserir PV/trecho, mover,
+      botão direito para propriedades, seleção mostra resultados)
+- [ ] Exportação do perfil (folha 1 da OSE) para PDF/imagem
+- [ ] Planta: imagem/DXF de fundo e interpolação de curvas de nível
+      (cota automática dos PVs)
 - [ ] Exportação DXF (planta/perfil para CAD)
+- [ ] Desfazer/refazer no editor gráfico

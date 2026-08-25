@@ -17,6 +17,7 @@ from ..core.simulation import SimulationError, simulate
 from .criteria_tabs import CalcTab, CriteriaTab, DesignTab
 from .network_tabs import MaterialsTab, NodesTab, PipesTab
 from .ose_tab import OseTab
+from .plan_tab import PlanTab
 from .profile_tab import ProfileTab
 from .results_tab import ResultsTab
 
@@ -41,6 +42,9 @@ class MainWindow(QMainWindow):
         self.ose_tab = OseTab()
         self.ose_tab.result_provider = lambda: self.last_result
         self.profile_tab = ProfileTab()
+        self.plan_tab = PlanTab()
+        self.plan_tab.result_provider = lambda: self.last_result
+        self.plan_tab.network_changed = self._on_network_changed
         self.tabs.addTab(self.criteria_tab, "1. Critérios de Projeto")
         self.tabs.addTab(self.design_tab, "2. Dimensionamento")
         self.tabs.addTab(self.calc_tab, "3. Método de Cálculo")
@@ -50,6 +54,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.results_tab, "7. Resultados")
         self.tabs.addTab(self.ose_tab, "8. OSEs")
         self.tabs.addTab(self.profile_tab, "9. Perfil")
+        self.tabs.addTab(self.plan_tab, "10. Planta")
         self.setCentralWidget(self.tabs)
 
         self._build_toolbar()
@@ -94,6 +99,7 @@ class MainWindow(QMainWindow):
         self.pipes_tab.load_from(self.project)
         self.materials_tab.load_from(self.project)
         self.ose_tab.load_from(self.project)
+        self.plan_tab.load_from(self.project)
 
     def _apply_all(self):
         # o catálogo primeiro: os combos de material dependem dele
@@ -104,6 +110,12 @@ class MainWindow(QMainWindow):
         self.nodes_tab.apply_to(self.project)
         self.pipes_tab.apply_to(self.project)
         self.ose_tab.apply_to(self.project)
+
+    def _on_network_changed(self):
+        """Edição feita na planta: sincroniza as tabelas de nós/trechos."""
+        self.nodes_tab.load_from(self.project)
+        self.pipes_tab.load_from(self.project)
+        self.ose_tab.load_from(self.project)
 
     # ------------------------------------------------------------------
     def new_project(self):
@@ -157,8 +169,10 @@ class MainWindow(QMainWindow):
         self.results_tab.show_result(self.last_result)
         self.ose_tab._refresh_preview()
         self.profile_tab.show_result(self.project, self.last_result)
+        self.plan_tab.show_result(self.project, self.last_result)
         if self.tabs.currentWidget() not in (self.ose_tab,
-                                             self.profile_tab):
+                                             self.profile_tab,
+                                             self.plan_tab):
             self.tabs.setCurrentWidget(self.results_tab)
         n_viol = sum(1 for r in self.last_result.pipes if r.violations)
         if n_viol:

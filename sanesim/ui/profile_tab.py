@@ -3,8 +3,8 @@
 Sempre de montante (esquerda) para jusante (direita). Escalas de desenho
 independentes (padrão H 1:1000, V 1:100), grid com linhas mestras (100 m
 na horizontal, 5 m na vertical) e secundárias mais fracas, e bandas de
-dados sob o perfil (estilo Civil 3D): distâncias, cota do terreno, cota
-da geratriz inferior, profundidade, declividade e material/vazão.
+dados sob o perfil (estilo Civil 3D) com ticks a cada estaca de 20 m,
+textos centralizados e tratamento de sobreposição.
 """
 
 from __future__ import annotations
@@ -36,6 +36,8 @@ GRID_MINOR_H = 20.0     # grid secundário horizontal (m de distância)
 GRID_MASTER_H = 100.0   # grid mestre horizontal
 GRID_MINOR_V = 1.0      # grid secundário vertical (m de cota)
 GRID_MASTER_V = 5.0     # grid mestre vertical
+BANDS_GAP = 48.0        # afastamento entre o gráfico e as bandas (px)
+TICK = 5.0              # comprimento dos ticks das bandas (px)
 
 
 class _ProfileView(QGraphicsView):
@@ -125,27 +127,65 @@ class ProfileTab(QWidget):
             self.path_combo.setCurrentIndex(0)
         self._redraw()
 
-    # ------------------------------------------------------------------
-    def _text(self, text: str, x: float, y: float, size: float = 8,
-              bold: bool = False, rotate: bool = False,
-              center_x: bool = False) -> QGraphicsSimpleTextItem:
+    # ---------------------------------------------------------- helpers
+    def _make_text(self, text: str, size: float,
+                   bold: bool = False) -> QGraphicsSimpleTextItem:
         item = QGraphicsSimpleTextItem(text)
         font = QFont()
         font.setPointSizeF(size)
         font.setBold(bold)
         item.setFont(font)
         item.setBrush(QBrush(_TEXT))
+        return item
+
+    def _text(self, text: str, x: float, y: float, size: float = 8,
+              bold: bool = False, center_x: bool = False,
+              center_y: bool = False) -> QGraphicsSimpleTextItem:
+        item = self._make_text(text, size, bold)
         br = item.boundingRect()
-        if rotate:
-            # texto na vertical, subindo a partir de (x, y)
-            item.setRotation(-90)
-            item.setPos(x + br.height() / 2.0, y)
-        elif center_x:
-            item.setPos(x - br.width() / 2.0, y)
-        else:
-            item.setPos(x, y)
+        px = x - br.width() / 2.0 if center_x else x
+        py = y - br.height() / 2.0 if center_y else y
+        item.setPos(px, py)
         self.scene.addItem(item)
         return item
+
+    def _rotated_texts(self, entries, X, y0: float, y1: float,
+                       size: float = 6.5):
+        """Textos verticais centralizados na banda, sem sobreposição.
+
+        entries: lista de (x_m, texto, âncora) ordenada por x, âncora em
+        {"center", "left", "right"} — "left" coloca o texto para dentro
+        (à esquerda da linha), usado no fechamento do perfil.
+        """
+        placed = []
+        for x_m, text, anchor in entries:
+            item = self._make_text(text, size)
+            item.setRotation(-90)
+            br = item.boundingRect()
+            h = br.height()          # extensão horizontal após a rotação
+            if anchor == "left":
+                left = X(x_m) - h - 2.0
+            elif anchor == "right":
+                left = X(x_m) + 2.0
+            else:
+                left = X(x_m) - h / 2.0
+            placed.append([left, h, item, br])
+        # afasta sobreposições: o da esquerda vai mais para a esquerda e
+        # o da direita mais para a direita
+        for _ in range(6):
+            moved = False
+            for a, b in zip(placed, placed[1:]):
+                overlap = (a[0] + a[1] + 1.5) - b[0]
+                if overlap > 0:
+                    a[0] -= overlap / 2.0
+                    b[0] += overlap / 2.0
+                    moved = True
+            if not moved:
+                break
+        mid = (y0 + y1) / 2.0
+        for left, _h, item, br in placed:
+            item.setPos(left, mid + br.width() / 2.0)
+            self.scene.addItem(item)
 
     @staticmethod
     def _interp(segments: list[ProfileSegment], x: float):
@@ -158,6 +198,20 @@ class ProfileTab(QWidget):
         s = segments[-1]
         return s.ground1, s.invert1
 
+    def _stations(self, total: float) -> list[float]:
+        xs = []
+        x = 0.0
+        while x <= total + 1e-6:
+            xs.append(min(x, total))
+            x += STATION_STEP
+        return xs
+
+    def _pv_xs(self, segments) -> list[float]:
+        xs = [s.x0 for s in segments]
+        xs.append(segments[-1].x1)
+        return xs
+
+    # ------------------------------------------------------------ redraw
     def _redraw(self, *_):
         self.scene.clear()
         idx = self.path_combo.currentIndex()
@@ -174,9 +228,8 @@ class ProfileTab(QWidget):
 
         elev_top = max(max(s.ground0, s.ground1) for s in segments)
         elev_bot = min(min(s.invert0, s.invert1) for s in segments)
-        # limites do grid em múltiplos das linhas mestras
         grid_top = (int(elev_top / GRID_MASTER_V) + 1) * GRID_MASTER_V
-        grid_bot = (int(elev_bot / GRID_MASTER_V) - 0) * GRID_MASTER_V
+        grid_bot = int(elev_bot / GRID_MASTER_V) * GRID_MASTER_V
         if grid_bot > elev_bot - 0.5:
             grid_bot -= GRID_MASTER_V
 
@@ -195,24 +248,36 @@ class ProfileTab(QWidget):
         pen_minor.setStyle(Qt.DashLine)
         pen_master = QPen(_GRID_MASTER, 0)
         pen_master.setCosmetic(True)
+        pen_border = QPen(_BAND_FRAME, 0)
+        pen_border.setCosmetic(True)
 
         e = grid_bot
         while e <= grid_top + 1e-6:
             master = abs(e / GRID_MASTER_V - round(e / GRID_MASTER_V)) < 1e-6
-            pen = pen_master if master else pen_minor
-            self.scene.addLine(X(0), Y(e), X(total), Y(e), pen)
+            self.scene.addLine(X(0), Y(e), X(total), Y(e),
+                               pen_master if master else pen_minor)
             if master:
-                self._text(fmt.fmt(e, 2), X(0) - 8 - 46, Y(e) - 7, size=7)
+                item = self._make_text(fmt.fmt(e, 2), 7)
+                br = item.boundingRect()
+                item.setPos(X(0) - br.width() - 8, Y(e) - br.height() / 2)
+                self.scene.addItem(item)
+                item = self._make_text(fmt.fmt(e, 2), 7)
+                item.setPos(X(total) + 8, Y(e) - item.boundingRect().height() / 2)
+                self.scene.addItem(item)
             e += GRID_MINOR_V
         x = 0.0
         while x <= total + 1e-6:
             master = abs(x / GRID_MASTER_H - round(x / GRID_MASTER_H)) < 1e-6
-            pen = pen_master if master else pen_minor
-            self.scene.addLine(X(x), y_grid_top, X(x), y_grid_bot, pen)
+            self.scene.addLine(X(x), y_grid_top, X(x), y_grid_bot,
+                               pen_master if master else pen_minor)
             if master:
                 self._text(fmt.fmt(x, 0), X(x), y_grid_top - 14,
                            size=7, center_x=True)
             x += GRID_MINOR_H
+        # fechamento do gráfico nas duas extremidades (esquerda e direita)
+        self.scene.addLine(X(0), y_grid_top, X(0), y_grid_bot, pen_border)
+        self.scene.addLine(X(total), y_grid_top, X(total), y_grid_bot,
+                           pen_border)
 
         # ------------------------------------------------------- perfil
         pen_ground = QPen(_GROUND, 2)
@@ -235,7 +300,6 @@ class ProfileTab(QWidget):
             self.scene.addLine(X(s.x0), Y(s.ground0), X(s.x1), Y(s.ground1),
                                pen_ground)
 
-        # nomes dos PVs acima do terreno
         pv_positions = [(s.x0, s.ground0, s.pipe.upstream) for s in segments]
         pv_positions.append((segments[-1].x1, segments[-1].ground1,
                              segments[-1].pipe.downstream))
@@ -243,8 +307,12 @@ class ProfileTab(QWidget):
             self._text(name, X(x_pv), Y(ground) - 16, size=8, bold=True,
                        center_x=True)
 
-        # ------------------------------------------------------- bandas
-        band_top = y_grid_bot + 24
+        # ------------------------------------------- eixo X e bandas
+        cx = X(total) / 2
+        self._text("Distância (m)", cx, y_grid_bot + BANDS_GAP / 2,
+                   size=8, bold=True, center_x=True, center_y=True)
+
+        band_top = y_grid_bot + BANDS_GAP
         band_defs = [
             ("Distâncias (m)", 62, self._band_distances),
             ("Cota terreno (m)", 56, self._band_ground),
@@ -253,22 +321,22 @@ class ProfileTab(QWidget):
             ("Declividade (m/m)", 24, self._band_slope),
             ("Material / Vazão", 24, self._band_material),
         ]
-        pen_frame = QPen(_BAND_FRAME, 0)
-        pen_frame.setCosmetic(True)
+        stations = self._stations(total)
         y0 = band_top
         for label, height, renderer in band_defs:
             y1 = y0 + height
-            self.scene.addRect(X(0), y0, X(total), height, pen_frame)
-            item = QGraphicsSimpleTextItem(label)
-            font = QFont()
-            font.setPointSizeF(7)
-            font.setBold(True)
-            item.setFont(font)
-            item.setBrush(QBrush(_TEXT))
+            self.scene.addRect(X(0), y0, X(total), height, pen_border)
+            item = self._make_text(label, 7, bold=True)
             br = item.boundingRect()
             item.setPos(X(0) - br.width() - 10,
                         (y0 + y1) / 2 - br.height() / 2)
             self.scene.addItem(item)
+            # ticks nas estacas de 20 em 20 m (topo e base da banda)
+            for x_st in stations:
+                self.scene.addLine(X(x_st), y0, X(x_st), y0 + TICK,
+                                   pen_border)
+                self.scene.addLine(X(x_st), y1 - TICK, X(x_st), y1,
+                                   pen_border)
             renderer(segments, X, y0, y1, total)
             y0 = y1
         bands_bottom = y0
@@ -281,58 +349,53 @@ class ProfileTab(QWidget):
                                pen_pv)
 
         # ------------------------------------------------ títulos e eixos
-        cx = X(total) / 2
         self._text(f"PERFIL — {path.label}", cx, y_grid_top - 64,
                    size=13, bold=True, center_x=True)
         self._text(f"Escala horizontal 1:{self.scale_h.value()} — "
                    f"vertical 1:{self.scale_v.value()}",
                    cx, y_grid_top - 40, size=8, center_x=True)
-        self._text("Distância (m)", cx, bands_bottom + 12, size=8,
-                   bold=True, center_x=True)
-        item = self._text("Cota (m)", 0, 0, size=8, bold=True, rotate=True)
-        br = item.boundingRect()
-        item.setPos(X(0) - 78, (y_grid_top + y_grid_bot) / 2 + br.width() / 2)
+        for x_axis, offset in ((X(0), -84.0), (X(total), 66.0)):
+            item = self._make_text("Cota (m)", 8, bold=True)
+            item.setRotation(-90)
+            br = item.boundingRect()
+            item.setPos(x_axis + offset,
+                        (y_grid_top + y_grid_bot) / 2 + br.width() / 2)
+            self.scene.addItem(item)
 
         rect = self.scene.itemsBoundingRect().adjusted(-30, -20, 30, 20)
         self.scene.setSceneRect(rect)
         self.view.user_zoomed = False
         self.view.fit_scene()
 
-    # ------------------------------------------------------ conteúdo das bandas
-    def _stations(self, total: float) -> list[float]:
-        xs = []
-        x = 0.0
-        while x <= total + 1e-6:
-            xs.append(min(x, total))
-            x += STATION_STEP
-        return xs
-
-    def _pv_xs(self, segments) -> list[float]:
-        xs = [s.x0 for s in segments]
-        xs.append(segments[-1].x1)
-        return xs
-
+    # -------------------------------------------------- conteúdo das bandas
     def _band_distances(self, segments, X, y0, y1, total):
-        # distância entre PVs: horizontal, no meio da banda e do vão
+        # distância entre PVs: horizontal, centralizada no vão e na banda
         for s in segments:
             self._text(fmt.fmt(s.x1 - s.x0, 2), X((s.x0 + s.x1) / 2),
-                       (y0 + y1) / 2 - 6, size=7, center_x=True)
-        # distância acumulada: vertical, no alinhamento de cada PV
-        for x_pv in self._pv_xs(segments):
-            self._text(fmt.fmt(x_pv, 2), X(x_pv), y1 - 4, size=6.5,
-                       rotate=True)
+                       (y0 + y1) / 2, size=7, center_x=True, center_y=True)
+        # distância acumulada: vertical, no alinhamento de cada PV; o
+        # último texto vai para dentro (à esquerda da linha de fechamento)
+        pv_xs = self._pv_xs(segments)
+        entries = []
+        for i, x_pv in enumerate(pv_xs):
+            anchor = ("right" if i == 0
+                      else "left" if i == len(pv_xs) - 1 else "center")
+            entries.append((x_pv, fmt.fmt(x_pv, 2), anchor))
+        self._rotated_texts(entries, X, y0, y1)
 
     def _values_band(self, segments, X, y0, y1, total, value_fn):
         pv_xs = self._pv_xs(segments)
-        for x_pv in pv_xs:
-            self._text(fmt.fmt(value_fn(x_pv), 3), X(x_pv), y1 - 4,
-                       size=6.5, rotate=True)
+        entries = []
         for x in self._stations(total):
-            # evita sobrepor o texto do PV
             if any(abs(x - x_pv) < 6.0 for x_pv in pv_xs):
                 continue
-            self._text(fmt.fmt(value_fn(x), 3), X(x), y1 - 4, size=6.5,
-                       rotate=True)
+            entries.append((x, fmt.fmt(value_fn(x), 3), "center"))
+        for i, x_pv in enumerate(pv_xs):
+            anchor = ("right" if i == 0
+                      else "left" if i == len(pv_xs) - 1 else "center")
+            entries.append((x_pv, fmt.fmt(value_fn(x_pv), 3), anchor))
+        entries.sort(key=lambda t: t[0])
+        self._rotated_texts(entries, X, y0, y1)
 
     def _band_ground(self, segments, X, y0, y1, total):
         self._values_band(segments, X, y0, y1, total,
@@ -351,8 +414,8 @@ class ProfileTab(QWidget):
     def _band_slope(self, segments, X, y0, y1, total):
         for s in segments:
             self._text(f"I = {fmt.fmt(s.pipe.slope, 4)}",
-                       X((s.x0 + s.x1) / 2), (y0 + y1) / 2 - 6,
-                       size=7, center_x=True)
+                       X((s.x0 + s.x1) / 2), (y0 + y1) / 2,
+                       size=7, center_x=True, center_y=True)
 
     def _band_material(self, segments, X, y0, y1, total):
         for s in segments:
@@ -360,5 +423,5 @@ class ProfileTab(QWidget):
             mat = r.material.split("(")[0].strip()
             self._text(f"{mat}  DN {r.diameter_mm} — "
                        f"Qf = {fmt.fmt(r.q_down_end, 2)} l/s",
-                       X((s.x0 + s.x1) / 2), (y0 + y1) / 2 - 6,
-                       size=6.5, center_x=True)
+                       X((s.x0 + s.x1) / 2), (y0 + y1) / 2,
+                       size=6.5, center_x=True, center_y=True)
