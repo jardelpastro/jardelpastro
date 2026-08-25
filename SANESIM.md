@@ -179,4 +179,8 @@ examples/            # projeto de exemplo
       imagem raster georreferenciada (world file .jgw/.pgw/.tfw lido
       automaticamente, ou posicionamento manual E/N + m/pixel)
 - [ ] Exportação DXF (planta/perfil para CAD)
-- [ ] Desfazer/refazer no editor gráfico
+- [x] Desfazer/refazer no editor gráfico (Ctrl+Z / Ctrl+Y, até 60
+      passos: inserir/mover/excluir/editar/dividir/inverter)
+- [x] Snap ao PV mais próximo ao inserir trechos; "Inserir PV neste
+      ponto" no botão direito do trecho divide-o em dois, com a cota do
+      novo PV vinda do terreno (ou interpolada entre os PVs vizinhos)

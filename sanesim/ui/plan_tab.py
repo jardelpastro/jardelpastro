@@ -31,9 +31,67 @@ from PySide6.QtWidgets import (QButtonGroup, QColorDialog, QComboBox,
                                QSpinBox, QSplitter, QToolButton,
                                QVBoxLayout, QWidget)
 
+from dataclasses import asdict
+
 from ..core import fmt
-from ..core.models import NODE_TYPES, Node, Pipe, Project
+from ..core.models import NODE_TYPES, Node, OseSheet, Pipe, Project
 from ..core.simulation import SimulationResult
+
+
+class _UndoStack:
+    """Desfazer/refazer por snapshots do estado editável da rede.
+
+    Guarda apenas nós, trechos e OSEs (o que o editor altera) — terreno e
+    fundo ficam fora para não pesar. Snapshots idênticos são descartados.
+    """
+
+    LIMIT = 60
+
+    def __init__(self):
+        self.undo_states: list[dict] = []
+        self.redo_states: list[dict] = []
+
+    @staticmethod
+    def capture(project: Project) -> dict:
+        return {
+            "nodes": [asdict(n) for n in project.nodes],
+            "pipes": [asdict(p) for p in project.pipes],
+            "oses": [asdict(o) for o in project.oses],
+        }
+
+    @staticmethod
+    def restore(project: Project, state: dict):
+        project.nodes = [Node(**d) for d in state["nodes"]]
+        project.pipes = [Pipe(**d) for d in state["pipes"]]
+        project.oses = [OseSheet(**d) for d in state["oses"]]
+
+    def push(self, state: dict):
+        if self.undo_states and self.undo_states[-1] == state:
+            return
+        self.undo_states.append(state)
+        if len(self.undo_states) > self.LIMIT:
+            self.undo_states.pop(0)
+        self.redo_states.clear()
+
+    def drop_if_unchanged(self, project: Project):
+        """Remove o último snapshot se nada mudou (clique sem arrasto)."""
+        if self.undo_states and self.undo_states[-1] == \
+                self.capture(project):
+            self.undo_states.pop()
+
+    def undo(self, project: Project) -> bool:
+        if not self.undo_states:
+            return False
+        self.redo_states.append(self.capture(project))
+        self.restore(project, self.undo_states.pop())
+        return True
+
+    def redo(self, project: Project) -> bool:
+        if not self.redo_states:
+            return False
+        self.undo_states.append(self.capture(project))
+        self.restore(project, self.redo_states.pop())
+        return True
 
 NODE_RADIUS = 4.0        # raio do símbolo do PV (m de desenho)
 # cores padrão por tipo de nó (PV branco; elevatória no rosinha padrão)
@@ -106,6 +164,23 @@ def _make_icon(kind: str) -> QIcon:
         pen.setWidthF(2.2)
         p.setPen(pen)
         p.drawLine(QPointF(14, 14), QPointF(20, 20))
+    elif kind in ("undo", "redo"):             # setas curvas
+        p.setBrush(Qt.NoBrush)
+        pen.setWidthF(2.0)
+        p.setPen(pen)
+        rect = QRectF(5, 7, 14, 14)
+        if kind == "undo":
+            p.drawArc(rect, 30 * 16, 180 * 16)
+            p.setBrush(QBrush(_ICON_FG))
+            p.setPen(Qt.NoPen)
+            p.drawPolygon(QPolygonF([QPointF(5, 10), QPointF(11, 8),
+                                     QPointF(7, 15)]))
+        else:
+            p.drawArc(rect, -30 * 16, 180 * 16)
+            p.setBrush(QBrush(_ICON_FG))
+            p.setPen(Qt.NoPen)
+            p.drawPolygon(QPolygonF([QPointF(19, 10), QPointF(13, 8),
+                                     QPointF(17, 15)]))
     elif kind == "colors":                     # paleta de cores
         p.setBrush(QBrush(QColor("#ffffff")))
         p.drawEllipse(QRectF(3, 4, 18, 16))
@@ -155,8 +230,14 @@ class NodeItem(QGraphicsPathItem):
             self.tab.update_pipes_of(self.node.name)
         return super().itemChange(change, value)
 
+    def mousePressEvent(self, event):
+        # snapshot no início do arrasto (descartado se nada mudar)
+        self.tab.checkpoint()
+        super().mousePressEvent(event)
+
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
+        self.tab.undo_stack.drop_if_unchanged(self.tab.project)
         self.tab.notify_network_changed(reload_scene=False)
 
     def contextMenuEvent(self, event):
@@ -232,7 +313,7 @@ class PipeItem(QGraphicsLineItem):
             painter.drawPolygon(self.arrow_poly)
 
     def contextMenuEvent(self, event):
-        self.tab.show_pipe_menu(self, event.screenPos())
+        self.tab.show_pipe_menu(self, event.screenPos(), event.scenePos())
 
 
 class PlanScene(QGraphicsScene):
@@ -248,9 +329,8 @@ class PlanScene(QGraphicsScene):
                 event.accept()
                 return
             if mode == "add_pipe":
-                item = self.itemAt(event.scenePos(), self.views()[0].transform())
-                while item is not None and not isinstance(item, NodeItem):
-                    item = item.parentItem()
+                # snap: aceita o clique perto do PV, não só em cima dele
+                item = self.tab.node_item_near(event.scenePos())
                 self.tab.pick_pipe_node(item)
                 event.accept()
                 return
@@ -428,6 +508,21 @@ class PlanTab(QWidget):
             sep.setFrameShadow(QFrame.Sunken)
             toolbar.addWidget(sep)
 
+        # grupo desfazer/refazer
+        self.undo_stack = _UndoStack()
+        self.btn_undo = QToolButton()
+        self.btn_undo.setIcon(_make_icon("undo"))
+        self.btn_undo.setIconSize(QSize(22, 22))
+        self.btn_undo.setToolTip("Desfazer (Ctrl+Z)")
+        self.btn_undo.clicked.connect(self.undo)
+        toolbar.addWidget(self.btn_undo)
+        self.btn_redo = QToolButton()
+        self.btn_redo.setIcon(_make_icon("redo"))
+        self.btn_redo.setIconSize(QSize(22, 22))
+        self.btn_redo.setToolTip("Refazer (Ctrl+Y)")
+        self.btn_redo.clicked.connect(self.redo)
+        toolbar.addWidget(self.btn_redo)
+        separator()
         # grupo navegação/seleção
         self.btn_select = mode_button(
             "select", "Selecionar", "select",
@@ -526,6 +621,34 @@ class PlanTab(QWidget):
         layout.addWidget(splitter, stretch=1)
 
         self.scene.selectionChanged.connect(self._selection_changed)
+
+        from PySide6.QtGui import QKeySequence, QShortcut
+        QShortcut(QKeySequence.Undo, self, activated=self.undo)
+        QShortcut(QKeySequence.Redo, self, activated=self.redo)
+        QShortcut(QKeySequence("Ctrl+Y"), self, activated=self.redo)
+        self._update_undo_buttons()
+
+    # ------------------------------------------------------ desfazer/refazer
+    def checkpoint(self):
+        """Grava o estado atual antes de uma alteração."""
+        self.undo_stack.push(_UndoStack.capture(self.project))
+        self._update_undo_buttons()
+
+    def undo(self):
+        if self.undo_stack.undo(self.project):
+            self.notify_network_changed(reload_scene=True)
+            self.status.setText("Desfeito.")
+        self._update_undo_buttons()
+
+    def redo(self):
+        if self.undo_stack.redo(self.project):
+            self.notify_network_changed(reload_scene=True)
+            self.status.setText("Refeito.")
+        self._update_undo_buttons()
+
+    def _update_undo_buttons(self):
+        self.btn_undo.setEnabled(bool(self.undo_stack.undo_states))
+        self.btn_redo.setEnabled(bool(self.undo_stack.redo_states))
 
     # ------------------------------------------------------- painel lateral
     def _build_side_panel(self) -> QWidget:
@@ -667,23 +790,55 @@ class PlanTab(QWidget):
             i += 1
         return f"{prefix}{i:02d}"
 
+    def _terrain_elevation(self, e: float, n: float) -> float | None:
+        if not self.project.terrain_lines:
+            return None
+        from ..core.terrain import TerrainError, TerrainModel, lines_to_points
+        try:
+            model = TerrainModel(lines_to_points(self.project.terrain_lines))
+            return round(model.elevation_at(e, n), 3)
+        except TerrainError:
+            return None
+
+    def node_item_near(self, pos: QPointF,
+                       radius_px: float = 18.0) -> NodeItem | None:
+        """Nó mais próximo do clique dentro do raio de snap (em pixels)."""
+        scale = self.view.transform().m11() or 1.0
+        radius = radius_px / scale
+        best, best_dist = None, radius
+        for item in self._node_items.values():
+            dist = math.hypot(item.pos().x() - pos.x(),
+                              item.pos().y() - pos.y())
+            if dist <= best_dist:
+                best, best_dist = item, dist
+        return best
+
     def add_node_at(self, pos: QPointF):
+        self.checkpoint()
         names = {n.name for n in self.project.nodes}
         node_type = self.node_type_combo.currentText()
         prefix = "PV-" if node_type == "PV" else f"{node_type}-"
+        e, n = round(pos.x(), 2), round(-pos.y(), 2)
+        ground = self._terrain_elevation(e, n)
         node = Node(
             name=self._next_name(prefix, names),
             node_type=node_type,
-            coord_e=round(pos.x(), 2),
-            coord_n=round(-pos.y(), 2),
+            coord_e=e,
+            coord_n=n,
+            ground_elev=ground if ground is not None else 0.0,
         )
         self.project.nodes.append(node)
         item = NodeItem(node, self)
         item.setFlag(QGraphicsItem.ItemIsMovable, False)
         self.scene.addItem(item)
         self._node_items[node.id] = item
-        self.status.setText(f"Nó {node.name} criado — informe a cota do "
-                            "terreno nas propriedades.")
+        if ground is not None:
+            self.status.setText(
+                f"Nó {node.name} criado — cota {fmt.fmt(ground, 3)} m "
+                "interpolada do terreno.")
+        else:
+            self.status.setText(f"Nó {node.name} criado — informe a cota "
+                                "do terreno nas propriedades.")
         self.notify_network_changed(reload_scene=False)
 
     def pick_pipe_node(self, item: NodeItem | None):
@@ -698,6 +853,7 @@ class PlanTab(QWidget):
             return
         if item is self._pipe_first:
             return
+        self.checkpoint()
         names = {p.name for p in self.project.pipes}
         i = 1
         while f"T{i}" in names:
@@ -724,6 +880,7 @@ class PlanTab(QWidget):
         self.network_changed()
         if reload_scene:
             self.load_from(self.project)
+        self._update_undo_buttons()
 
     # ------------------------------------------------------------ terreno
     def load_terrain(self):
@@ -996,16 +1153,20 @@ class PlanTab(QWidget):
         elif chosen == act_del:
             self.delete_node(item.node)
 
-    def show_pipe_menu(self, item: PipeItem, screen_pos):
+    def show_pipe_menu(self, item: PipeItem, screen_pos, scene_pos=None):
         menu = QMenu()
         act_prop = menu.addAction("Propriedades…")
+        act_split = menu.addAction("Inserir PV neste ponto (dividir trecho)")
         act_invert = menu.addAction("Inverter sentido (mont ↔ jus)")
         act_del = menu.addAction("Excluir trecho")
         chosen = menu.exec(screen_pos)
         if chosen == act_prop:
             item.setSelected(True)
             self.p_name.setFocus()
+        elif chosen == act_split and scene_pos is not None:
+            self.split_pipe(item.pipe, scene_pos)
         elif chosen == act_invert:
+            self.checkpoint()
             item.pipe.upstream, item.pipe.downstream = \
                 item.pipe.downstream, item.pipe.upstream
             item.update_geometry()
@@ -1013,7 +1174,62 @@ class PlanTab(QWidget):
         elif chosen == act_del:
             self.delete_pipe(item.pipe)
 
+    def split_pipe(self, pipe: Pipe, scene_pos: QPointF):
+        """Insere um PV sobre o trecho, dividindo-o em dois.
+
+        O ponto clicado é projetado sobre o eixo do trecho; a cota do novo
+        PV vem do terreno (se carregado) ou é interpolada entre os PVs de
+        montante e jusante.
+        """
+        up = self.project.node_by_name(pipe.upstream)
+        down = self.project.node_by_name(pipe.downstream)
+        if not (up and down):
+            return
+        # projeção do clique sobre o segmento (coords de cena: y = -N)
+        ax, ay = up.coord_e, -up.coord_n
+        bx, by = down.coord_e, -down.coord_n
+        dx, dy = bx - ax, by - ay
+        length2 = dx * dx + dy * dy
+        if length2 <= 1e-9:
+            return
+        frac = ((scene_pos.x() - ax) * dx + (scene_pos.y() - ay) * dy) \
+            / length2
+        frac = min(max(frac, 0.05), 0.95)   # nunca em cima dos PVs
+        e = round(ax + dx * frac, 2)
+        n = round(-(ay + dy * frac), 2)
+        ground = self._terrain_elevation(e, n)
+        if ground is None:
+            ground = round(up.ground_elev
+                           + (down.ground_elev - up.ground_elev) * frac, 3)
+
+        self.checkpoint()
+        names = {nd.name for nd in self.project.nodes}
+        node = Node(name=self._next_name("PV-", names), node_type="PV",
+                    coord_e=e, coord_n=n, ground_elev=ground,
+                    network=pipe.network)
+        self.project.nodes.append(node)
+        # trecho original passa a terminar no novo PV; o novo trecho herda
+        # as propriedades e segue até o jusante original
+        pipe_names = {p.name for p in self.project.pipes}
+        i = 1
+        while f"T{i}" in pipe_names:
+            i += 1
+        new_pipe = Pipe(name=f"T{i}", upstream=node.name,
+                        downstream=pipe.downstream, material=pipe.material,
+                        diameter_mm=pipe.diameter_mm, slope=pipe.slope,
+                        status=pipe.status, network=pipe.network,
+                        zone=pipe.zone, color=pipe.color)
+        pipe.downstream = node.name
+        pipe.length = 0.0        # recalcula pelas coordenadas
+        index = self.project.pipes.index(pipe)
+        self.project.pipes.insert(index + 1, new_pipe)
+        self.status.setText(
+            f"Trecho dividido: {pipe.name} até {node.name} "
+            f"(cota {fmt.fmt(ground, 3)} m) e {new_pipe.name} adiante.")
+        self.notify_network_changed(reload_scene=True)
+
     def delete_node(self, node: Node):
+        self.checkpoint()
         self.project.pipes = [p for p in self.project.pipes
                               if node.name not in (p.upstream, p.downstream)]
         self.project.nodes = [n for n in self.project.nodes
@@ -1021,6 +1237,7 @@ class PlanTab(QWidget):
         self.notify_network_changed(reload_scene=True)
 
     def delete_pipe(self, pipe: Pipe):
+        self.checkpoint()
         self.project.pipes = [p for p in self.project.pipes
                               if p.id != pipe.id]
         self.notify_network_changed(reload_scene=True)
@@ -1150,6 +1367,8 @@ class PlanTab(QWidget):
         items = self.scene.selectedItems()
         node_item = next((i for i in items if isinstance(i, NodeItem)), None)
         pipe_item = next((i for i in items if isinstance(i, PipeItem)), None)
+        if node_item is not None or pipe_item is not None:
+            self.checkpoint()
         if node_item is not None:
             node = node_item.node
             old_name = node.name
@@ -1185,5 +1404,6 @@ class PlanTab(QWidget):
             pipe_item.refresh()
         else:
             return
+        self.undo_stack.drop_if_unchanged(self.project)
         self.notify_network_changed(reload_scene=False)
         self.status.setText("Alterações aplicadas.")
