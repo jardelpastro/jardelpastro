@@ -487,6 +487,25 @@ class PlanTab(QWidget):
         terrain_btn.setMenu(terrain_menu)
         terrain_btn.setPopupMode(QToolButton.InstantPopup)
         toolbar.addWidget(terrain_btn)
+        bg_btn = QToolButton()
+        bg_btn.setText("Fundo ▾")
+        bg_btn.setToolTip(
+            "Fundo da planta: DXF de arruamento/cadastro ou imagem "
+            "georreferenciada (world file lido automaticamente).")
+        bg_menu = QMenu(bg_btn)
+        bg_menu.addAction("Carregar DXF de fundo (arruamento/cadastro)…",
+                          self.load_background_dxf)
+        bg_menu.addAction("Carregar imagem de fundo…",
+                          self.load_background_image)
+        self.act_show_background = bg_menu.addAction("Mostrar fundo")
+        self.act_show_background.setCheckable(True)
+        self.act_show_background.setChecked(True)
+        self.act_show_background.toggled.connect(
+            lambda _checked: self._draw_background())
+        bg_menu.addAction("Remover fundo do projeto", self.clear_background)
+        bg_btn.setMenu(bg_menu)
+        bg_btn.setPopupMode(QToolButton.InstantPopup)
+        toolbar.addWidget(bg_btn)
 
         self.btn_select.setChecked(True)
         toolbar.addStretch(1)
@@ -619,6 +638,8 @@ class PlanTab(QWidget):
             self._pipe_items[pipe.id] = item
         self.scene.blockSignals(False)
         self._terrain_items = []
+        self._background_items = []
+        self._draw_background()
         self._draw_terrain()
         self.set_mode(self.mode)
         self.fit_view()
@@ -789,6 +810,142 @@ class PlanTab(QWidget):
             label.setZValue(-1)
             self.scene.addItem(label)
             self._terrain_items.append(label)
+
+    # ------------------------------------------------------------- fundo
+    def load_background_dxf(self):
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        from ..core.background import BackgroundError, load_dxf_background
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Carregar DXF de fundo (arruamento/cadastro)", "",
+            "DXF (*.dxf)")
+        if not path:
+            return
+        try:
+            lines, texts = load_dxf_background(path)
+        except BackgroundError as exc:
+            QMessageBox.warning(self, "Fundo", str(exc))
+            return
+        self.project.background_lines = lines
+        self.project.background_texts = texts
+        self.status.setText(
+            f"Fundo carregado: {len(lines)} linha(s), {len(texts)} "
+            "texto(s).")
+        self._draw_background()
+        self.fit_view()
+
+    def load_background_image(self):
+        from PySide6.QtGui import QPixmap
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        from ..core.background import read_world_file
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Carregar imagem de fundo", "",
+            "Imagens (*.png *.jpg *.jpeg *.bmp *.tif *.tiff)")
+        if not path:
+            return
+        if QPixmap(path).isNull():
+            QMessageBox.warning(self, "Fundo",
+                                "Não foi possível ler a imagem.")
+            return
+        bg = self.project.background_image
+        world = read_world_file(path)
+        if world is not None:
+            bg.m_per_px, bg.origin_e, bg.origin_n = world
+            self.status.setText(
+                "World file encontrado: imagem georreferenciada "
+                "automaticamente.")
+        else:
+            if not self._ask_image_placement(bg):
+                return
+        bg.path = path
+        self._draw_background()
+        self.fit_view()
+
+    def _ask_image_placement(self, bg) -> bool:
+        """Posicionamento manual quando a imagem não tem world file."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Posicionar imagem de fundo")
+        v = QVBoxLayout(dialog)
+        hint = QLabel(
+            "Imagem sem world file (.jgw/.pgw/.tfw). Informe a coordenada "
+            "do canto SUPERIOR ESQUERDO e a resolução (metros por pixel).")
+        hint.setWordWrap(True)
+        v.addWidget(hint)
+        form = QFormLayout()
+        e_edit = QLineEdit(fmt.fmt_edit(bg.origin_e, 2))
+        n_edit = QLineEdit(fmt.fmt_edit(bg.origin_n, 2))
+        res_edit = QLineEdit(fmt.fmt_edit(bg.m_per_px, 4))
+        form.addRow("E do canto sup. esquerdo (m):", e_edit)
+        form.addRow("N do canto sup. esquerdo (m):", n_edit)
+        form.addRow("Metros por pixel:", res_edit)
+        v.addLayout(form)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok
+                                   | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        v.addWidget(buttons)
+        if dialog.exec() != QDialog.Accepted:
+            return False
+        bg.origin_e = fmt.parse(e_edit.text(), bg.origin_e)
+        bg.origin_n = fmt.parse(n_edit.text(), bg.origin_n)
+        bg.m_per_px = max(1e-6, fmt.parse(res_edit.text(), bg.m_per_px))
+        return True
+
+    def clear_background(self):
+        self.project.background_lines = []
+        self.project.background_texts = []
+        self.project.background_image.path = ""
+        self._draw_background()
+        self.status.setText("Fundo removido do projeto.")
+
+    def _draw_background(self):
+        from PySide6.QtGui import QPixmap
+        for item in getattr(self, "_background_items", []):
+            try:
+                self.scene.removeItem(item)
+            except RuntimeError:
+                pass
+        self._background_items = []
+        if not self.act_show_background.isChecked():
+            return
+        # imagem raster (abaixo de tudo)
+        bg = self.project.background_image
+        if bg.path:
+            pixmap = QPixmap(bg.path)
+            if pixmap.isNull():
+                self.status.setText(
+                    f"Imagem de fundo não encontrada: {bg.path}")
+            else:
+                item = self.scene.addPixmap(pixmap)
+                item.setPos(bg.origin_e, -bg.origin_n)
+                item.setScale(bg.m_per_px)
+                item.setOpacity(bg.opacity)
+                item.setZValue(-4)
+                self._background_items.append(item)
+        # DXF de fundo (linhas cinza + textos)
+        pen = QPen(QColor(120, 120, 120, 110), 0)
+        pen.setCosmetic(True)
+        for line in self.project.background_lines:
+            if len(line) < 2:
+                continue
+            path = QPainterPath(QPointF(line[0][0], -line[0][1]))
+            for vertex in line[1:]:
+                path.lineTo(vertex[0], -vertex[1])
+            item = self.scene.addPath(path, pen)
+            item.setZValue(-3)
+            self._background_items.append(item)
+        for e, n, height, rotation, content in self.project.background_texts:
+            label = QGraphicsSimpleTextItem(str(content))
+            font = QFont()
+            font.setPointSizeF(max(0.5, float(height)))
+            label.setFont(font)
+            label.setBrush(QBrush(QColor(120, 120, 120, 150)))
+            label.setPos(float(e), -float(n) - float(height) * 1.4)
+            if rotation:
+                label.setTransformOriginPoint(0, float(height) * 1.4)
+                label.setRotation(-float(rotation))
+            label.setZValue(-3)
+            self.scene.addItem(label)
+            self._background_items.append(label)
 
     def edit_network_colors(self):
         """Diálogo de cor por nome de rede (coletor, interceptor...)."""

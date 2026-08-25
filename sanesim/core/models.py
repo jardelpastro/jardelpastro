@@ -13,7 +13,7 @@ NODE_TYPES = ["PV", "TIL", "TL", "CP", "TQ", "EEE", "Lançamento"]
 
 # Versão do esquema do arquivo de projeto (.json). Incrementar a cada
 # mudança incompatível e tratar a migração em Project.from_dict.
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 def new_id() -> str:
@@ -239,6 +239,21 @@ class OseSheet:
 
 
 @dataclass
+class BackgroundImage:
+    """Imagem raster de fundo da planta, referenciada por caminho.
+
+    A imagem NÃO é embutida no projeto (arquivos grandes); o caminho é
+    salvo e a imagem recarregada na abertura. origin_e/origin_n são as
+    coordenadas do canto superior esquerdo; m_per_px é a resolução.
+    """
+    path: str = ""
+    origin_e: float = 0.0
+    origin_n: float = 0.0
+    m_per_px: float = 1.0
+    opacity: float = 1.0
+
+
+@dataclass
 class Project:
     title: str = "Projeto sem título"
     info: ProjectInfo = field(default_factory=ProjectInfo)
@@ -255,6 +270,13 @@ class Project:
     # Curvas de nível / pontos cotados: lista de polylines, cada uma uma
     # lista de vértices [E, N, Z]. Alimenta a interpolação de cotas.
     terrain_lines: list[list[list[float]]] = field(default_factory=list)
+    # Fundo de planta em DXF (arruamento/cadastro), já convertido em
+    # geometria leve: polylines [[e, n], ...] e textos
+    # [e, n, altura, rotação°, texto].
+    background_lines: list[list[list[float]]] = field(default_factory=list)
+    background_texts: list[list] = field(default_factory=list)
+    background_image: BackgroundImage = field(
+        default_factory=BackgroundImage)
 
     # ------------------------------------------------------------------
     def node_by_name(self, name: str) -> Node | None:
@@ -323,6 +345,11 @@ class Project:
             "terrain_lines": [[[round(v, 3) for v in vertex]
                                for vertex in line]
                               for line in self.terrain_lines],
+            "background_lines": [[[round(v, 3) for v in vertex]
+                                  for vertex in line]
+                                 for line in self.background_lines],
+            "background_texts": self.background_texts,
+            "background_image": asdict(self.background_image),
         }
 
     @staticmethod
@@ -355,6 +382,10 @@ class Project:
         proj.oses = [OseSheet(**o) for o in d.get("oses", [])]
         proj.network_colors = dict(d.get("network_colors", {}))
         proj.terrain_lines = d.get("terrain_lines", [])
+        proj.background_lines = d.get("background_lines", [])
+        proj.background_texts = d.get("background_texts", [])
+        proj.background_image = BackgroundImage(
+            **d.get("background_image", {}))
         # migração v1 -> v2: garante ids estáveis em nós e trechos
         for n in proj.nodes:
             if not n.id:

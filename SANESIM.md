@@ -174,6 +174,9 @@ examples/            # projeto de exemplo
       elevação) e CSV (E,N,Z), interpolação TIN (Delaunay, estilo
       Civil 3D; IDW como reserva), curvas desenhadas na planta e cota
       automática dos PVs (na simulação ou gravada nos nós)
-- [ ] Imagem/DXF de fundo na planta (arruamento, cadastro)
+- [x] Fundo de planta: DXF de arruamento/cadastro (linhas, círculos,
+      arcos, textos e blocos explodidos, em cinza atrás da rede) e
+      imagem raster georreferenciada (world file .jgw/.pgw/.tfw lido
+      automaticamente, ou posicionamento manual E/N + m/pixel)
 - [ ] Exportação DXF (planta/perfil para CAD)
 - [ ] Desfazer/refazer no editor gráfico
