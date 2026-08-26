@@ -164,6 +164,20 @@ def simulate(project: Project) -> SimulationResult:
             raise SimulationError(
                 f"Trecho {p.name}: nó de jusante '{p.downstream}' não existe.")
 
+    # Cada unidade (PV/TIL/EEE...) tem obrigatoriamente UMA única saída:
+    # duas saídas do mesmo nó tornariam a marcha de vazões inválida.
+    outlets: dict[str, list[str]] = {}
+    for p in project.pipes:
+        outlets.setdefault(p.upstream, []).append(p.name)
+    multiple = {node: names for node, names in outlets.items()
+                if len(names) > 1}
+    if multiple:
+        detail = "; ".join(f"{node} → {', '.join(names)}"
+                           for node, names in multiple.items())
+        raise SimulationError(
+            f"Unidade com mais de uma saída (não permitido): {detail}. "
+            "Cada PV deve ter uma única tubulação de saída.")
+
     order = _topological_order(project)
 
     design = project.design
@@ -462,6 +476,31 @@ def simulate(project: Project) -> SimulationResult:
                 f"aprofundamento especial).")
 
         res.pipes.append(r)
+
+    # Chegadas por PV: usual até 3 entradas; acima disso, alerta — e
+    # verificação de conflito físico quando várias chegam na mesma cota.
+    arrivals: dict[str, list[PipeResult]] = {}
+    for r in res.pipes:
+        arrivals.setdefault(r.downstream, []).append(r)
+    for node_name, incoming in arrivals.items():
+        if len(incoming) <= 3:
+            continue
+        inverts = sorted(r.invert_down for r in incoming)
+        clustered = 1
+        max_cluster = 1
+        for a, b in zip(inverts, inverts[1:]):
+            clustered = clustered + 1 if (b - a) <= 0.40 else 1
+            max_cluster = max(max_cluster, clustered)
+        note = (f"{node_name} recebe {len(incoming)} chegadas (usual: "
+                "até 3) — verifique o conflito físico das tubulações.")
+        if max_cluster > 3:
+            note += (f" {max_cluster} chegadas em cotas praticamente "
+                     "iguais (diferença <= 0,40 m): conflito provável.")
+        res.messages.append(note)
+        for r in incoming:
+            r.violations.append(
+                f"PV {node_name} com {len(incoming)} chegadas (> 3): "
+                "verifique conflito físico conforme as cotas de entrada.")
 
     if res.has_violations:
         n_viol = sum(1 for p in res.pipes if p.violations)

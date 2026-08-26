@@ -14,12 +14,13 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 from PySide6.QtGui import (QBrush, QColor, QFont, QImage, QPageLayout,
                            QPageSize, QPainter, QPainterPath, QPdfWriter,
                            QPen, QPolygonF)
-from PySide6.QtWidgets import (QFileDialog, QGraphicsScene,
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QGraphicsScene,
                                QGraphicsSimpleTextItem, QGraphicsView,
                                QHBoxLayout, QLabel, QMessageBox,
                                QPushButton, QVBoxLayout, QWidget)
 
 from ..core import fmt
+from ..core.materials import find_material
 from ..core.models import OseSheet, Project
 from ..core.ose import ose_pipe_results
 from ..core.simulation import SimulationResult
@@ -49,7 +50,12 @@ class CroquiTab(QWidget):
 
         layout = QVBoxLayout(self)
         top = QHBoxLayout()
-        self.header = QLabel("Selecione uma OSE na aba Planilha.")
+        top.addWidget(QLabel("OSE:"))
+        self.ose_combo = QComboBox()
+        self.ose_combo.setMinimumWidth(260)
+        self.ose_combo.currentIndexChanged.connect(self._combo_changed)
+        top.addWidget(self.ose_combo)
+        self.header = QLabel("Crie/selecione uma OSE.")
         self.header.setWordWrap(True)
         font = self.header.font()
         font.setBold(True)
@@ -62,6 +68,34 @@ class CroquiTab(QWidget):
         self.scene = QGraphicsScene()
         self.view = _CroquiView(self.scene)
         layout.addWidget(self.view, stretch=1)
+
+    # ------------------------------------------------------------------
+    def set_context(self, project: Project, result: SimulationResult | None,
+                    current_ose: OseSheet | None = None):
+        """Popula o seletor de OSEs e mostra a OSE atual (se houver)."""
+        self._project, self._result = project, result
+        self.ose_combo.blockSignals(True)
+        self.ose_combo.clear()
+        for ose in project.oses:
+            label = f"OSE {ose.number}" if ose.number else "OSE (sem nº)"
+            if ose.street:
+                label += f" — {ose.street}"
+            if ose.status == "cancelada":
+                label += "  (CANCELADA)"
+            self.ose_combo.addItem(label, ose.id)
+        target = current_ose or (project.oses[0] if project.oses else None)
+        if target is not None:
+            idx = self.ose_combo.findData(target.id)
+            self.ose_combo.setCurrentIndex(max(0, idx))
+        self.ose_combo.blockSignals(False)
+        self.show_ose(project, target, result)
+
+    def _combo_changed(self, _index: int):
+        if self._project is None:
+            return
+        ose_id = self.ose_combo.currentData()
+        ose = next((o for o in self._project.oses if o.id == ose_id), None)
+        self.show_ose(self._project, ose, self._result)
 
     # ------------------------------------------------------------------
     def show_ose(self, project: Project, ose: OseSheet | None,
@@ -79,6 +113,39 @@ class CroquiTab(QWidget):
 
         pipe_ids = set(ose.pipe_ids)
         results = ({r.pipe: r for r in result.pipes} if result else {})
+
+        # camadas de contexto: fundo (arruamento) e curvas de nível
+        bg_pen = QPen(QColor(120, 120, 120, 80), 0)
+        bg_pen.setCosmetic(True)
+        for line in project.background_lines:
+            if len(line) < 2:
+                continue
+            path = QPainterPath(QPointF(line[0][0], -line[0][1]))
+            for vertex in line[1:]:
+                path.lineTo(vertex[0], -vertex[1])
+            item = self.scene.addPath(path, bg_pen)
+            item.setZValue(-3)
+        for e, n, height, rotation, content in project.background_texts:
+            label = QGraphicsSimpleTextItem(str(content))
+            font = QFont()
+            font.setPointSizeF(max(0.5, float(height)))
+            label.setFont(font)
+            label.setBrush(QBrush(QColor(120, 120, 120, 130)))
+            label.setPos(float(e), -float(n) - float(height) * 1.4)
+            if rotation:
+                label.setRotation(-float(rotation))
+            label.setZValue(-3)
+            self.scene.addItem(label)
+        terrain_pen = QPen(QColor(160, 120, 60, 70), 0)
+        terrain_pen.setCosmetic(True)
+        for line in project.terrain_lines:
+            if len(line) < 2:
+                continue
+            path = QPainterPath(QPointF(line[0][0], -line[0][1]))
+            for vertex in line[1:]:
+                path.lineTo(vertex[0], -vertex[1])
+            item = self.scene.addPath(path, terrain_pen)
+            item.setZValue(-2)
 
         # contexto: restante da rede esmaecido
         ghost_pen = QPen(_GHOST, 1.0)
@@ -115,15 +182,19 @@ class CroquiTab(QWidget):
                 QPointF(ax - size * math.cos(ang + 0.45),
                         ay - size * math.sin(ang + 0.45))])
             self.scene.addPolygon(poly, QPen(Qt.NoPen), QBrush(_PIPE))
-            # rótulo: nome, DN e extensão (declividade se simulado)
+            # rótulo: nome, material, DN, extensão (e declividade simulada)
             r = results.get(pipe.name)
-            label = pipe.name
+            mat = find_material(project.catalog,
+                                pipe.material
+                                or project.options.default_material)
+            mat_name = mat.name.split("(")[0].strip() if mat else ""
             if r:
-                label = (f"{pipe.name}  DN {r.diameter_mm}  "
+                label = (f"{pipe.name}  {mat_name}  DN {r.diameter_mm}  "
                          f"L={fmt.fmt(r.length, 2)} m  "
                          f"I={fmt.fmt(r.slope, 4)}")
             else:
-                label = (f"{pipe.name}  "
+                dn = f"DN {pipe.diameter_mm}  " if pipe.diameter_mm else ""
+                label = (f"{pipe.name}  {mat_name}  {dn}"
                          f"L={fmt.fmt(project.pipe_length(pipe), 2)} m")
             item = QGraphicsSimpleTextItem(label)
             font = QFont()
@@ -162,14 +233,18 @@ class CroquiTab(QWidget):
             item.setBrush(QBrush(_TEXT))
             item.setPos(x + 4.5, y - 11.0)
             self.scene.addItem(item)
+            info_lines = []
             if node.ground_elev:
-                sub = QGraphicsSimpleTextItem(
-                    f"CT {fmt.fmt(node.ground_elev, 3)}")
+                info_lines.append(f"CT {fmt.fmt(node.ground_elev, 3)}")
+            info_lines.append(f"E {fmt.fmt(node.coord_e, 2)}")
+            info_lines.append(f"N {fmt.fmt(node.coord_n, 2)}")
+            for k, text in enumerate(info_lines):
+                sub = QGraphicsSimpleTextItem(text)
                 font = QFont()
-                font.setPointSizeF(3.2)
+                font.setPointSizeF(3.0)
                 sub.setFont(font)
                 sub.setBrush(QBrush(QColor("#4a5470")))
-                sub.setPos(x + 4.5, y - 5.5)
+                sub.setPos(x + 4.5, y - 5.5 + k * 4.2)
                 self.scene.addItem(sub)
 
         rect = self.scene.itemsBoundingRect().adjusted(-30, -30, 30, 30)

@@ -105,6 +105,9 @@ class NodesTab(_TableTab):
             self._set(row, 7, node.network)
 
     def apply_to(self, project: Project):
+        # Atualiza os objetos EXISTENTES em vez de recriá-los: a planta e
+        # o desfazer guardam referências a eles (identidade preservada).
+        existing = {n.id: n for n in project.nodes}
         nodes: list[Node] = []
         for row in range(self.table.rowCount()):
             name = _text(self.table.item(row, 0))
@@ -114,17 +117,19 @@ class NodesTab(_TableTab):
             node_type = combo.currentText() if combo else "PV"
             item0 = self.table.item(row, 0)
             stable_id = item0.data(Qt.UserRole) if item0 else None
-            nodes.append(Node(
-                name=name,
-                node_type=node_type,
-                **({"id": stable_id} if stable_id else {}),
-                coord_n=_num(self.table.item(row, 2)),
-                coord_e=_num(self.table.item(row, 3)),
-                ground_elev=_num(self.table.item(row, 4)),
-                q_point_start=_num(self.table.item(row, 5)),
-                q_point_end=_num(self.table.item(row, 6)),
-                network=_text(self.table.item(row, 7)),
-            ))
+            node = existing.get(stable_id)
+            if node is None:
+                node = Node(name=name,
+                            **({"id": stable_id} if stable_id else {}))
+            node.name = name
+            node.node_type = node_type
+            node.coord_n = _num(self.table.item(row, 2))
+            node.coord_e = _num(self.table.item(row, 3))
+            node.ground_elev = _num(self.table.item(row, 4))
+            node.q_point_start = _num(self.table.item(row, 5))
+            node.q_point_end = _num(self.table.item(row, 6))
+            node.network = _text(self.table.item(row, 7))
+            nodes.append(node)
         project.nodes = nodes
 
 
@@ -185,6 +190,7 @@ class PipesTab(_TableTab):
 
     def apply_to(self, project: Project):
         self._catalog = project.catalog
+        existing = {p.id: p for p in project.pipes}
         pipes: list[Pipe] = []
         for row in range(self.table.rowCount()):
             name = _text(self.table.item(row, 0))
@@ -196,19 +202,21 @@ class PipesTab(_TableTab):
             material = combo.currentData() if combo else ""
             item0 = self.table.item(row, 0)
             stable_id = item0.data(Qt.UserRole) if item0 else None
-            pipes.append(Pipe(
-                name=name,
-                **({"id": stable_id} if stable_id else {}),
-                upstream=up,
-                downstream=down,
-                length=_num(self.table.item(row, 3)),
-                material=material or "",
-                diameter_mm=int(_num(self.table.item(row, 5))),
-                slope=_num(self.table.item(row, 6)),
-                zone=_text(self.table.item(row, 7)),
-                status=_text(self.table.item(row, 8)) or "Rede Projetada",
-                network=_text(self.table.item(row, 9)),
-            ))
+            pipe = existing.get(stable_id)
+            if pipe is None:
+                pipe = Pipe(name=name, upstream=up, downstream=down,
+                            **({"id": stable_id} if stable_id else {}))
+            pipe.name = name
+            pipe.upstream = up
+            pipe.downstream = down
+            pipe.length = _num(self.table.item(row, 3))
+            pipe.material = material or ""
+            pipe.diameter_mm = int(_num(self.table.item(row, 5)))
+            pipe.slope = _num(self.table.item(row, 6))
+            pipe.zone = _text(self.table.item(row, 7))
+            pipe.status = _text(self.table.item(row, 8)) or "Rede Projetada"
+            pipe.network = _text(self.table.item(row, 9))
+            pipes.append(pipe)
         project.pipes = pipes
 
 

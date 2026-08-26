@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout,
 from ..core import fmt
 from ..core.models import Project
 from ..core.profile import (ProfilePath, ProfileSegment, build_geometry,
-                            build_ose_paths, build_paths)
+                            build_ose_paths)
 from ..core.simulation import SimulationResult
 
 _GROUND = QColor("#8a5a2b")
@@ -81,7 +81,7 @@ class ProfileTab(QWidget):
 
         layout = QVBoxLayout(self)
         controls = QHBoxLayout()
-        controls.addWidget(QLabel("Caminho (montante → jusante):"))
+        controls.addWidget(QLabel("OSE / ramal (montante → jusante):"))
         self.path_combo = QComboBox()
         self.path_combo.currentIndexChanged.connect(self._redraw)
         controls.addWidget(self.path_combo, stretch=1)
@@ -122,9 +122,10 @@ class ProfileTab(QWidget):
 
     # ------------------------------------------------------------------
     def show_result(self, project: Project, result: SimulationResult):
+        """Perfis por OSE: um caminho por ramal de cada OSE do projeto."""
         self._project = project
         self._result = result
-        self._paths = build_ose_paths(project, result) + build_paths(result)
+        self._paths = build_ose_paths(project, result)
         self.path_combo.blockSignals(True)
         self.path_combo.clear()
         for path in self._paths:
@@ -132,7 +133,12 @@ class ProfileTab(QWidget):
         self.path_combo.blockSignals(False)
         if self._paths:
             self.path_combo.setCurrentIndex(0)
-        self._redraw()
+            self._redraw()
+        else:
+            self.scene.clear()
+            self.hint.setText(
+                "Nenhuma OSE com trechos: crie as OSEs (janela OSEs) para "
+                "gerar os perfis — cada OSE tem o perfil dos seus trechos.")
 
     # ------------------------------------------------------- exportação
     def _export_dialog(self):

@@ -51,16 +51,29 @@ def test_add_node_via_click_position(window):
 
 def test_add_pipe_by_picking_nodes(window):
     plan = window.plan_tab
+    # cria um nó novo (sem saída) para ser o montante do novo trecho
+    plan.add_node_at(QPointF(672250.0, -7184750.0))
+    new_node = window.project.nodes[-1]
     plan.set_mode("add_pipe")
-    items = list(plan._node_items.values())
     n_before = len(window.project.pipes)
-    plan.pick_pipe_node(items[0])
-    plan.pick_pipe_node(items[1])
+    plan.pick_pipe_node(plan._node_items[new_node.id])
+    target = plan._node_items[window.project.nodes[0].id]
+    plan.pick_pipe_node(target)
     assert len(window.project.pipes) == n_before + 1
     pipe = window.project.pipes[-1]
-    assert pipe.upstream == items[0].node.name
-    assert pipe.downstream == items[1].node.name
-    assert window.pipes_tab.table.rowCount() == n_before + 1
+    assert pipe.upstream == new_node.name
+    assert pipe.downstream == target.node.name
+
+
+def test_second_outlet_is_blocked(window):
+    plan = window.plan_tab
+    # PV-01 já tem saída (T1): criar outra saída é bloqueado
+    up = window.project.node_by_name("PV-01")
+    down = window.project.node_by_name("PV-05")
+    n_before = len(window.project.pipes)
+    assert plan._create_pipe(up, down) is None
+    assert len(window.project.pipes) == n_before
+    assert "única saída" in plan.status.text()
 
 
 def test_move_node_updates_coordinates(window):

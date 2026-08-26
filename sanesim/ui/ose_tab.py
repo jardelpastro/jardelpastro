@@ -324,9 +324,13 @@ class OseTab(QWidget):
         self.f_gauge.valueChanged.connect(self._gauge_changed)
         form.addRow("Gabarito da régua:", self.f_gauge)
         mv.addWidget(params)
-        mv.addWidget(QLabel("Trechos desta OSE\n(ordem da aba Trechos):"))
+        mv.addWidget(QLabel("Trechos desta OSE\n(clique para "
+                            "incluir/retirar):"))
         self.pipe_list = QListWidget()
-        self.pipe_list.itemChanged.connect(self._pipes_changed)
+        # o clique em QUALQUER ponto da linha alterna a marcação (sem o
+        # flag UserCheckable, o Qt não alterna sozinho — evita o toggle
+        # duplo ao clicar exatamente na caixinha)
+        self.pipe_list.itemClicked.connect(self._toggle_pipe_item)
         mv.addWidget(self.pipe_list)
         splitter.addWidget(mid)
 
@@ -422,7 +426,7 @@ class OseTab(QWidget):
                 item = QListWidgetItem(
                     f"{pipe.name}  ({pipe.upstream} → {pipe.downstream})")
                 item.setData(Qt.UserRole, pipe.id)
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 item.setCheckState(Qt.Checked if pipe.id in selected
                                    else Qt.Unchecked)
                 self.pipe_list.addItem(item)
@@ -446,8 +450,12 @@ class OseTab(QWidget):
                 pipe_ids.append(item.data(Qt.UserRole))
         ose.pipe_ids = pipe_ids
         row = self.ose_list.currentRow()
-        if 0 <= row < len(self._project.oses):
-            self.ose_list.item(row).setText(self._ose_label(ose))
+        if 0 <= row < len(self._project.oses) \
+                and self._project.oses[row] is ose:
+            label = self._ose_label(ose)
+            item = self.ose_list.item(row)
+            if item.text() != label:   # evita "piscar" o nome a cada clique
+                item.setText(label)
 
     # ------------------------------------------------------------------
     def _new_ose(self):
@@ -502,12 +510,16 @@ class OseTab(QWidget):
 
     # ------------------------------------------------------------------
     def _preview_edited(self):
-        if self._current is not None:
-            self.preview.save_into(self._current)
-            row = self.ose_list.currentRow()
-            if self._project and 0 <= row < len(self._project.oses):
-                self.ose_list.item(row).setText(
-                    self._ose_label(self._current))
+        if self._current is None:
+            return
+        self.preview.save_into(self._current)
+        row = self.ose_list.currentRow()
+        if self._project and 0 <= row < len(self._project.oses) \
+                and self._project.oses[row] is self._current:
+            label = self._ose_label(self._current)
+            item = self.ose_list.item(row)
+            if item.text() != label:
+                item.setText(label)
 
     def _obs_edited(self):
         if self._current is not None:
@@ -519,10 +531,14 @@ class OseTab(QWidget):
             self._current.gauge_height = value
             self._refresh_preview()
 
-    def _pipes_changed(self, _item):
-        if self._current is not None:
-            self._save_current()
-            self._refresh_preview()
+    def _toggle_pipe_item(self, item):
+        if self._current is None or item is None:
+            return
+        item.setCheckState(Qt.Unchecked
+                           if item.checkState() == Qt.Checked
+                           else Qt.Checked)
+        self._save_current()
+        self._refresh_preview()
 
     def _refresh_preview(self):
         if self._project is None or self._current is None:

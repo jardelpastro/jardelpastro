@@ -234,13 +234,16 @@ class NodeItem(QGraphicsPathItem):
 
     def mousePressEvent(self, event):
         # snapshot no início do arrasto (descartado se nada mudar)
+        self._press_pos = self.pos()
         self.tab.checkpoint()
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
+        moved = (self.pos() - getattr(self, "_press_pos",
+                                      self.pos())).manhattanLength() > 1e-9
         self.tab.undo_stack.drop_if_unchanged(self.tab.project)
-        self.tab.notify_network_changed(reload_scene=False)
+        self.tab._node_drag_finished(self, moved)
 
     def contextMenuEvent(self, event):
         self.tab.show_node_menu(self, event.screenPos())
@@ -776,22 +779,42 @@ class PlanTab(QWidget):
         if hit is not None:
             node = hit.node
         else:
+            node = None
+        if self._draw_last is not None:
+            # continuando o traçado: o nó de partida não pode ganhar uma
+            # segunda saída
+            if self._has_outlet(self._draw_last.name):
+                self.status.setText(
+                    f"⚠ {self._draw_last.name} já possui uma saída — cada "
+                    "unidade tem uma única saída. Sequência encerrada.")
+                self._draw_last = None
+                return
+        if node is None:
             self.add_node_at(pos)
             node = self.project.nodes[-1]
         if self._draw_last is not None and self._draw_last.name != node.name:
-            self._create_pipe(self._draw_last, node)
+            if self._create_pipe(self._draw_last, node) is None:
+                return
         if node.node_type == "EEE":
             # elevatória é o fim da linha: encerra o traçado
             self._draw_last = None
-            self.set_mode("select")
-            self.btn_select.setChecked(True)
-            self.status.setText(
+            self.exit_to_select(
                 f"Traçado encerrado na elevatória {node.name}.")
             return
         self._draw_last = node
         self.status.setText(
             f"Traçando a partir de {node.name} — clique no próximo ponto "
             "(ESC encerra).")
+
+    def exit_to_select(self, message: str = ""):
+        """Volta ao modo Selecionar (após ESC, EEE ou simulação)."""
+        self.set_mode("select")
+        self.btn_select.setChecked(True)
+        if message:
+            self.status.setText(message)
+
+    def _has_outlet(self, node_name: str) -> bool:
+        return any(p.upstream == node_name for p in self.project.pipes)
 
     def draw_type_menu(self, screen_pos):
         """Botão direito durante o desenho: troca o tipo do próximo nó."""
@@ -803,7 +826,12 @@ class PlanTab(QWidget):
             self.status.setText(
                 f"Próximo nó será do tipo {actions[chosen]}.")
 
-    def _create_pipe(self, up_node: Node, down_node: Node):
+    def _create_pipe(self, up_node: Node, down_node: Node) -> Pipe | None:
+        if self._has_outlet(up_node.name):
+            self.status.setText(
+                f"⚠ {up_node.name} já possui uma saída — cada unidade tem "
+                "uma única saída (não criado).")
+            return None
         self.checkpoint()
         names = {p.name for p in self.project.pipes}
         i = 1
@@ -816,6 +844,7 @@ class PlanTab(QWidget):
         self.scene.addItem(pitem)
         self._pipe_items[pipe.id] = pitem
         self.notify_network_changed(reload_scene=False)
+        return pipe
 
     def live_update(self, node: Node):
         """Painel acompanha o arrasto: coordenadas e extensões ao vivo."""
@@ -946,23 +975,12 @@ class PlanTab(QWidget):
             return
         if item is self._pipe_first:
             return
-        self.checkpoint()
-        names = {p.name for p in self.project.pipes}
-        i = 1
-        while f"T{i}" in names:
-            i += 1
-        pipe = Pipe(name=f"T{i}", upstream=self._pipe_first.node.name,
-                    downstream=item.node.name,
-                    network=self._pipe_first.node.network)
-        self.project.pipes.append(pipe)
-        pitem = PipeItem(pipe, self)
-        self.scene.addItem(pitem)
-        self._pipe_items[pipe.id] = pitem
-        self.status.setText(f"Trecho {pipe.name} criado "
-                            f"({pipe.upstream} → {pipe.downstream}). "
-                            "Clique no próximo nó de MONTANTE.")
+        pipe = self._create_pipe(self._pipe_first.node, item.node)
+        if pipe is not None:
+            self.status.setText(f"Trecho {pipe.name} criado "
+                                f"({pipe.upstream} → {pipe.downstream}). "
+                                "Clique no próximo nó de MONTANTE.")
         self._pipe_first = None
-        self.notify_network_changed(reload_scene=False)
 
     def update_pipes_of(self, node_name: str):
         for item in self._pipe_items.values():
@@ -974,6 +992,22 @@ class PlanTab(QWidget):
         if reload_scene:
             self.load_from(self.project)
         self._update_undo_buttons()
+
+    def _node_drag_finished(self, item: NodeItem, moved: bool):
+        """Fim de um clique/arrasto em PV: só invalida se houve movimento.
+
+        Clique simples (selecionar e ver propriedades) não altera nada e
+        não pode descartar os resultados da simulação.
+        """
+        if moved:
+            self.notify_network_changed(reload_scene=False)
+
+    def refresh_geometry(self):
+        """Sincroniza o desenho com o modelo (posições, nomes, cores)."""
+        for item in self._node_items.values():
+            item.refresh()
+        for item in self._pipe_items.values():
+            item.refresh()
 
     def export_dxf(self):
         from PySide6.QtWidgets import QFileDialog, QMessageBox
@@ -1355,14 +1389,8 @@ class PlanTab(QWidget):
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape and self.mode == "draw":
-            if self._draw_last is not None:
-                self._draw_last = None
-                self.status.setText("Sequência encerrada — clique para "
-                                    "iniciar outro traçado (ESC sai do "
-                                    "modo).")
-            else:
-                self.set_mode("select")
-                self.btn_select.setChecked(True)
+            self._draw_last = None
+            self.exit_to_select("Traçado encerrado (modo Selecionar).")
             return
         if event.key() == Qt.Key_Delete:
             for item in list(self.scene.selectedItems()):
@@ -1467,21 +1495,48 @@ class PlanTab(QWidget):
         if result is None:
             self.results_box.hide()
             return
-        rows = []
-        for r in result.pipes:
-            if r.upstream == node.name:
-                rows.append((f"Saída {r.pipe} — cota GI:",
-                             f"{fmt.fmt(r.invert_up, 3)} m "
-                             f"(prof. {fmt.fmt(r.depth_up, 2)} m)"))
-            if r.downstream == node.name:
-                rows.append((f"Chegada {r.pipe} — cota GI:",
-                             f"{fmt.fmt(r.invert_down, 3)} m "
-                             f"(prof. {fmt.fmt(r.depth_down, 2)} m)"))
-        if not rows:
+        arrivals = [r for r in result.pipes if r.downstream == node.name]
+        outlets = [r for r in result.pipes if r.upstream == node.name]
+        if not arrivals and not outlets:
             self.results_box.hide()
             return
+        rows = []
+        total_ini = total_fim = 0.0
+        for r in arrivals:
+            total_ini += r.q_down_start
+            total_fim += r.q_down_end
+            rows.append((
+                f"Chegada {r.pipe}:",
+                f"Q = {fmt.fmt(r.q_down_start, 2)} / "
+                f"{fmt.fmt(r.q_down_end, 2)} l/s — "
+                f"GI {fmt.fmt(r.invert_down, 3)} "
+                f"(prof. {fmt.fmt(r.depth_down, 2)} m)"))
+        if len(arrivals) > 1:
+            rows.append(("Total de chegadas:",
+                         f"Q = {fmt.fmt(total_ini, 2)} / "
+                         f"{fmt.fmt(total_fim, 2)} l/s"))
+        if node.q_point_start or node.q_point_end:
+            rows.append(("Vazão pontual no nó:",
+                         f"Q = {fmt.fmt(node.q_point_start, 2)} / "
+                         f"{fmt.fmt(node.q_point_end, 2)} l/s"))
+        for r in outlets:
+            rows.append((
+                f"Saída {r.pipe}:",
+                f"Q = {fmt.fmt(r.q_up_start, 2)} / "
+                f"{fmt.fmt(r.q_up_end, 2)} l/s — "
+                f"GI {fmt.fmt(r.invert_up, 3)} "
+                f"(prof. {fmt.fmt(r.depth_up, 2)} m)"))
+        if len(arrivals) > 3:
+            alerta = QLabel(f"⚠ {len(arrivals)} chegadas neste PV (usual: "
+                            "até 3) — verifique conflito físico das "
+                            "tubulações.")
+            alerta.setWordWrap(True)
+            alerta.setStyleSheet("color: #b36b00;")
+            self.results_form.addRow(alerta)
         for label, value in rows:
-            self.results_form.addRow(label, QLabel(value))
+            value_label = QLabel(value)
+            value_label.setWordWrap(True)
+            self.results_form.addRow(label, value_label)
         self.results_box.show()
 
     def apply_panel(self):

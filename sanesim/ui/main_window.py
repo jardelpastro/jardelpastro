@@ -104,7 +104,7 @@ class MainWindow(QMainWindow):
         self.ose_group = QTabWidget()
         self.ose_group.addTab(self.ose_tab, "Planilha")
         self.ose_group.addTab(self.profile_tab, "Perfil")
-        self.ose_group.addTab(self.croqui_tab, "Croqui (planta)")
+        self.ose_group.addTab(self.croqui_tab, "Croqui")
         self.win_ose = _ToolWindow(self, "OSE — Planilha / Perfil / Croqui",
                                    self.ose_group, (1280, 720))
         self.ose_group.currentChanged.connect(self._sync_ose_views)
@@ -197,7 +197,7 @@ class MainWindow(QMainWindow):
     def _sync_ose_views(self, *_):
         """Perfil e croqui seguem a OSE selecionada na Planilha."""
         ose = self.ose_tab._current
-        self.croqui_tab.show_ose(self.project, ose, self.last_result)
+        self.croqui_tab.set_context(self.project, self.last_result, ose)
         if ose is not None and self.last_result is not None:
             combo = self.profile_tab.path_combo
             prefix = f"OSE {ose.number}"
@@ -274,6 +274,10 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def run_simulation(self):
         self._apply_all()
+        # o desenho acompanha o modelo (tabelas podem ter mudado coords)
+        self.plan_tab.refresh_geometry()
+        # simular sempre volta o cursor ao modo Selecionar
+        self.plan_tab.exit_to_select()
         try:
             self.last_result = simulate(self.project)
         except SimulationError as exc:
