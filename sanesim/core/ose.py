@@ -228,6 +228,8 @@ def export_oses(project: Project, result: SimulationResult, path: str,
 def _ose_sheet(wb, project: Project, result: SimulationResult,
                ose: OseSheet, step: float):
     title = f"OSE {ose.number}" if ose.number else f"OSE s-n {ose.id[:4]}"
+    if ose.status == "cancelada":
+        title += " CANCELADA"
     ws = wb.create_sheet(title[:31])
     for col, width in enumerate(WIDTHS, start=1):
         ws.column_dimensions[get_column_letter(col)].width = width
@@ -253,8 +255,12 @@ def _ose_sheet(wb, project: Project, result: SimulationResult,
     ws.merge_cells(start_row=1, start_column=2 * third + 1,
                    end_row=1, end_column=NCOLS)
 
-    c = ws.cell(row=2, column=1, value="ORDEM DE SERVIÇO PARA EXECUÇÃO")
-    c.font = Font(bold=True, size=14)
+    header_title = "ORDEM DE SERVIÇO PARA EXECUÇÃO"
+    if ose.status == "cancelada":
+        header_title += "  —  *** CANCELADA ***"
+    c = ws.cell(row=2, column=1, value=header_title)
+    c.font = Font(bold=True, size=14,
+                  color="CC0000" if ose.status == "cancelada" else "000000")
     c.alignment = _CENTER
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=NCOLS)
 

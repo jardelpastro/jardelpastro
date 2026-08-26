@@ -22,9 +22,22 @@ python -m pytest tests/
 
 ## Interface
 
-A janela principal tem 7 abas — a simulação (**F5** ou botão
-**▶ Rodar Simulação**) e a exportação do memorial funcionam de **qualquer
-aba**, sem precisar passar por todas:
+A **planta é a tela principal** — o ambiente de trabalho permanente, com
+o traçado contínuo da rede ("Desenhar rede": clique no vazio cria PV e o
+trecho ligando ao anterior; clique num PV existente conecta; botão
+direito troca o tipo do nó; elevatória encerra; ESC sai), terreno, fundo,
+desfazer/refazer, cores e exportação DXF. Os demais conteúdos abrem como
+**janelas sobre a planta** pelos botões da barra (Ctrl+1 a Ctrl+4):
+*Dados do Projeto* (critérios, dimensionamento, método, materiais),
+*Tabelas da Rede* (nós e trechos), *Resultados* e *OSEs* — este último um
+**grupo com três abas sincronizadas pela OSE selecionada: Planilha,
+Perfil e Croqui (planta da OSE)**. Qualquer alteração de topologia
+**invalida os resultados** da simulação anterior automaticamente. A
+simulação (**F5**) e as exportações funcionam de qualquer lugar. Tema
+visual nas cores da Pastro Engenharia (azul-marinho e turquesa), tabelas
+com textos centralizados e ponto de milhar.
+
+Conteúdo das janelas:
 
 1. **Critérios de Projeto** — início e fim de plano: população, consumo
    per capita, coeficiente de retorno (C), K1, K2, K3; taxa de
@@ -46,7 +59,7 @@ aba**, sem precisar passar por todas:
    **pessimista** (vazão mínima de 1,5 l/s aplicada trecho a trecho, como
    no CESG) ou **otimista** (vazões reais acumuladas); renomear PVs em
    ordem de cálculo; cota de terreno manual ou interpolada de curvas de
-   nível (reservado para a versão com planta).
+   nível carregadas na tela principal (Terreno).
 4. **Nós (PVs)** — nome, tipo (PV, TIL, TL, CP, TQ, EEE, Lançamento),
    coordenadas N/E, cota do terreno, vazões pontuais início/fim.
 5. **Trechos** — nó de montante/jusante, extensão (ou automática pelas

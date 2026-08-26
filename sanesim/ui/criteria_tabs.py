@@ -148,8 +148,11 @@ class CriteriaTab(QWidget):
                   fmt.fmt_edit(zone.per_capita_start, 1),
                   fmt.fmt_edit(zone.per_capita_end, 1),
                   fmt.fmt_edit(zone.return_coef, 2)]
+        from PySide6.QtCore import Qt
         for col, value in enumerate(values):
-            self.zones_table.setItem(row, col, QTableWidgetItem(str(value)))
+            item = QTableWidgetItem(str(value))
+            item.setTextAlignment(Qt.AlignCenter)
+            self.zones_table.setItem(row, col, item)
         self.zones_table.setCellWidget(row, 7, self._mode_combo(zone.auto))
         self.zones_table.setItem(
             row, 8, QTableWidgetItem(fmt.fmt_edit(zone.rate_start_manual)))

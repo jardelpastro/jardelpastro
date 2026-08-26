@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (QLabel, QTableWidget, QTableWidgetItem,
                                QVBoxLayout, QWidget)
@@ -39,10 +40,18 @@ class ResultsTab(QWidget):
         self.table.insertRow(row)
         for col, value in enumerate(values):
             item = QTableWidgetItem("" if value is None else str(value))
+            item.setTextAlignment(Qt.AlignCenter)
             if violated:
                 item.setBackground(QBrush(_VIOL_BG))
                 item.setForeground(QBrush(_VIOL_FG))
             self.table.setItem(row, col, item)
+
+    def show_invalidated(self):
+        """A rede mudou: limpa os resultados que deixaram de valer."""
+        self.table.setRowCount(0)
+        self.summary.setText(
+            "⚠ A rede foi alterada — os resultados anteriores foram "
+            "descartados. Rode a simulação novamente (F5).")
 
     def show_result(self, result: SimulationResult):
         self.table.setRowCount(0)

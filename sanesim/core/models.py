@@ -13,7 +13,7 @@ NODE_TYPES = ["PV", "TIL", "TL", "CP", "TQ", "EEE", "Lançamento"]
 
 # Versão do esquema do arquivo de projeto (.json). Incrementar a cada
 # mudança incompatível e tratar a migração em Project.from_dict.
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 def new_id() -> str:
@@ -234,6 +234,7 @@ class OseSheet:
     resp_approval: str = ""       # aprovação
     resp_release: str = ""        # liberação para execução
     resp_execution: str = ""      # execução/cadastramento
+    status: str = "ativa"         # "ativa" | "cancelada"
     pipe_ids: list[str] = field(default_factory=list)  # trechos (ids)
     id: str = field(default_factory=new_id)
 

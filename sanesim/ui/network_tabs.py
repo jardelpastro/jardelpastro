@@ -61,7 +61,9 @@ class _TableTab(QWidget):
     def _set(self, row: int, col: int, value, decimals: int = 3):
         if isinstance(value, float):
             value = fmt.fmt_edit(value, decimals)
-        self.table.setItem(row, col, QTableWidgetItem(str(value)))
+        item = QTableWidgetItem(str(value))
+        item.setTextAlignment(Qt.AlignCenter)
+        self.table.setItem(row, col, item)
 
 
 class NodesTab(_TableTab):

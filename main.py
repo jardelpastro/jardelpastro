@@ -10,11 +10,14 @@ from PySide6.QtWidgets import QApplication
 
 from sanesim.core.models import Project
 from sanesim.ui.main_window import MainWindow
+from sanesim.ui.style import STYLE, app_icon
 
 
 def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("SaneSim")
+    app.setStyleSheet(STYLE)
+    app.setWindowIcon(app_icon())
     window = MainWindow()
     if len(sys.argv) > 1:
         window.project = Project.load(sys.argv[1])

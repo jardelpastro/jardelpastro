@@ -387,7 +387,19 @@ class OseTab(QWidget):
         name = f"OSE {ose.number}" if ose.number else "OSE (sem número)"
         if ose.street:
             name += f" — {ose.street}"
+        if ose.status == "cancelada":
+            name = f"✕ {name}  (CANCELADA)"
         return name
+
+    def _next_number(self) -> str:
+        """Número sequencial em relação à última OSE da lista."""
+        if not self._project or not self._project.oses:
+            return "1"
+        last = self._project.oses[-1].number
+        try:
+            return str(int(last) + 1)
+        except (TypeError, ValueError):
+            return str(len(self._project.oses) + 1)
 
     def _on_select(self, row: int):
         self._save_current()
@@ -443,14 +455,36 @@ class OseTab(QWidget):
             return
         self._save_current()
         self._project.oses.append(OseSheet(
-            number=str(len(self._project.oses) + 1),
+            number=self._next_number(),
             city=self._project.info.city))
         self.ose_list.addItem(self._ose_label(self._project.oses[-1]))
         self.ose_list.setCurrentRow(self.ose_list.count() - 1)
 
     def _remove_ose(self):
+        from PySide6.QtWidgets import QMessageBox
         row = self.ose_list.currentRow()
         if self._project is None or row < 0:
+            return
+        ose = self._project.oses[row]
+        box = QMessageBox(self)
+        box.setWindowTitle("Remover OSE")
+        box.setText(
+            f"O que deseja fazer com a {self._ose_label(ose)}?\n\n"
+            "Cancelar mantém a OSE no projeto (registro histórico, "
+            "marcada como CANCELADA); excluir remove definitivamente.")
+        cancel_ose = box.addButton("Marcar como CANCELADA",
+                                   QMessageBox.AcceptRole)
+        delete = box.addButton("Excluir definitivamente",
+                               QMessageBox.DestructiveRole)
+        back = box.addButton("Voltar", QMessageBox.RejectRole)
+        box.setDefaultButton(cancel_ose)
+        box.exec()
+        if box.clickedButton() is back:
+            return
+        if box.clickedButton() is cancel_ose:
+            self._save_current()
+            ose.status = "cancelada"
+            self.ose_list.item(row).setText(self._ose_label(ose))
             return
         self._current = None
         del self._project.oses[row]

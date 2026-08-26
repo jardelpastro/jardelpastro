@@ -228,6 +228,8 @@ class NodeItem(QGraphicsPathItem):
             self.node.coord_e = self.pos().x()
             self.node.coord_n = -self.pos().y()
             self.tab.update_pipes_of(self.node.name)
+            # coordenadas/extensões no painel acompanham o arrasto
+            self.tab.live_update(self.node)
         return super().itemChange(change, value)
 
     def mousePressEvent(self, event):
@@ -290,7 +292,7 @@ class PipeItem(QGraphicsLineItem):
         ax = x1 + (x2 - x1) * 0.6
         ay = y1 + (y2 - y1) * 0.6
         ang = math.atan2(y2 - y1, x2 - x1)
-        size = 4.0
+        size = 8.0
         self.arrow_poly = QPolygonF([
             QPointF(ax, ay),
             QPointF(ax - size * math.cos(ang - 0.45),
@@ -322,14 +324,22 @@ class PlanScene(QGraphicsScene):
         self.tab = tab
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            mode = self.tab.mode
+        mode = self.tab.mode
+        if mode == "draw":
+            if event.button() == Qt.LeftButton:
+                self.tab.draw_click(event.scenePos())
+                event.accept()
+                return
+            if event.button() == Qt.RightButton:
+                self.tab.draw_type_menu(event.screenPos())
+                event.accept()
+                return
+        elif event.button() == Qt.LeftButton:
             if mode == "add_node":
                 self.tab.add_node_at(event.scenePos())
                 event.accept()
                 return
             if mode == "add_pipe":
-                # snap: aceita o clique perto do PV, não só em cima dele
                 item = self.tab.node_item_near(event.scenePos())
                 self.tab.pick_pipe_node(item)
                 event.accept()
@@ -532,16 +542,19 @@ class PlanTab(QWidget):
             "Arraste para mover a vista (o botão do meio do mouse também "
             "faz pan em qualquer modo).")
         separator()
-        # grupo inserção
-        self.btn_add_node = mode_button(
-            "node", "Inserir PV", "add_node",
-            "Clique na planta para criar um nó do tipo escolhido ao lado.")
+        # grupo desenho (unificado: PV + trecho em sequência)
+        self.btn_draw = mode_button(
+            "pipe", "Desenhar rede", "draw",
+            "Traçado contínuo: clique no vazio cria um PV (e o trecho "
+            "ligando ao anterior); clique num PV existente conecta a ele; "
+            "botão direito troca o tipo do nó (EEE encerra o traçado); "
+            "ESC encerra a sequência.")
         self.node_type_combo = QComboBox()
         self.node_type_combo.addItems(NODE_TYPES)
+        self.node_type_combo.setToolTip(
+            "Tipo do próximo nó criado no traçado (botão direito também "
+            "troca durante o desenho).")
         toolbar.addWidget(self.node_type_combo)
-        self.btn_add_pipe = mode_button(
-            "pipe", "Inserir Trecho", "add_pipe",
-            "Clique no nó de montante e depois no de jusante.")
         separator()
         # grupo vista/aparência
         fit = QToolButton()
@@ -738,6 +751,7 @@ class PlanTab(QWidget):
     def set_mode(self, mode: str):
         self.mode = mode
         self._pipe_first = None
+        self._draw_last = None      # último nó do traçado contínuo
         if mode == "pan":
             self.view.setDragMode(QGraphicsView.ScrollHandDrag)
         else:
@@ -748,10 +762,73 @@ class PlanTab(QWidget):
         hints = {
             "select": "Clique para selecionar; arraste PVs para mover.",
             "pan": "Arraste para mover a vista.",
+            "draw": "Traçado: clique no vazio cria PV; num PV existente, "
+                    "conecta. ESC encerra a sequência.",
             "add_node": "Clique na planta para inserir o nó.",
             "add_pipe": "Clique no nó de MONTANTE.",
         }
         self.status.setText(hints.get(mode, ""))
+
+    # ------------------------------------------------ traçado contínuo
+    def draw_click(self, pos: QPointF):
+        """Um clique do modo Desenhar: cria/conecta e segue a sequência."""
+        hit = self.node_item_near(pos)
+        if hit is not None:
+            node = hit.node
+        else:
+            self.add_node_at(pos)
+            node = self.project.nodes[-1]
+        if self._draw_last is not None and self._draw_last.name != node.name:
+            self._create_pipe(self._draw_last, node)
+        if node.node_type == "EEE":
+            # elevatória é o fim da linha: encerra o traçado
+            self._draw_last = None
+            self.set_mode("select")
+            self.btn_select.setChecked(True)
+            self.status.setText(
+                f"Traçado encerrado na elevatória {node.name}.")
+            return
+        self._draw_last = node
+        self.status.setText(
+            f"Traçando a partir de {node.name} — clique no próximo ponto "
+            "(ESC encerra).")
+
+    def draw_type_menu(self, screen_pos):
+        """Botão direito durante o desenho: troca o tipo do próximo nó."""
+        menu = QMenu()
+        actions = {menu.addAction(t): t for t in NODE_TYPES}
+        chosen = menu.exec(screen_pos)
+        if chosen is not None:
+            self.node_type_combo.setCurrentText(actions[chosen])
+            self.status.setText(
+                f"Próximo nó será do tipo {actions[chosen]}.")
+
+    def _create_pipe(self, up_node: Node, down_node: Node):
+        self.checkpoint()
+        names = {p.name for p in self.project.pipes}
+        i = 1
+        while f"T{i}" in names:
+            i += 1
+        pipe = Pipe(name=f"T{i}", upstream=up_node.name,
+                    downstream=down_node.name, network=up_node.network)
+        self.project.pipes.append(pipe)
+        pitem = PipeItem(pipe, self)
+        self.scene.addItem(pitem)
+        self._pipe_items[pipe.id] = pitem
+        self.notify_network_changed(reload_scene=False)
+
+    def live_update(self, node: Node):
+        """Painel acompanha o arrasto: coordenadas e extensões ao vivo."""
+        items = self.scene.selectedItems()
+        for item in items:
+            if isinstance(item, NodeItem) and item.node is node:
+                self.n_coord_n.setText(fmt.fmt_edit(node.coord_n, 2))
+                self.n_coord_e.setText(fmt.fmt_edit(node.coord_e, 2))
+            elif isinstance(item, PipeItem) and node.name in (
+                    item.pipe.upstream, item.pipe.downstream):
+                self.p_length.setText(
+                    f"{fmt.fmt(self.project.pipe_length(item.pipe), 2)} m"
+                    + ("" if item.pipe.length > 0 else " (por coordenadas)"))
 
     def load_from(self, project: Project):
         self.project = project
@@ -782,6 +859,14 @@ class PlanTab(QWidget):
             item.violated = bool(r and r.violations)
             dn = f" DN{r.diameter_mm}" if r else ""
             item.label.setText(f"{item.pipe.name}{dn}")
+            item.update_geometry()
+        self._selection_changed()
+
+    def clear_result_markers(self):
+        """Rede alterada: remove DN/violações herdados da simulação."""
+        for item in self._pipe_items.values():
+            item.violated = False
+            item.label.setText(item.pipe.name)
             item.update_geometry()
         self._selection_changed()
 
@@ -1269,6 +1354,16 @@ class PlanTab(QWidget):
         self.notify_network_changed(reload_scene=True)
 
     def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape and self.mode == "draw":
+            if self._draw_last is not None:
+                self._draw_last = None
+                self.status.setText("Sequência encerrada — clique para "
+                                    "iniciar outro traçado (ESC sai do "
+                                    "modo).")
+            else:
+                self.set_mode("select")
+                self.btn_select.setChecked(True)
+            return
         if event.key() == Qt.Key_Delete:
             for item in list(self.scene.selectedItems()):
                 if isinstance(item, NodeItem):
