@@ -355,13 +355,23 @@ class PlanView(QGraphicsView):
         super().__init__(scene)
         self.setRenderHint(QPainter.Antialiasing)
         self.setDragMode(QGraphicsView.RubberBandDrag)
+        # zoom ancorado na ponta do mouse (in e out)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
         self._mid_panning = False
         self._pan_start = None
+        self.fit_requested = lambda: None   # duplo clique do meio
 
     def wheelEvent(self, event):
         factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
         self.scale(factor, factor)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            self.fit_requested()            # zoom extend
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
 
     # botão do meio (rodinha pressionada) funciona como pan em qualquer modo
     def mousePressEvent(self, event):
@@ -645,6 +655,11 @@ class PlanTab(QWidget):
         layout.addWidget(splitter, stretch=1)
 
         self.scene.selectionChanged.connect(self._selection_changed)
+        self.view.fit_requested = self.fit_view
+        # digitar a coordenada no painel move o PV na tela (ao concluir
+        # a edição — Enter ou sair do campo)
+        self.n_coord_n.editingFinished.connect(self._coords_typed)
+        self.n_coord_e.editingFinished.connect(self._coords_typed)
 
         from PySide6.QtGui import QKeySequence, QShortcut
         QShortcut(QKeySequence.Undo, self, activated=self.undo)
@@ -846,13 +861,36 @@ class PlanTab(QWidget):
         self.notify_network_changed(reload_scene=False)
         return pipe
 
+    def _coords_typed(self):
+        """Coordenada digitada no painel: move o PV imediatamente."""
+        items = self.scene.selectedItems()
+        node_item = next((i for i in items if isinstance(i, NodeItem)), None)
+        if node_item is None:
+            return
+        node = node_item.node
+        new_n = fmt.parse(self.n_coord_n.text(), node.coord_n)
+        new_e = fmt.parse(self.n_coord_e.text(), node.coord_e)
+        # tolerância acima do arredondamento de exibição: Enter num campo
+        # não editado não pode "mover" o PV nem descartar a simulação
+        if abs(new_n - node.coord_n) < 0.005 and \
+                abs(new_e - node.coord_e) < 0.005:
+            return
+        self.checkpoint()
+        node.coord_n = new_n
+        node.coord_e = new_e
+        node_item.refresh()
+        self.update_pipes_of(node.name)
+        self.notify_network_changed(reload_scene=False)
+        self.status.setText(f"{node.name} movido para "
+                            f"N {fmt.fmt(new_n, 2)}, E {fmt.fmt(new_e, 2)}.")
+
     def live_update(self, node: Node):
         """Painel acompanha o arrasto: coordenadas e extensões ao vivo."""
         items = self.scene.selectedItems()
         for item in items:
             if isinstance(item, NodeItem) and item.node is node:
-                self.n_coord_n.setText(fmt.fmt_edit(node.coord_n, 2))
-                self.n_coord_e.setText(fmt.fmt_edit(node.coord_e, 2))
+                self.n_coord_n.setText(fmt.fmt_edit(node.coord_n, 3))
+                self.n_coord_e.setText(fmt.fmt_edit(node.coord_e, 3))
             elif isinstance(item, PipeItem) and node.name in (
                     item.pipe.upstream, item.pipe.downstream):
                 self.p_length.setText(
@@ -900,10 +938,19 @@ class PlanTab(QWidget):
         self._selection_changed()
 
     def fit_view(self):
-        rect = self.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50)
-        if rect.isValid():
-            self.scene.setSceneRect(rect)
-            self.view.fitInView(rect, Qt.KeepAspectRatio)
+        content = self.scene.itemsBoundingRect()
+        if content.isValid() and content.width() > 1e-6:
+            # sceneRect bem maior que o conteúdo: dá espaço para o pan e
+            # permite o zoom ancorado no mouse funcionar nas bordas
+            margin = max(content.width(), content.height(), 500.0) * 4.0
+            self.scene.setSceneRect(
+                content.adjusted(-margin, -margin, margin, margin))
+            self.view.fitInView(content.adjusted(-50, -50, 50, 50),
+                                Qt.KeepAspectRatio)
+        else:
+            # planta vazia: área ampla para navegar e achar a coordenada
+            self.scene.setSceneRect(-500_000.0, -10_000_000.0,
+                                    10_000_000.0, 10_000_000.0)
 
     # -------------------------------------------------------- edição gráfica
     def _next_name(self, prefix: str, existing: set[str]) -> str:
@@ -1421,8 +1468,8 @@ class PlanTab(QWidget):
             self.pipe_box.hide()
             self.n_name.setText(node.name)
             self.n_type.setCurrentText(node.node_type)
-            self.n_coord_n.setText(fmt.fmt_edit(node.coord_n, 2))
-            self.n_coord_e.setText(fmt.fmt_edit(node.coord_e, 2))
+            self.n_coord_n.setText(fmt.fmt_edit(node.coord_n, 3))
+            self.n_coord_e.setText(fmt.fmt_edit(node.coord_e, 3))
             self.n_ground.setText(fmt.fmt_edit(node.ground_elev))
             self.n_qini.setText(fmt.fmt_edit(node.q_point_start, 2))
             self.n_qfim.setText(fmt.fmt_edit(node.q_point_end, 2))
@@ -1495,8 +1542,9 @@ class PlanTab(QWidget):
         if result is None:
             self.results_box.hide()
             return
-        arrivals = [r for r in result.pipes if r.downstream == node.name]
-        outlets = [r for r in result.pipes if r.upstream == node.name]
+        display = result.renamed.get(node.name, node.name)
+        arrivals = [r for r in result.pipes if r.downstream == display]
+        outlets = [r for r in result.pipes if r.upstream == display]
         if not arrivals and not outlets:
             self.results_box.hide()
             return

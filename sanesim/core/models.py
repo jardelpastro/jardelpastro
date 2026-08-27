@@ -13,7 +13,7 @@ NODE_TYPES = ["PV", "TIL", "TL", "CP", "TQ", "EEE", "Lançamento"]
 
 # Versão do esquema do arquivo de projeto (.json). Incrementar a cada
 # mudança incompatível e tratar a migração em Project.from_dict.
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 def new_id() -> str:
@@ -201,6 +201,16 @@ class Pipe:
 
 
 @dataclass
+class DisplaySettings:
+    """Casas decimais e detalhes de exibição (croqui, painéis, folhas)."""
+    coord_decimals: int = 3      # coordenadas N/E
+    elev_decimals: int = 3       # cotas (terreno, GI)
+    flow_decimals: int = 2       # vazões
+    slope_decimals: int = 5      # declividades
+    depth_decimals: int = 2      # profundidades
+
+
+@dataclass
 class ProjectInfo:
     """Informações gerais do projeto (usadas como padrão nas OSEs)."""
     city: str = ""
@@ -236,6 +246,9 @@ class OseSheet:
     resp_execution: str = ""      # execução/cadastramento
     status: str = "ativa"         # "ativa" | "cancelada"
     pipe_ids: list[str] = field(default_factory=list)  # trechos (ids)
+    # observações do projetista por linha do estaqueamento
+    # (chave estável: "r<ramal>:<distância acumulada>")
+    row_notes: dict[str, str] = field(default_factory=dict)
     id: str = field(default_factory=new_id)
 
 
@@ -254,10 +267,24 @@ class BackgroundImage:
     opacity: float = 1.0
 
 
+def next_ose_number(oses: list["OseSheet"]) -> str:
+    """Próximo número de OSE, padrão de 3 dígitos ("001", "002"...)."""
+    highest = 0
+    for ose in oses:
+        try:
+            highest = max(highest, int(ose.number))
+        except (TypeError, ValueError):
+            continue
+    if highest == 0 and oses:
+        return f"{len(oses) + 1:03d}"
+    return f"{highest + 1:03d}"
+
+
 @dataclass
 class Project:
     title: str = "Projeto sem título"
     info: ProjectInfo = field(default_factory=ProjectInfo)
+    display: DisplaySettings = field(default_factory=DisplaySettings)
     criteria: ProjectCriteria = field(default_factory=ProjectCriteria)
     design: DesignCriteria = field(default_factory=DesignCriteria)
     options: CalcOptions = field(default_factory=CalcOptions)
@@ -308,7 +335,7 @@ class Project:
         for net, pipe_ids in by_network.items():
             created += 1
             self.oses.append(OseSheet(
-                number=str(len(self.oses) + 1),
+                number=next_ose_number(self.oses),
                 city=self.info.city,
                 observations="",
                 pipe_ids=pipe_ids,
@@ -335,6 +362,7 @@ class Project:
             "schema_version": SCHEMA_VERSION,
             "title": self.title,
             "info": asdict(self.info),
+            "display": asdict(self.display),
             "criteria": asdict(self.criteria),
             "design": asdict(self.design),
             "options": asdict(self.options),
@@ -366,6 +394,7 @@ class Project:
         proj = Project(
             title=d.get("title", "Projeto sem título"),
             info=ProjectInfo(**d.get("info", {})),
+            display=DisplaySettings(**d.get("display", {})),
             criteria=ProjectCriteria(
                 start=PlanCriteria(**crit.get("start", {})),
                 end=PlanCriteria(**crit.get("end", {})),

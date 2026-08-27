@@ -147,6 +147,58 @@ QLineEdit:focus, QPlainTextEdit:focus, QSpinBox:focus,
 QDoubleSpinBox:focus, QComboBox:focus {{
     border-color: {TEAL};
 }}
+/* botões dos spin boxes: área clicável larga e setas visíveis (sem
+   isso o estilo global encolhia os botões e o cursor virava I-beam) */
+QSpinBox::up-button, QDoubleSpinBox::up-button,
+QSpinBox::down-button, QDoubleSpinBox::down-button {{
+    subcontrol-origin: border;
+    width: 20px;
+    background: #e4e9f2;
+    border-left: 1px solid #c7d0e0;
+}}
+QSpinBox::up-button, QDoubleSpinBox::up-button {{
+    subcontrol-position: top right;
+    border-top-right-radius: 4px;
+}}
+QSpinBox::down-button, QDoubleSpinBox::down-button {{
+    subcontrol-position: bottom right;
+    border-bottom-right-radius: 4px;
+}}
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
+    background: {TEAL_LIGHT};
+}}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+    width: 0; height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 6px solid {NAVY};
+}}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+    width: 0; height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 6px solid {NAVY};
+}}
+/* caixas de seleção: vazia quando desmarcada, preenchida quando marcada */
+QCheckBox::indicator, QGroupBox::indicator,
+QListWidget::indicator, QTableWidget::indicator,
+QTreeView::indicator, QListView::indicator {{
+    width: 15px;
+    height: 15px;
+    border: 2px solid #8a97b0;
+    border-radius: 3px;
+    background: white;
+}}
+QCheckBox::indicator:checked, QGroupBox::indicator:checked,
+QListWidget::indicator:checked, QTableWidget::indicator:checked,
+QTreeView::indicator:checked, QListView::indicator:checked {{
+    background: {TEAL};
+    border-color: {TEAL_DARK};
+}}
+QCheckBox::indicator:hover, QListWidget::indicator:hover {{
+    border-color: {TEAL};
+}}
 QSplitter::handle {{
     background: #ccd5e3;
 }}

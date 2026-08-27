@@ -38,8 +38,9 @@ GRID_MINOR_H = 20.0     # grid secundário horizontal (m de distância)
 GRID_MASTER_H = 100.0   # grid mestre horizontal
 GRID_MINOR_V = 1.0      # grid secundário vertical (m de cota)
 GRID_MASTER_V = 5.0     # grid mestre vertical
-BANDS_GAP = 48.0        # afastamento entre o gráfico e as bandas (px)
+BANDS_GAP = 64.0        # afastamento entre o gráfico e as bandas (px)
 TICK = 5.0              # comprimento dos ticks das bandas (px)
+SHEET_RATIO = 1.41421356   # proporção das folhas série A (paisagem)
 
 
 class _ProfileView(QGraphicsView):
@@ -103,6 +104,11 @@ class ProfileTab(QWidget):
         scales.addRow("Escala horizontal:", self.scale_h)
         scales.addRow("Escala vertical:", self.scale_v)
         controls.addLayout(scales)
+        controls.addWidget(QLabel("Folha:"))
+        self.paper_combo = QComboBox()
+        self.paper_combo.addItems(["A3", "A4", "A2", "A1"])
+        self.paper_combo.currentIndexChanged.connect(self._redraw)
+        controls.addWidget(self.paper_combo)
         export_btn = QPushButton("Exportar perfil…")
         export_btn.setToolTip("Exporta o perfil atual para PDF (A3 "
                               "paisagem) ou imagem PNG.")
@@ -121,6 +127,19 @@ class ProfileTab(QWidget):
         layout.addWidget(self.view, stretch=1)
 
     # ------------------------------------------------------------------
+    def ensure_paths(self, project: Project, result: SimulationResult):
+        """Reconstrói os perfis só se as OSEs mudaram de fato.
+
+        Evita resetar o zoom e o ramal escolhido a cada clique na lista
+        de OSEs ou troca de aba do grupo.
+        """
+        signature = [p.label for p in build_ose_paths(project, result)]
+        if signature == [p.label for p in self._paths] \
+                and self._result is result:
+            self._project = project
+            return
+        self.show_result(project, result)
+
     def show_result(self, project: Project, result: SimulationResult):
         """Perfis por OSE: um caminho por ramal de cada OSE do projeto."""
         self._project = project
@@ -191,9 +210,12 @@ class ProfileTab(QWidget):
             raise OSError(f"falha ao gravar {path}")
 
     def export_pdf(self, path: str):
-        """Exporta a cena atual do perfil em PDF A3 paisagem."""
+        """Exporta a cena atual do perfil em PDF (folha escolhida)."""
         writer = QPdfWriter(path)
-        writer.setPageSize(QPageSize(QPageSize.A3))
+        size = {"A4": QPageSize.A4, "A3": QPageSize.A3,
+                "A2": QPageSize.A2,
+                "A1": QPageSize.A1}[self.paper_combo.currentText()]
+        writer.setPageSize(QPageSize(size))
         writer.setPageOrientation(QPageLayout.Landscape)
         writer.setResolution(300)
         painter = QPainter(writer)
@@ -392,8 +414,29 @@ class ProfileTab(QWidget):
 
         # ------------------------------------------- eixo X e bandas
         cx = X(total) / 2
-        self._text("Distância (m)", cx, y_grid_bot + BANDS_GAP / 2,
+        stations = self._stations(total)
+        # estaqueamento de 20 em 20 m, alinhado com as grades do perfil
+        for x_st in stations:
+            self.scene.addLine(X(x_st), y_grid_bot, X(x_st),
+                               y_grid_bot + TICK, pen_border)
+            self._text(fmt.fmt(x_st, 0), X(x_st), y_grid_bot + 8,
+                       size=6.5, center_x=True)
+        self._text("Distância (m)", cx, y_grid_bot + BANDS_GAP - 18,
                    size=8, bold=True, center_x=True, center_y=True)
+
+        # banda Material/Vazão: quando algum vão é curto demais para o
+        # texto em linha única, empilha (material/DN em cima, vazão
+        # embaixo) e aumenta a altura da banda
+        self._material_stacked = False
+        for s in segments:
+            r = s.pipe
+            mat = r.material.split("(")[0].strip()
+            single = (f"{mat}  DN {r.diameter_mm} — "
+                      f"Qf = {fmt.fmt(r.q_down_end, 2)} l/s")
+            if len(single) * 4.2 > (s.x1 - s.x0) * sx:
+                self._material_stacked = True
+                break
+        material_h = 42 if self._material_stacked else 24
 
         band_top = y_grid_bot + BANDS_GAP
         # ticks: "pvs" = só nos PVs; "stations" = a cada 20 m;
@@ -404,9 +447,9 @@ class ProfileTab(QWidget):
             ("Cota coletor GI (m)", 56, self._band_invert, "stations"),
             ("Profundidade (m)", 56, self._band_depth, "stations"),
             ("Declividade (m/m)", 24, self._band_slope, "dividers"),
-            ("Material / Vazão", 24, self._band_material, "dividers"),
+            ("Material / Vazão", material_h, self._band_material,
+             "dividers"),
         ]
-        stations = self._stations(total)
         pv_xs = self._pv_xs(segments)
         y0 = band_top
         for label, height, renderer, ticks in band_defs:
@@ -465,10 +508,73 @@ class ProfileTab(QWidget):
                         (y_grid_top + y_grid_bot) / 2 + br.width() / 2)
             self.scene.addItem(item)
 
-        rect = self.scene.itemsBoundingRect().adjusted(-30, -20, 30, 20)
-        self.scene.setSceneRect(rect)
+        # ------------------------------------------ folha com carimbo
+        sheet = self._draw_sheet(path)
+        self.scene.setSceneRect(sheet)
         self.view.user_zoomed = False
         self.view.fit_scene()
+
+    def _draw_sheet(self, path: ProfilePath):
+        """Enquadra o desenho numa folha série A (paisagem) com carimbo."""
+        import datetime as _dt
+        bounds = self.scene.itemsBoundingRect().adjusted(-46, -20, 30, 26)
+        carimbo_h = max(64.0, bounds.height() * 0.10)
+        gap = carimbo_h * 0.35
+        need_w = bounds.width()
+        need_h = bounds.height() + carimbo_h + gap
+        if need_w / need_h >= SHEET_RATIO:
+            W = need_w
+            H = need_w / SHEET_RATIO
+        else:
+            H = need_h
+            W = need_h * SHEET_RATIO
+        x0 = bounds.center().x() - W / 2
+        y0 = bounds.top() - (H - carimbo_h - gap - bounds.height()) / 2
+        frame = QRectF(x0, y0, W, H)
+        pen = QPen(QColor("#333333"), 1.4)
+        self.scene.addRect(frame, pen)
+        inner = frame.adjusted(8, 8, -8, -8)
+        self.scene.addRect(inner, QPen(QColor("#333333"), 0.8))
+
+        # carimbo no rodapé (faixa inteira dentro da margem)
+        box = QRectF(inner.left(), inner.bottom() - carimbo_h,
+                     inner.width(), carimbo_h)
+        self.scene.addRect(box, pen, QBrush(QColor("#ffffff")))
+        cols = [0.0, 0.22, 0.55, 0.78, 1.0]
+        for c in cols[1:-1]:
+            x = box.left() + box.width() * c
+            self.scene.addLine(x, box.top(), x, box.bottom(), pen)
+        project = self._project
+        info = project.info if project else None
+        paper = self.paper_combo.currentText()
+        pad = 6.0
+
+        def cell_text(col, lines, sizes=None):
+            cx0 = box.left() + box.width() * cols[col] + pad
+            y = box.top() + pad
+            for k, line in enumerate(lines):
+                size = (sizes or [8] * len(lines))[k]
+                item = self._make_text(line, size, bold=(k == 0))
+                item.setPos(cx0, y)
+                self.scene.addItem(item)
+                y += size * 2.0
+
+        cell_text(0, ["PASTRO ENGENHARIA",
+                      (info.designer if info and info.designer
+                       else ""),
+                      (info.registration if info and info.registration
+                       else "")], [10, 7, 7])
+        cell_text(1, [(project.title if project else ""),
+                      (info.system if info and info.system else ""),
+                      (info.city if info and info.city else "")],
+                  [9, 8, 8])
+        cell_text(2, [f"PERFIL — {path.label}",
+                      f"Escalas: H 1:{self.scale_h.value()} — "
+                      f"V 1:{self.scale_v.value()}"], [8, 7])
+        cell_text(3, [f"Formato {paper}",
+                      f"Data: {_dt.date.today().strftime('%d/%m/%Y')}"],
+                  [8, 7])
+        return frame
 
     # -------------------------------------------------- conteúdo das bandas
     def _band_distances(self, segments, X, y0, y1, total):
@@ -521,10 +627,22 @@ class ProfileTab(QWidget):
                        size=7, center_x=True, center_y=True)
 
     def _band_material(self, segments, X, y0, y1, total):
+        stacked = getattr(self, "_material_stacked", False)
         for s in segments:
             r = s.pipe
             mat = r.material.split("(")[0].strip()
-            self._text(f"{mat}  DN {r.diameter_mm} — "
-                       f"Qf = {fmt.fmt(r.q_down_end, 2)} l/s",
-                       X((s.x0 + s.x1) / 2), (y0 + y1) / 2,
-                       size=6.5, center_x=True, center_y=True)
+            mid_x = X((s.x0 + s.x1) / 2)
+            if stacked:
+                # vãos curtos: material/DN em cima, vazão embaixo —
+                # centralizados e dentro da banda (mais alta)
+                self._text(f"{mat}  DN {r.diameter_mm}",
+                           mid_x, y0 + (y1 - y0) * 0.28,
+                           size=6.5, center_x=True, center_y=True)
+                self._text(f"Qf = {fmt.fmt(r.q_down_end, 2)} l/s",
+                           mid_x, y0 + (y1 - y0) * 0.72,
+                           size=6.5, center_x=True, center_y=True)
+            else:
+                self._text(f"{mat}  DN {r.diameter_mm} — "
+                           f"Qf = {fmt.fmt(r.q_down_end, 2)} l/s",
+                           mid_x, (y0 + y1) / 2,
+                           size=6.5, center_x=True, center_y=True)

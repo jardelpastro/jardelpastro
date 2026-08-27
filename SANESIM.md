@@ -71,16 +71,22 @@ Conteúdo das janelas:
 7. **Resultados** — planilha no padrão do memorial (duas linhas por
    trecho: montante/jusante e início/fim de plano), com violações de
    critério destacadas em vermelho.
-8. **OSEs** — as OSEs são entidades do projeto (a planta e o perfil usam
-   as mesmas: alterar aqui reflete lá). A **prévia é a própria folha da
-   OSE**, no layout da exportação, com os campos não hidráulicos
-   **editáveis clicando neles**: número, locação, folha de cadastro,
-   cidade, rua, lado, entre/e rua, observações e responsáveis
-   (proposição, aprovação, liberação, execução). O **gabarito da régua é
-   ajustável por OSE** (redes profundas podem exigir régua maior) e a
-   planilha de estaqueamento recalcula na hora. Os três painéis (lista |
-   parâmetros | prévia) são **redimensionáveis arrastando os divisores**.
-   "Gerar p/ trechos sem OSE" cria OSEs automaticamente (uma por rede).
+8. **OSEs** — as OSEs são entidades do projeto (numeração padrão de 3
+   dígitos, renomeável), compostas por **Planilha, Perfil e Croqui**. A
+   prévia da planilha é a própria folha da OSE, com os campos não
+   hidráulicos editáveis clicando neles, **coluna "Obs. do Projetista"
+   editável por estaca** (salva no projeto e exportada) e gabarito da
+   régua ajustável por OSE. Remover pergunta: CANCELADA (mantida e
+   exportada com tarja) ou excluir. "Gerar p/ trechos sem OSE" cria
+   OSEs automaticamente (uma por rede). O **Croqui** é a folha 2: papel
+   série A (A4/A3/A2/A1) com margem, carimbo (logo, empresa, projeto,
+   OSE, escala aproximada, data), malha de coordenadas discreta, seta
+   de norte, trechos com rótulos padronizados alinhados à seta de fluxo
+   (nome+OSE e material/DN acima; L e i abaixo), PVs com **bloco de
+   informações arrastável com leader** (N, E, CT, GI de chegada(s), GI
+   de saída, profundidade — e vazões máximas na EEE) e o restante da
+   rede em cinza com informações menores. Casas decimais configuráveis
+   em Método de Cálculo > Exibição.
 9. **Perfil** — perfil longitudinal desenhado **sempre de montante
    (esquerda) para jusante (direita)**, com **escalas independentes**
    (padrão horizontal 1:1000, vertical 1:100, ambas editáveis), grid com

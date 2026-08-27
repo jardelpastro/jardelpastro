@@ -103,9 +103,14 @@ def test_ose_sequential_numbering(window):
     window.project.oses = [OseSheet(number="41")]
     ose_tab.load_from(window.project)
     ose_tab._new_ose()
-    assert window.project.oses[-1].number == "42"
+    assert window.project.oses[-1].number == "042"   # padrão de 3 dígitos
     ose_tab._new_ose()
-    assert window.project.oses[-1].number == "43"
+    assert window.project.oses[-1].number == "043"
+    # projeto vazio começa em 001
+    window.project.oses = []
+    ose_tab.load_from(window.project)
+    ose_tab._new_ose()
+    assert window.project.oses[-1].number == "001"
 
 
 def test_ose_cancelada_flag_and_serialization(tmp_path):

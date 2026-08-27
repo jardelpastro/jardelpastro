@@ -10,7 +10,7 @@ redimensionáveis arrastando os divisores.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (QDoubleSpinBox, QFormLayout, QFrame,
                                QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QListWidget, QListWidgetItem,
@@ -128,14 +128,20 @@ class OsePreview(QWidget):
         add(2, 2, "e Rua:", self.f_and, span=2)
         outer.addLayout(ident)
 
-        # planilha de estaqueamento (hidráulica — somente leitura)
+        # planilha de estaqueamento: hidráulica somente leitura; a última
+        # coluna (Obs. do Projetista) é editável e fica salva na OSE
         self.table = QTableWidget(0, len(OSE_HEADERS))
-        self.table.setHorizontalHeaderLabels(OSE_HEADERS)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setHorizontalHeaderLabels(
+            [h.replace("\n", " ") for h in OSE_HEADERS])
+        self.table.setEditTriggers(QTableWidget.DoubleClicked
+                                   | QTableWidget.SelectedClicked
+                                   | QTableWidget.EditKeyPressed)
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         outer.addWidget(self.table)
+        self.note_edited = lambda key, text: None   # ligado pela OseTab
+        self.table.itemChanged.connect(self._table_item_changed)
 
         # observações
         obs_row = QHBoxLayout()
@@ -180,6 +186,12 @@ class OsePreview(QWidget):
         outer.addStretch(1)
 
     # ------------------------------------------------------------------
+    def _table_item_changed(self, item):
+        if item.column() == len(OSE_HEADERS) - 1:
+            key = item.data(Qt.UserRole)
+            if key:
+                self.note_edited(key, item.text().strip())
+
     def edit_fields(self) -> dict[str, QWidget]:
         """Campos editáveis, mapeados para os atributos de OseSheet."""
         return {
@@ -233,6 +245,7 @@ class OsePreview(QWidget):
         self.ro_material.setText(" / ".join(dict.fromkeys(
             r.material.split("(")[0].strip() for r in pipes)) or "-")
         f = fmt.fmt
+        self.table.blockSignals(True)
         for r in build_ose_rows(project, result, ose):
             i = self.table.rowCount()
             self.table.insertRow(i)
@@ -244,7 +257,14 @@ class OsePreview(QWidget):
             for col, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 item.setTextAlignment(Qt.AlignCenter)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 self.table.setItem(i, col, item)
+            note = QTableWidgetItem(ose.row_notes.get(r.key, ""))
+            note.setTextAlignment(Qt.AlignCenter)
+            note.setData(Qt.UserRole, r.key)
+            note.setBackground(QBrush(QColor("#fffef5")))
+            self.table.setItem(i, len(values), note)
+        self.table.blockSignals(False)
         self.table.resizeColumnsToContents()
         self._fit_table()
 
@@ -355,6 +375,16 @@ class OseTab(QWidget):
         for widget in self.preview.edit_fields().values():
             widget.editingFinished.connect(self._preview_edited)
         self.preview.f_obs.textChanged.connect(self._obs_edited)
+        self.preview.note_edited = self._note_edited
+
+    def _note_edited(self, key: str, text: str):
+        """Observação do projetista digitada na planilha da prévia."""
+        if self._current is None:
+            return
+        if text:
+            self._current.row_notes[key] = text
+        else:
+            self._current.row_notes.pop(key, None)
 
     # ------------------------------------------------------------------
     def load_from(self, project: Project):
@@ -396,14 +426,11 @@ class OseTab(QWidget):
         return name
 
     def _next_number(self) -> str:
-        """Número sequencial em relação à última OSE da lista."""
-        if not self._project or not self._project.oses:
-            return "1"
-        last = self._project.oses[-1].number
-        try:
-            return str(int(last) + 1)
-        except (TypeError, ValueError):
-            return str(len(self._project.oses) + 1)
+        """Número sequencial padrão de 3 dígitos ("001", "002"...)."""
+        from ..core.models import next_ose_number
+        if not self._project:
+            return "001"
+        return next_ose_number(self._project.oses)
 
     def _on_select(self, row: int):
         self._save_current()

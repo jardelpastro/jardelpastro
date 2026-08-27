@@ -402,6 +402,28 @@ class CalcTab(QWidget):
         form.addRow("Material para trechos sem material definido:",
                     self.default_material)
         layout.addWidget(default_mat)
+
+        display = QGroupBox("Exibição (casas decimais — croqui, painéis "
+                            "e folhas)")
+        form = QFormLayout(display)
+
+        def dec_spin(value):
+            s = QSpinBox()
+            s.setRange(0, 6)
+            s.setValue(value)
+            return s
+
+        self.dec_coords = dec_spin(3)
+        self.dec_elev = dec_spin(3)
+        self.dec_flow = dec_spin(2)
+        self.dec_slope = dec_spin(5)
+        self.dec_depth = dec_spin(2)
+        form.addRow("Coordenadas N/E:", self.dec_coords)
+        form.addRow("Cotas (terreno, GI):", self.dec_elev)
+        form.addRow("Vazões:", self.dec_flow)
+        form.addRow("Declividades:", self.dec_slope)
+        form.addRow("Profundidades:", self.dec_depth)
+        layout.addWidget(display)
         layout.addStretch(1)
 
     def load_from(self, project: Project):
@@ -420,6 +442,12 @@ class CalcTab(QWidget):
             self.default_material.addItem(m.name, m.key)
         idx = self.default_material.findData(o.default_material)
         self.default_material.setCurrentIndex(max(0, idx))
+        d = project.display
+        self.dec_coords.setValue(d.coord_decimals)
+        self.dec_elev.setValue(d.elev_decimals)
+        self.dec_flow.setValue(d.flow_decimals)
+        self.dec_slope.setValue(d.slope_decimals)
+        self.dec_depth.setValue(d.depth_decimals)
 
     def apply_to(self, project: Project):
         o = project.options
@@ -433,3 +461,9 @@ class CalcTab(QWidget):
                               else "interpolar")
         if self.default_material.currentData():
             o.default_material = self.default_material.currentData()
+        d = project.display
+        d.coord_decimals = self.dec_coords.value()
+        d.elev_decimals = self.dec_elev.value()
+        d.flow_decimals = self.dec_flow.value()
+        d.slope_decimals = self.dec_slope.value()
+        d.depth_decimals = self.dec_depth.value()

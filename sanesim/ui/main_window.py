@@ -165,14 +165,50 @@ class MainWindow(QMainWindow):
         self.criteria_tab.apply_to(self.project)
         self.design_tab.apply_to(self.project)
         self.calc_tab.apply_to(self.project)
-        self.nodes_tab.apply_to(self.project)
-        self.pipes_tab.apply_to(self.project)
+        self._apply_network_tables()
         self.ose_tab.apply_to(self.project)
+
+    def _apply_network_tables(self):
+        """Aplica as tabelas de nós e trechos com as regras de rede:
+
+        - RENOMEAR um nó propaga o novo nome aos trechos (não os apaga);
+        - EXCLUIR um nó leva os trechos ligados a ele junto;
+        - excluir um trecho mantém os PVs;
+        - trechos digitados antes dos seus PVs existirem são preservados.
+        """
+        names_before = {n.name for n in self.project.nodes}
+        renames = self.nodes_tab.apply_to(self.project)
+        self.pipes_tab.apply_to(self.project)
+        if renames:
+            for pipe in self.project.pipes:
+                pipe.upstream = renames.get(pipe.upstream, pipe.upstream)
+                pipe.downstream = renames.get(pipe.downstream,
+                                              pipe.downstream)
+        names_after = {n.name for n in self.project.nodes}
+        # apenas nomes que EXISTIAM e sumiram (sem contar renomeações)
+        deleted = names_before - names_after - set(renames.keys())
+        orphans = [p for p in self.project.pipes
+                   if p.upstream in deleted or p.downstream in deleted]
+        if orphans:
+            removed_names = ", ".join(p.name for p in orphans)
+            orphan_ids = {p.id for p in orphans}
+            self.project.pipes = [p for p in self.project.pipes
+                                  if p.id not in orphan_ids]
+            for ose in self.project.oses:
+                ose.pipe_ids = [pid for pid in ose.pipe_ids
+                                if pid not in orphan_ids]
+            self.ose_tab.load_from(self.project)
+            self.invalidate_results()
+            self.statusBar().showMessage(
+                f"Trecho(s) removido(s) junto com o(s) PV(s) excluído(s): "
+                f"{removed_names}.")
+        if renames or orphans:
+            self.pipes_tab.load_from(self.project)
+            self.plan_tab.load_from(self.project)
 
     def _tables_edited(self, *_):
         """Ao navegar nas tabelas, aplica e reflete na tela principal."""
-        self.nodes_tab.apply_to(self.project)
-        self.pipes_tab.apply_to(self.project)
+        self._apply_network_tables()
         self.plan_tab.load_from(self.project)
 
     def _on_network_changed(self):
@@ -198,13 +234,20 @@ class MainWindow(QMainWindow):
         """Perfil e croqui seguem a OSE selecionada na Planilha."""
         ose = self.ose_tab._current
         self.croqui_tab.set_context(self.project, self.last_result, ose)
+        if self.last_result is not None:
+            # OSEs criadas/alteradas depois da simulação: reconstrói a
+            # lista de perfis apenas quando mudou (preserva zoom/ramal)
+            self.profile_tab.ensure_paths(self.project, self.last_result)
         if ose is not None and self.last_result is not None:
             combo = self.profile_tab.path_combo
-            prefix = f"OSE {ose.number}"
-            for i in range(combo.count()):
-                if combo.itemText(i).startswith(prefix):
-                    combo.setCurrentIndex(i)
-                    break
+            # delimitador no prefixo: "OSE 1" não pode casar com "OSE 10"
+            prefixes = (f"OSE {ose.number}:", f"OSE {ose.number} (")
+            current = combo.currentText()
+            if not current.startswith(prefixes):
+                for i in range(combo.count()):
+                    if combo.itemText(i).startswith(prefixes):
+                        combo.setCurrentIndex(i)
+                        break
 
     # ------------------------------------------------------------------
     def _confirm_discard(self) -> bool:

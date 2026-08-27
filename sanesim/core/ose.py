@@ -36,8 +36,8 @@ HEADERS = ["Estaca", "Dist. entre\nPiquetes (m)", "Dist.\nAcumulada (m)",
            "Cota Geratriz\nInf. Coletor (m)", "Altura do\nGabarito (m)",
            "Cota Bordo Sup.\nda Régua (m)", "Altura da\nRégua (m)",
            "Diâmetro\n(mm)", "Prof. da\nVala (m)", "Recobrimento\n(m)",
-           "Observações"]
-WIDTHS = [8, 11, 11, 11, 11, 13, 10, 13, 10, 9, 10, 12, 28]
+           "Observações", "Obs. do\nProjetista"]
+WIDTHS = [8, 11, 11, 11, 11, 13, 10, 13, 10, 9, 10, 12, 24, 24]
 NCOLS = len(HEADERS)
 
 
@@ -48,6 +48,7 @@ class OseError(Exception):
 @dataclass
 class OseRow:
     """Uma linha (estaca) da planilha de uma OSE."""
+    key: str          # chave estável ("r<ramal>:<dist>") p/ notas do usuário
     stake_label: str
     dist_prev: float
     dist_accum: float
@@ -105,7 +106,7 @@ def build_ose_rows(project: Project, result: SimulationResult,
     pipes = ose_pipe_results(project, result, ose)
     rows: list[OseRow] = []
     for i, run in enumerate(split_runs(pipes)):
-        run_rows = _run_rows(run, ose, step)
+        run_rows = _run_rows(run, ose, step, run_index=i)
         if run_rows and len(pipes) > len(run):
             label = (f"Ramal {i + 1}: {run[0].upstream} → "
                      f"{run[-1].downstream}")
@@ -116,7 +117,7 @@ def build_ose_rows(project: Project, result: SimulationResult,
 
 
 def _run_rows(pipes: list[PipeResult], ose: OseSheet,
-              step: float) -> list[OseRow]:
+              step: float, run_index: int = 0) -> list[OseRow]:
     if not pipes:
         return []
     # segmentos com posição acumulada
@@ -141,6 +142,7 @@ def _run_rows(pipes: list[PipeResult], ose: OseSheet,
     rows: list[OseRow] = []
     prev_x = 0.0
     stake = 0
+    used_keys: set[str] = set()
     for pos in sorted(positions):
         # segmento que contém a posição (limite pertence ao trecho seguinte,
         # pois é o tubo que será assentado a partir dali)
@@ -170,7 +172,12 @@ def _run_rows(pipes: list[PipeResult], ose: OseSheet,
         is_multiple = abs(pos / step - round(pos / step)) < 1e-6
         label = (str(stake) if is_multiple
                  else f"+{pos % step:.2f}".replace(".", ","))
+        key = f"r{run_index}:{pos:.3f}"
+        while key in used_keys:     # posições quase coincidentes
+            key += "+"
+        used_keys.add(key)
         rows.append(OseRow(
+            key=key,
             stake_label=label,
             dist_prev=pos - prev_x,
             dist_accum=pos,
@@ -311,6 +318,7 @@ def _ose_sheet(wb, project: Project, result: SimulationResult,
         _cell(ws, r_, 11, round(row.depth, 3), "#,##0.000")
         _cell(ws, r_, 12, round(row.cover, 3), "#,##0.000")
         _cell(ws, r_, 13, row.obs, align=_LEFT)
+        _cell(ws, r_, 14, ose.row_notes.get(row.key, ""), align=_LEFT)
         r_ += 1
 
     # ------------------------------------------------------- observações

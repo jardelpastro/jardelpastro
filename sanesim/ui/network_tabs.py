@@ -104,10 +104,13 @@ class NodesTab(_TableTab):
             self._set(row, 6, node.q_point_end)
             self._set(row, 7, node.network)
 
-    def apply_to(self, project: Project):
+    def apply_to(self, project: Project) -> dict[str, str]:
         # Atualiza os objetos EXISTENTES em vez de recriá-los: a planta e
         # o desfazer guardam referências a eles (identidade preservada).
+        # Retorna os RENOMES {nome antigo: novo} para o chamador propagar
+        # aos trechos — sem isso, renomear um PV órfão-izaria os trechos.
         existing = {n.id: n for n in project.nodes}
+        renames: dict[str, str] = {}
         nodes: list[Node] = []
         for row in range(self.table.rowCount()):
             name = _text(self.table.item(row, 0))
@@ -121,6 +124,8 @@ class NodesTab(_TableTab):
             if node is None:
                 node = Node(name=name,
                             **({"id": stable_id} if stable_id else {}))
+            elif node.name != name:
+                renames[node.name] = name
             node.name = name
             node.node_type = node_type
             node.coord_n = _num(self.table.item(row, 2))
@@ -131,6 +136,7 @@ class NodesTab(_TableTab):
             node.network = _text(self.table.item(row, 7))
             nodes.append(node)
         project.nodes = nodes
+        return renames
 
 
 class PipesTab(_TableTab):
