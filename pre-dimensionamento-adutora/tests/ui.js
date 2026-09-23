@@ -465,7 +465,9 @@ function titulo(t) { console.log('\n' + t); }
   await page.waitForTimeout(320);
   const txtResumo = await page.locator('#conteudo').innerText();
   ok('panorama lista os trechos', /Panorama do sistema/.test(txtResumo));
-  ok('panorama mostra altura manométrica', /ALTURA MANOMÉTRICA/i.test(txtResumo));
+  ok('faixa padronizada mostra a manométrica', /MANOMÉTRICA/i.test(txtResumo));
+  ok('faixa padronizada mostra extensão e pressões',
+     /EXTENSÃO TOTAL/i.test(txtResumo) && /PRESSÃO MÁXIMA/i.test(txtResumo) && /PRESSÃO MÍNIMA/i.test(txtResumo));
   ok('panorama mostra o motor', /MOTOR POR BOMBA/i.test(txtResumo));
   ok('campos essenciais destacados', (await page.locator('#conteudo label.campo.chave').count()) >= 5);
   ok('esquema de cotas presente', (await page.locator('#conteudo svg.esquema').count()) >= 1);
@@ -1895,6 +1897,83 @@ function titulo(t) { console.log('\n' + t); }
   const opsPead = await page.locator('select[data-bind="adutoras.0.junta"] option').allInnerTexts();
   ok('PEAD oferece solda de topo / eletrofusão / flange',
      /Solda de topo/.test(opsPead.join('|')) && /Eletrofusão/.test(opsPead.join('|')), opsPead.join(' | '));
+
+  titulo('40b. Peças por material do trecho');
+  /* estado atual: adutoras.0 é PEAD (do teste anterior) */
+  await page.evaluate(() => { window.PDA.App.irPara('adutoras'); });
+  await page.waitForTimeout(400);
+  const opsPecasPead = await page.evaluate(() => {
+    const sel = document.querySelector('select[data-acao-change="addPeca"][data-base="adutoras.0"]');
+    return Array.from(sel.options).map(o => o.textContent).join(' | ');
+  });
+  ok('PEAD oferece curvas gomadas e joelhos de eletrofusão',
+     /gomada/.test(opsPecasPead) && /eletrofusão/.test(opsPecasPead), opsPecasPead.slice(0, 140));
+  ok('PEAD não oferece curva de bolsa/flange', !/bolsa\/flange/.test(opsPecasPead));
+  /* peça de outro padrão já lançada continua na lista, marcada */
+  await page.evaluate(() => {
+    window.PDA.App.st.adutoras[0].pecas = [window.PDA.E.novaPeca('curva90')];
+    window.PDA.App.render();
+  });
+  await page.waitForTimeout(350);
+  const opRowPeca = await page.evaluate(() => {
+    const sel = document.querySelector('select[data-bind="adutoras.0.pecas.0.pecaId"]');
+    return sel.options[sel.selectedIndex].textContent;
+  });
+  ok('peça de outro material segue válida e marcada', /padrão de outro material/.test(opRowPeca), opRowPeca);
+  const opsAco = await page.evaluate(() => {
+    const P = window.PDA, st = P.App.st;
+    const aco = P.App.cats.todos.filter(c => c.familia === 'Aço')[0];
+    st.adutoras[0].catalogoId = aco.id; st.adutoras[0].itemRot = ''; st.adutoras[0].junta = '';
+    P.App.render();
+    const sel = document.querySelector('select[data-acao-change="addPeca"][data-base="adutoras.0"]');
+    return Array.from(sel.options).map(o => o.textContent).join(' | ');
+  });
+  ok('aço oferece curvas forjadas (raio longo/curto) e gomadas',
+     /raio longo/.test(opsAco) && /gomada/.test(opsAco), opsAco.slice(0, 140));
+
+  titulo('40c. Copiar pontos para a planilha');
+  await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    st.perfil = { ativo: true, modo: 'acumulada', unidExt: 'm',
+      pontos: [{ est: 0, cota: 100 }, { est: 1500, cota: 145, rot: 'crista' }, { est: 3000, cota: 140 }] };
+    /* sem clipboard: força o caminho do modal, que é determinístico */
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    window.PDA.App.irPara('perfil');
+  });
+  await page.waitForTimeout(450);
+  await page.locator('[data-acao="copiarPerfil"]').click();
+  await page.waitForTimeout(300);
+  const tsvPerfil = await page.evaluate(() => {
+    const ta = document.querySelector('.modal textarea');
+    return ta ? ta.value : '(sem modal)';
+  });
+  ok('sem clipboard, abre modal com o TSV do perfil (tabulações + cabeçalho)',
+     /Distância/.test(tsvPerfil) && /1500\t145\tcrista/.test(tsvPerfil),
+     JSON.stringify(tsvPerfil.slice(0, 90)));
+  await page.evaluate(() => window.PDA.UI.fecharModal());
+  await page.waitForTimeout(200);
+  /* curva da bomba também copia */
+  await page.evaluate(() => {
+    const st = window.PDA.App.st;
+    st.curvaBomba = { ativo: true, unidQ: 'L/s', npshr: '', pontos: [{ q: 0, H: 60 }, { q: 100, H: 52 }, { q: 200, H: 40 }] };
+    window.PDA.App.irPara('bombas');
+  });
+  await page.waitForTimeout(450);
+  await page.locator('[data-acao="copiarCurva"]').click();
+  await page.waitForTimeout(300);
+  const tsvCurva = await page.evaluate(() => {
+    const ta = document.querySelector('.modal textarea');
+    return ta ? ta.value : '(sem modal)';
+  });
+  ok('curva da bomba copia como TSV', /Q \(L\/s\)\tH \(mca\)/.test(tsvCurva) && /100\t52/.test(tsvCurva),
+     JSON.stringify(tsvCurva.slice(0, 60)));
+  await page.evaluate(() => window.PDA.UI.fecharModal());
+  await page.waitForTimeout(200);
+  /* faixa padronizada presente também na aba de proteção */
+  await page.evaluate(() => window.PDA.App.irPara('protecao'));
+  await page.waitForTimeout(400);
+  ok('faixa fixa padronizada aparece na aba Transitório e proteção',
+     (await page.locator('#fixo .faixa-resumo').count()) === 1);
 
   titulo('25. Impressão fiel');
   await page.locator('[data-acao="exemplo"]').click();

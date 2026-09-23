@@ -10,7 +10,20 @@
      Fonte principal: AZEVEDO NETTO, "Manual de Hidráulica", tabela de
      coeficientes de perda localizada. Os itens marcados com origem
      'planilha' são os que já constavam das planilhas de origem, mantidos
-     com o mesmo valor para garantir a continuidade dos cálculos. */
+     com o mesmo valor para garantir a continuidade dos cálculos.
+
+     CURVAS POR MATERIAL: cada família de tubo tem o seu padrão de
+     conexão — FD/PVC/PRFV/concreto usam curvas de ponta-e-bolsa ou
+     flangeadas (90/45/22°30'/11°15', NBR 7675); PEAD usa joelhos de
+     eletrofusão (DE pequenos) e curvas GOMADAS fabricadas de segmentos
+     de tubo soldados de topo; aço usa curvas forjadas/estampadas (raio
+     longo R=1,5D ou curto R=1D, ASME B16.9) e curvas gomadas soldadas
+     nos grandes diâmetros. Os campos soFam/naoFam controlam para quais
+     famílias de catálogo a peça é OFERECIDA; uma peça já lançada segue
+     válida e calculando mesmo se o material do trecho mudar. */
+  var FAM_ACO = ['Aço', 'Aço galvanizado', 'Aço inoxidável'];
+  var FAM_SOLDADOS = ['PEAD'].concat(FAM_ACO);
+
   P.pecas = [
     { id: 'sino_succao',      rot: 'Sino de sucção',                 K: 0.30, cat: 'Sucção',        origem: 'planilha' },
     { id: 'valvula_pe',       rot: 'Válvula de pé com crivo',        K: 1.75, cat: 'Sucção',        origem: 'az' },
@@ -18,18 +31,43 @@
     { id: 'entrada_normal',   rot: 'Entrada normal em canalização',  K: 0.50, cat: 'Sucção',        origem: 'az' },
     { id: 'entrada_borda',    rot: 'Entrada de borda',               K: 1.00, cat: 'Sucção',        origem: 'az' },
 
-    { id: 'curva90',          rot: 'Curva 90°',                      K: 0.40, cat: 'Curvas',        origem: 'planilha' },
-    { id: 'curva45',          rot: 'Curva 45°',                      K: 0.20, cat: 'Curvas',        origem: 'planilha' },
-    { id: 'curva22',          rot: 'Curva 22,5°',                    K: 0.10, cat: 'Curvas',        origem: 'planilha' },
-    { id: 'curva11',          rot: 'Curva 11,25°',                   K: 0.05, cat: 'Curvas',        origem: 'planilha' },
-    { id: 'cotovelo90',       rot: 'Cotovelo 90° (raio curto)',      K: 0.90, cat: 'Curvas',        origem: 'az' },
-    { id: 'cotovelo45',       rot: 'Cotovelo 45°',                   K: 0.40, cat: 'Curvas',        origem: 'az' },
+    /* curvas de ponta-e-bolsa / flangeadas (FD, PVC, PVC-O, PRFV, concreto) */
+    { id: 'curva90',          rot: 'Curva 90° (bolsa/flange)',       K: 0.40, cat: 'Curvas',        origem: 'planilha', naoFam: FAM_SOLDADOS },
+    { id: 'curva45',          rot: 'Curva 45° (bolsa/flange)',       K: 0.20, cat: 'Curvas',        origem: 'planilha', naoFam: FAM_SOLDADOS },
+    { id: 'curva22',          rot: 'Curva 22°30′ (bolsa/flange)',    K: 0.10, cat: 'Curvas',        origem: 'planilha', naoFam: FAM_SOLDADOS },
+    { id: 'curva11',          rot: 'Curva 11°15′ (bolsa/flange)',    K: 0.05, cat: 'Curvas',        origem: 'planilha', naoFam: FAM_SOLDADOS },
+    { id: 'cotovelo90',       rot: 'Cotovelo 90° (raio curto)',      K: 0.90, cat: 'Curvas',        origem: 'az',       naoFam: ['PEAD'] },
+    { id: 'cotovelo45',       rot: 'Cotovelo 45°',                   K: 0.40, cat: 'Curvas',        origem: 'az',       naoFam: ['PEAD'] },
+
+    /* curvas de aço: forjadas/estampadas (ASME B16.9) e gomadas soldadas */
+    { id: 'aco_curva90_rl',   rot: 'Curva 90° raio longo (R = 1,5D)', K: 0.25, cat: 'Curvas',       origem: 'crane', soFam: FAM_ACO },
+    { id: 'aco_curva90_rc',   rot: 'Curva 90° raio curto (R = 1D)',  K: 0.35, cat: 'Curvas',        origem: 'crane', soFam: FAM_ACO },
+    { id: 'aco_curva45',      rot: 'Curva 45° forjada',              K: 0.20, cat: 'Curvas',        origem: 'crane', soFam: FAM_ACO },
+    { id: 'aco_gomada90_1',   rot: 'Curva 90° gomada — 1 corte (2 gomos)',  K: 1.10, cat: 'Curvas', origem: 'mitra', soFam: FAM_ACO },
+    { id: 'aco_gomada90_2',   rot: 'Curva 90° gomada — 2 cortes (3 gomos)', K: 0.50, cat: 'Curvas', origem: 'mitra', soFam: FAM_ACO },
+    { id: 'aco_gomada90_3',   rot: 'Curva 90° gomada — 3 cortes (4 gomos)', K: 0.35, cat: 'Curvas', origem: 'mitra', soFam: FAM_ACO },
+    { id: 'aco_gomada45',     rot: 'Curva 45° gomada — 1 corte',     K: 0.25, cat: 'Curvas',        origem: 'mitra', soFam: FAM_ACO },
+    { id: 'aco_gomada30',     rot: 'Curva 30° gomada',               K: 0.12, cat: 'Curvas',        origem: 'mitra', soFam: FAM_ACO },
+    { id: 'aco_gomada22',     rot: 'Curva 22°30′ gomada',            K: 0.08, cat: 'Curvas',        origem: 'mitra', soFam: FAM_ACO },
+
+    /* curvas de PEAD: joelhos eletrofusão/injetados e gomadas termossoldadas */
+    { id: 'pead_joelho90',    rot: 'Joelho 90° eletrofusão / injetado', K: 0.50, cat: 'Curvas',     origem: 'lit',   soFam: ['PEAD'] },
+    { id: 'pead_joelho45',    rot: 'Joelho 45° eletrofusão / injetado', K: 0.25, cat: 'Curvas',     origem: 'lit',   soFam: ['PEAD'] },
+    { id: 'pead_gomada90_1',  rot: 'Curva 90° gomada — 1 corte (2 gomos)',  K: 1.10, cat: 'Curvas', origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada90_2',  rot: 'Curva 90° gomada — 2 cortes (3 gomos)', K: 0.50, cat: 'Curvas', origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada90_3',  rot: 'Curva 90° gomada — 3 cortes (4 gomos)', K: 0.35, cat: 'Curvas', origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada60',    rot: 'Curva 60° gomada — 1 corte',     K: 0.40, cat: 'Curvas',        origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada45',    rot: 'Curva 45° gomada — 1 corte',     K: 0.25, cat: 'Curvas',        origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada30',    rot: 'Curva 30° gomada',               K: 0.12, cat: 'Curvas',        origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada22',    rot: 'Curva 22°30′ gomada',            K: 0.08, cat: 'Curvas',        origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_curva_tubo',  rot: 'Curva do próprio tubo (R ≥ 25·DN)', K: 0.05, cat: 'Curvas',     origem: 'lit',   soFam: ['PEAD'] },
 
     { id: 'reducao_exc',      rot: 'Redução excêntrica',             K: 0.13, cat: 'Transições',    origem: 'planilha' },
     { id: 'reducao_conc',     rot: 'Redução concêntrica',            K: 0.30, cat: 'Transições',    origem: 'planilha' },
     { id: 'reducao_gradual',  rot: 'Redução gradual',                K: 0.15, cat: 'Transições',    origem: 'az' },
     { id: 'ampliacao',        rot: 'Ampliação gradual',              K: 0.30, cat: 'Transições',    origem: 'az' },
     { id: 'junta_montagem',   rot: 'Junta de montagem / dilatação',  K: 0.10, cat: 'Transições',    origem: 'planilha' },
+    { id: 'pead_flange',      rot: 'Kit flange (colarinho + flange solto)', K: 0.10, cat: 'Transições', origem: 'lit', soFam: ['PEAD'] },
 
     { id: 'te_direta',        rot: 'Tê — passagem direta',           K: 0.60, cat: 'Derivações',    origem: 'planilha' },
     { id: 'te_lateral',       rot: 'Tê — saída de lado',             K: 1.30, cat: 'Derivações',    origem: 'planilha' },
@@ -60,12 +98,25 @@
   P.fontePecas = {
     az: 'AZEVEDO NETTO, J. M. — Manual de Hidráulica, 9ª ed., Blucher. Tabela de coeficientes K de perda de carga localizada.',
     planilha: 'Valor adotado nas planilhas de pré-dimensionamento de origem (compatível com a tabela do Manual de Hidráulica).',
-    lit: 'Valor usual de catálogo de fabricante / literatura técnica — confirmar com o fornecedor da peça.'
+    lit: 'Valor usual de catálogo de fabricante / literatura técnica — confirmar com o fornecedor da peça.',
+    crane: 'CRANE Technical Paper 410 — Flow of Fluids Through Valves, Fittings and Pipe: curvas de aço forjadas, K = n·fT (raio longo R = 1,5D: 14·fT; raio curto R = 1D: 20·fT, com fT ≈ 0,017).',
+    mitra: 'Curvas gomadas (segmentos soldados ou termossoldados): IDELCHIK, Handbook of Hydraulic Resistance; MILLER, Internal Flow Systems; CRANE TP-410 (mitre bends). Ordem usual: 90° em 1 corte K ≈ 1,1; em 2 cortes ≈ 0,5; em 3 cortes ≈ 0,35; 45° em 1 corte ≈ 0,25. Valores para tubo liso — confirmar com o fabricante da conexão.'
   };
 
   P.buscarPeca = function (todas, id) {
     for (var i = 0; i < todas.length; i++) if (todas[i].id === id) return todas[i];
     return null;
+  };
+
+  /* Peças OFERECIDAS para uma família de catálogo (FD, PEAD, Aço...):
+     respeita soFam (só nessas famílias) e naoFam (em todas menos essas).
+     Sem família conhecida, oferece apenas as peças genéricas. */
+  P.pecasPara = function (familia) {
+    return P.pecas.filter(function (p) {
+      if (p.soFam) return familia ? p.soFam.indexOf(familia) >= 0 : false;
+      if (p.naoFam && familia) return p.naoFam.indexOf(familia) < 0;
+      return true;
+    });
   };
 
   /* ---------------- motores elétricos comerciais ----------------

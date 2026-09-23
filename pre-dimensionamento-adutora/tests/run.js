@@ -1359,6 +1359,49 @@ titulo('40c. TAU pela cavidade de separação (coluna rígida)');
   prox('KE somada por trecho (v de cada trecho)', rho2t.KE, keMao, 1e-6);
 }
 
+titulo('40d. Peças por material do trecho');
+{
+  const ids = l => l.map(p => p.id);
+  const pead = PDA.P.pecasPara('PEAD');
+  ok('PEAD tem gomadas e joelhos de eletrofusão, sem curvas de bolsa nem cotovelos',
+     ids(pead).includes('pead_gomada90_2') && ids(pead).includes('pead_joelho90') &&
+     !ids(pead).includes('curva90') && !ids(pead).includes('cotovelo90'));
+  const aco = PDA.P.pecasPara('Aço');
+  ok('aço tem forjadas (raio longo/curto) e gomadas, sem curva de bolsa',
+     ids(aco).includes('aco_curva90_rl') && ids(aco).includes('aco_curva90_rc') &&
+     ids(aco).includes('aco_gomada90_2') && !ids(aco).includes('curva90'));
+  ok('aço galvanizado herda o conjunto do aço e mantém cotovelos',
+     ids(PDA.P.pecasPara('Aço galvanizado')).includes('aco_gomada90_2') &&
+     ids(PDA.P.pecasPara('Aço galvanizado')).includes('cotovelo90'));
+  const fd = PDA.P.pecasPara('Ferro fundido dúctil');
+  ok('FD mantém as curvas de bolsa/flange e não ganha as gomadas',
+     ids(fd).includes('curva90') && ids(fd).includes('curva11') &&
+     !ids(fd).includes('pead_gomada90_2') && !ids(fd).includes('aco_gomada90_1'));
+  ok('sem família conhecida, só as peças genéricas',
+     PDA.P.pecasPara(null).every(p => !p.soFam));
+  ok('válvulas, sucção e derivações continuam em todas as famílias',
+     ['PEAD', 'Aço', 'Ferro fundido dúctil', 'PVC'].every(f =>
+       ids(PDA.P.pecasPara(f)).includes('vr') && ids(PDA.P.pecasPara(f)).includes('vg') &&
+       ids(PDA.P.pecasPara(f)).includes('te_direta')));
+  /* a ordem de grandeza das gomadas segue a literatura: 1 corte > 2 cortes > 3 cortes */
+  const g1 = PDA.P.buscarPeca(PDA.P.pecas, 'pead_gomada90_1').K;
+  const g2 = PDA.P.buscarPeca(PDA.P.pecas, 'pead_gomada90_2').K;
+  const g3 = PDA.P.buscarPeca(PDA.P.pecas, 'pead_gomada90_3').K;
+  ok('K da gomada cai com o número de cortes (1,1 / 0,5 / 0,35)',
+     g1 === 1.1 && g2 === 0.5 && g3 === 0.35 && g1 > g2 && g2 > g3);
+  /* toda peça tem origem citável */
+  ok('todas as peças têm fonte cadastrada',
+     PDA.P.pecas.every(p => PDA.P.fontePecas[p.origem]));
+  /* uma peça de outro padrão continua resolvível pelo motor */
+  const stPc = stProt();
+  stPc.adutoras[0].catalogoId = 'pead_pe100_sdr17';
+  stPc.adutoras[0].itemRot = 'DE 500';
+  stPc.adutoras[0].pecas = [E.novaPeca('curva90')];   /* padrão FD num trecho PEAD */
+  const resPc = C.resumo(stPc, cats);
+  ok('peça de outro material segue calculando a perda',
+     resPc.projeto.adutoras[0].hl > 0, String(resPc.projeto.adutoras[0].hl));
+}
+
 titulo('41. Tipos de junta');
 const catFDj = CAT.buscar(cats.todos, 'fd_k7');
 ok('FD tem 4 juntas (JGS, JTI, JTE, flangeada)', CAT.juntas['Ferro fundido dúctil'].length === 4);

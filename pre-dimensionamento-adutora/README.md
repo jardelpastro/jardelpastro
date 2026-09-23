@@ -119,13 +119,33 @@ cada trecho pode ser uma fração da vazão total (para os trechos a jusante de 
 derivação) ou um valor absoluto. Trechos podem ser adicionados, duplicados,
 desativados e removidos.
 
-**Peças e conexões** — 38 peças com coeficiente K de tabela, cada uma com
-quantidade e K sobreponível. A lista é reordenável: arraste pela alça ⠿ ou use as
+**Peças e conexões** — mais de 50 peças com coeficiente K de tabela, cada uma com
+quantidade e K sobreponível. As **curvas seguem o padrão de conexão do material
+do trecho**: FD/PVC/PRFV oferecem as curvas de ponta-e-bolsa ou flangeadas
+(90°/45°/22°30′/11°15′, NBR 7675); **PEAD** oferece joelhos de eletrofusão e
+curvas **gomadas** de segmentos termossoldados (1, 2 ou 3 cortes, K = 1,1 / 0,5 /
+0,35 — Idelchik, Miller, Crane TP-410), além da curva do próprio tubo flexionado;
+**aço** oferece as forjadas de raio longo (R = 1,5D, K = 0,25) e raio curto
+(K = 0,35) e as gomadas soldadas. Uma peça lançada antes de trocar o material
+continua válida e calculando, marcada como "padrão de outro material".
+A lista é reordenável: arraste pela alça ⠿ ou use as
 setas ↑ ↓ para deixar as peças na sequência física do barrilete. O mesmo vale
 para trechos de barrilete, trechos de adutora e pontos de perfil. Quando a peça tem diâmetro diferente do tubo do
 trecho — uma redução, uma válvula menor que a linha — basta escolher o **DN
 comercial**: o programa busca o diâmetro interno correspondente no catálogo e
 calcula a perda com a velocidade nesse diâmetro.
+
+**Faixa de resumo padronizada** — a mesma composição em todas as abas (fixa no
+topo ao rolar): extensão total, vazão total e por bomba, Hg geométrica, perdas na
+sucção e no recalque, Hm manométrica, BHP, motor, potência em operação, NPSH
+disponível, pressão máxima e mínima da linha e bombas em operação — com sinais de
+alerta nos valores que merecem um segundo olhar. As grades de entrada ficam em
+**até 3 colunas alinhadas** (2 em telas médias, 1 no celular).
+
+**Copiar para a planilha** — os pontos do perfil e da curva da bomba lançados no
+programa copiam como texto tabulado num clique ("Copiar para a planilha") — cole
+direto no Excel. Se o navegador negar a cópia automática, abre um modal com o
+texto selecionado para Ctrl+C.
 
 **Desenhos esquemáticos** — as informações que dão margem a dúvida vêm com um
 desenho que se atualiza com os dados do projeto: as cotas da elevatória, a

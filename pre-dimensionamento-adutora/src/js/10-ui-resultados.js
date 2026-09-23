@@ -10,24 +10,12 @@
 
   Res.init = function () { h = UI.h; };
 
-  /* ---------------- faixa de resumo do topo ---------------- */
+  /* ---------------- faixa de resumo do topo ----------------
+     A composição é a padronizada de F.faixaPadrao — a mesma em todas as
+     abas que exibem a faixa. Os sinais de alerta saem de Res.alertas. */
 
   Res.faixa = function (st, ctx, res) {
-    var c = res.projeto;
-    var av = Res.alertas(st, ctx, res);
-    return h('div', { class: 'faixa-resumo' },
-      PDA.F.chip('Vazão total', UI.num(ctx.qTotal * 1000, 1), 'L/s'),
-      PDA.F.chip('Por bomba', UI.num(ctx.qBomba * 1000, 1), 'L/s'),
-      PDA.F.chipAlerta('Hg', UI.num(c.Hg, 2), 'm', av.hg),
-      PDA.F.chipAlerta('Perdas totais', UI.num(c.hSuccao + c.hRecalque, 2), 'm', av.perdas),
-      PDA.F.chipAlerta('Hm', UI.num(c.Hm, 2), 'mca', av.hm, 'forte'),
-      PDA.F.chip('BHP por bomba', UI.num(c.bhpCv, 1), 'cv'),
-      PDA.F.chipAlerta('Motor', UI.numEdit(c.motorCv), 'cv (' + UI.num(c.motorKw, 1) + ' kW)', av.motor),
-      c.npshd !== null ? PDA.F.chipAlerta('NPSH disp.', UI.num(c.npshd, 2), 'mca', av.npsh) : null,
-      PDA.F.chipAlerta('Pressão máx.',
-        res.golpe && res.golpe.length ? UI.num(Math.max.apply(null, res.golpe.map(function (g) { return g.pressaoMaxMca; })), 0) : '—',
-        'mca c/ transitório', av.pressao),
-      PDA.F.chip('Bombas', ctx.nOp + ' de ' + ctx.nInst, 'em operação'));
+    return PDA.F.faixaPadrao(st, ctx, res);
   };
 
   /* Sinais de atenção para os resultados que costumam passar batido */

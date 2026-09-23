@@ -77,6 +77,9 @@
       h('div', { class: 'linha naoimprime', style: 'margin:11px 0 8px' },
         h('button', { class: 'btn primario', type: 'button', 'data-acao': 'colarPerfil' },
           'Colar perfil da planilha'),
+        pts.length ? h('button', { class: 'btn', type: 'button', 'data-acao': 'copiarPerfil',
+          title: 'Copia os pontos lançados como texto separado por tabulação — cole direto no Excel.' },
+          'Copiar para a planilha') : null,
         h('button', { class: 'btn', type: 'button', 'data-acao': 'addPontoPerfil' }, '+ ponto'),
         pts.length ? h('button', { class: 'btn perigo', type: 'button', 'data-acao': 'limparPerfil' }, 'Limpar tudo') : null,
         h('span', { class: 'nota' }, pts.length + ' ponto(s) · extensão do perfil ' + UI.num(calc.ultimoX, 1) + ' m' +

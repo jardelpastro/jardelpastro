@@ -138,19 +138,79 @@
   };
 
   /* ================================================================
+     Faixa de resumo PADRONIZADA — a mesma composição em todas as abas:
+     extensão, vazões, alturas (geométrica, perdas, manométrica),
+     potências, NPSH e pressões extremas da linha.
+     ================================================================ */
+
+  F.faixaPadrao = function (st, ctx, res) {
+    var c = res.projeto;
+    var av = (PDA.Res && PDA.Res.alertas) ? PDA.Res.alertas(st, ctx, res) : {};
+
+    var somaL = 0;
+    ['succao', 'recalque', 'adutoras'].forEach(function (g) {
+      (c[g] || []).forEach(function (r) { somaL += r.L || 0; });
+    });
+
+    /* pressões extremas: da envoltória (com transitório) quando o perfil
+       está lançado; senão, do golpe (máx.) e da piezométrica (mín.) */
+    var pMax = null, pMaxSub = null, pMin = null, pMinSub = null;
+    if (res.envoltoria && res.envoltoria.pontos.length) {
+      pMax = res.envoltoria.criticoMax.pMax; pMaxSub = 'mca c/ transitório';
+      pMin = res.envoltoria.criticoMin.pMin; pMinSub = 'mca c/ transitório';
+    } else {
+      if (res.golpe && res.golpe.length) {
+        pMax = Math.max.apply(null, res.golpe.map(function (g) { return g.pressaoMaxMca; }));
+        pMaxSub = 'mca c/ transitório';
+      }
+      if (res.piezometrica && res.piezometrica.length) {
+        var ps = res.piezometrica.map(function (p) { return p.pressao; });
+        pMin = Math.min.apply(null, ps); pMinSub = 'mca em regime';
+        if (pMax === null) { pMax = Math.max.apply(null, ps); pMaxSub = 'mca em regime'; }
+      }
+    }
+    var avMin = (pMin !== null && pMin < 0)
+      ? { grave: pMin < -10,
+          txt: 'Pressão mínima NEGATIVA: a linha entra em subpressão' +
+               (pMin < -10 ? ' abaixo de −10 mca — risco de separação de coluna' : '') +
+               '. Veja a envoltória no Perfil e a aba Transitório e proteção.' }
+      : null;
+
+    return h('div', { class: 'faixa-resumo' },
+      chip('Extensão total', UI.num(somaL, 0), 'm'),
+      chip('Vazão total', UI.num(ctx.qTotal * 1000, 1), 'L/s (' + UI.num(ctx.qTotal * 3600, 0) + ' m³/h)'),
+      chip('Vazão por bomba', UI.num(ctx.qBomba * 1000, 1), 'L/s'),
+      F.chipAlerta('Hg — geométrica', UI.num(c.Hg, 2), 'm', av.hg),
+      chip('Perdas na sucção', UI.num(c.hSuccao, 2), 'm'),
+      F.chipAlerta('Perdas no recalque', UI.num(c.hRecalque, 2), 'm', av.perdas),
+      F.chipAlerta('Hm — manométrica', UI.num(c.Hm, 2), 'mca', av.hm, 'forte'),
+      chip('BHP por bomba', UI.num(c.bhpCv, 1), 'cv (' + UI.num(c.bhpKw, 1) + ' kW)'),
+      F.chipAlerta('Motor por bomba', UI.numEdit(c.motorCv), 'cv (' + UI.num(c.motorKw, 1) + ' kW)', av.motor, 'forte'),
+      chip('Potência em operação', UI.num(c.potTotalKw, 1), 'kW · ' + ctx.nOp + ' bomba(s)'),
+      c.npshd !== null ? F.chipAlerta('NPSH disponível', UI.num(c.npshd, 2), 'mca', av.npsh) : null,
+      pMax !== null ? F.chipAlerta('Pressão máxima', UI.num(pMax, 1), pMaxSub, av.pressao) : null,
+      pMin !== null ? F.chipAlerta('Pressão mínima', UI.num(pMin, 1), pMinSub, avMin) : null,
+      chip('Bombas', ctx.nOp + ' de ' + ctx.nInst, 'em operação'));
+  };
+
+  /* ================================================================
      Tabela de peças
      ================================================================ */
 
   F.tabelaPecas = function (st, ctx, conj, base) {
+    var tubo = PDA.C.resolverTubo(conj, ctx);
+    var familia = tubo && tubo.cat ? tubo.cat.familia : null;
+    /* só as peças do padrão de conexão DESTE material (curvas gomadas no
+       PEAD, forjadas/gomadas no aço, bolsa/flange no FD...) */
+    var oferecidas = PDA.P.pecasPara(familia);
     var cats = {}, ordem = [];
-    PDA.P.pecas.forEach(function (p) {
+    oferecidas.forEach(function (p) {
       if (!cats[p.cat]) { cats[p.cat] = []; ordem.push(p.cat); }
       cats[p.cat].push(p);
     });
 
     var Q = 0;
     try { Q = PDA.C.vazaoConjunto(F.raizChave(base), conj, ctx.nOp, ctx); } catch (e) { Q = 0; }
-    var tubo = PDA.C.resolverTubo(conj, ctx);
     var somaK = 0, somaH = 0;
 
     /* DN da peça: escolhido entre os itens do catálogo do trecho, e o
@@ -185,11 +245,20 @@
         UI.celulaMover(caminhoArr, i, total),
         h('td', { class: 'esq' },
           h('select', { 'data-bind': base + '.pecas.' + i + '.pecaId', 'data-tipo': 'texto', 'data-estrutural': '1' },
-            ordem.map(function (c) {
-              return h('optgroup', { label: c }, cats[c].map(function (d) {
-                return h('option', { value: d.id, selected: d.id === p.pecaId }, d.rot);
-              }));
-            }))),
+            (function () {
+              var ops = ordem.map(function (c) {
+                return h('optgroup', { label: c }, cats[c].map(function (d) {
+                  return h('option', { value: d.id, selected: d.id === p.pecaId }, d.rot);
+                }));
+              });
+              /* peça lançada que não é do padrão deste material: continua
+                 válida e calculando — entra na lista marcada */
+              if (def && !oferecidas.some(function (d) { return d.id === p.pecaId; })) {
+                ops.unshift(h('option', { value: def.id, selected: true },
+                  def.rot + ' — padrão de outro material'));
+              }
+              return ops;
+            })())),
         h('td', { class: 'col-qtd' },
           h('input', { type: 'text', class: 'num', value: UI.numEdit(p.qtd),
                        'data-bind': base + '.pecas.' + i + '.qtd', 'data-tipo': 'num', inputmode: 'decimal' })),
@@ -219,7 +288,9 @@
 
     return h('div', {},
       h('div', { class: 'linha naoimprime', style: 'margin-bottom:8px' }, seletorNovo,
-        h('span', { class: 'nota' }, 'A peça entra no fim da lista.')),
+        h('span', { class: 'nota' }, 'A peça entra no fim da lista.' +
+          (familia === 'PEAD' ? ' Curvas do padrão PEAD: joelhos eletrofusão e curvas gomadas (segmentos termossoldados).'
+            : (familia && familia.indexOf('Aço') === 0 ? ' Curvas do padrão aço: forjadas (raio longo/curto) e gomadas soldadas.' : '')))),
       linhas.length ? h('div', { class: 'rolagem' }, h('table', { class: 'pecas-tab enxuta' },
         h('thead', {}, h('tr', {},
           h('th', { class: 'naoimprime' }, 'Ordem',
@@ -506,14 +577,7 @@
           UI.campo(st, 'Bombas instaladas', 'bombas.instaladas', { sufixo: 'ud' }),
           UI.campo(st, 'Bombas em operação', 'bombas.operando', { sufixo: 'ud', chave: true })),
 
-        h('div', { class: 'faixa-resumo', style: 'margin:13px 0 0' },
-          F.chip('Vazão total', UI.num(ctx.qTotal * 1000, 1), 'L/s  ·  ' + UI.num(ctx.qTotal * 3600, 1) + ' m³/h'),
-          F.chip('Por bomba', UI.num(ctx.qBomba * 1000, 1), 'L/s'),
-          F.chipAlerta('Altura geométrica', UI.num(cen.Hg, 2),
-            'm  =  ' + UI.num(st.cotas.nivelChegada, 2) + ' − ' + UI.num(st.cotas.nivelSuccaoMin, 2),
-            alertaCota, 'forte'),
-          F.chip('Perdas totais', UI.num(cen.hSuccao + cen.hRecalque, 2), 'm'),
-          chip('Altura manométrica', UI.num(cen.Hm, 2), 'mca', 'forte')),
+        h('div', { style: 'margin:13px 0 0' }, F.faixaPadrao(st, ctx, res)),
 
         alertaCota ? F.blocoAviso(alertaCota) : null,
         outrosAvisos.map(function (a) { return F.blocoAviso(a); }),
@@ -586,17 +650,7 @@
       'Cenário de projeto: ' + ctx.nOp + ' de ' + ctx.nInst + ' bombas em operação', [
       UI.tabela([{ rot: 'Grupo', esq: true }, { rot: 'Trecho', esq: true }, { rot: 'Material', esq: true },
                  { rot: 'Diâmetro', esq: true }, 'DI (mm)', 'L (m)', 'Q (L/s)', 'v (m/s)',
-                 'J (m/km)', 'hf (m)', 'Σhₗ (m)', 'Total (m)'], linhas, rodape),
-      h('div', { class: 'faixa-resumo', style: 'margin:12px 0 0' },
-        F.chip('Extensão total', UI.num(somaL, 1), 'm'),
-        F.chip('Altura geométrica', UI.num(cen.Hg, 2), 'm'),
-        F.chip('Perda distribuída', UI.num(somaHf, 2), 'm'),
-        F.chip('Perda localizada', UI.num(somaHl, 2), 'm'),
-        chip('Altura manométrica', UI.num(cen.Hm, 2), 'mca', 'forte'),
-        F.chip('BHP por bomba', UI.num(cen.bhpCv, 1), 'cv  (' + UI.num(cen.bhpKw, 1) + ' kW)'),
-        chip('Motor por bomba', UI.numEdit(cen.motorCv), 'cv  (' + UI.num(cen.motorKw, 1) + ' kW)', 'forte'),
-        F.chip('Potência em operação', UI.num(cen.potTotalKw, 1), 'kW com ' + ctx.nOp + ' conjunto(s)'),
-        cen.npshd !== null ? F.chip('NPSH disponível', UI.num(cen.npshd, 2), 'mca') : null)
+                 'J (m/km)', 'hf (m)', 'Σhₗ (m)', 'Total (m)'], linhas, rodape)
     ], h('button', { class: 'btn mini naoimprime', type: 'button', 'data-acao': 'irAba', 'data-aba': 'resultados' },
       'Ver resultados completos'));
   };
@@ -838,6 +892,9 @@
       corpo.push(h('div', { class: 'linha naoimprime', style: 'margin-bottom:8px' },
         h('button', { class: 'btn mini', type: 'button', 'data-acao': 'addPontoCurva' }, '+ ponto'),
         h('button', { class: 'btn mini', type: 'button', 'data-acao': 'colarCurva' }, 'Colar da planilha'),
+        (st.curvaBomba.pontos || []).length ? h('button', { class: 'btn mini', type: 'button', 'data-acao': 'copiarCurva',
+          title: 'Copia os pontos lançados como texto separado por tabulação — cole direto no Excel.' },
+          'Copiar para a planilha') : null,
         h('span', { class: 'nota' }, 'Mínimo de 3 pontos. Inclua a altura com vazão nula (shut-off) se tiver.')));
       corpo.push(linhas.length
         ? h('div', { class: 'rolagem', style: 'max-width:430px' }, h('table', { class: 'enxuta' },

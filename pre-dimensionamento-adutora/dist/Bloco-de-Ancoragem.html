@@ -153,19 +153,28 @@ main { max-width: 1500px; margin: 0 auto; padding: 16px; }
 }
 .faixa-fixa.ativa { display: block; }
 .faixa-fixa .interno { max-width: 1500px; margin: 0 auto; }
-.faixa-fixa .faixa-resumo { margin: 0; }
+.faixa-fixa .faixa-resumo {
+  margin: 0; padding: 6px 10px; gap: 4px 12px;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+}
+.faixa-fixa .chip .val { font-size: 13px; }
+.faixa-fixa .chip.forte .val { font-size: 14.5px; }
+.faixa-fixa .chip .rot { font-size: 9.5px; }
 
 #cabecalho-impressao { display: none; }
 .somenteimprime { display: none; }
 .valor-impresso { display: none; }
 
+/* A faixa de chips vira uma grade: os valores ficam alinhados em colunas
+   regulares em qualquer largura de tela, em vez de flutuarem. */
 .faixa-resumo {
-  display: flex; gap: 10px; flex-wrap: wrap;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 9px 14px; align-items: start;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r); padding: 10px 12px; margin-bottom: 14px;
   box-shadow: var(--sombra);
 }
-.chip { display: flex; flex-direction: column; gap: 1px; min-width: 92px; }
+.chip { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .chip .rot { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--texto-3); }
 .chip .val { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .chip.forte { padding: 2px 11px 3px; border-left: 3px solid var(--teal-vivo); background: var(--teal-claro); border-radius: 0 4px 4px 0; }
@@ -204,9 +213,15 @@ main { max-width: 1500px; margin: 0 auto; padding: 16px; }
 .cartao > .corpo { padding: 13px; }
 .cartao.recolhido > .corpo { display: none; }
 
-.grade { display: grid; gap: 11px 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.grade.g2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-.grade.g4 { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+/* Grades de campos: no máximo 3 colunas (2 em telas médias, 1 no
+   celular), para as entradas ficarem alinhadas em colunas regulares em
+   vez de se espalharem na horizontal. */
+.grade { display: grid; gap: 11px 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grade.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grade.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1150px) {
+  .grade, .grade.g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .linha { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
 
 /* ---------------- campos ---------------- */
@@ -591,7 +606,9 @@ button.btn.opcao-logo b { display: block; margin-bottom: 2px; }
   header.topo { padding: 8px 10px; }
   main { padding: 10px; }
   nav.abas { top: 47px; }
-  .grade { grid-template-columns: 1fr; }
+  .grade, .grade.g2, .grade.g4 { grid-template-columns: 1fr; }
+  /* no celular a faixa deixa de ser fixa (ocuparia a tela inteira) */
+  .faixa-fixa { position: static; }
 }
 
 /* ==================================================================
@@ -2213,7 +2230,20 @@ html.imprimindo-doc #doc-saida { display: block; }
      Fonte principal: AZEVEDO NETTO, "Manual de Hidráulica", tabela de
      coeficientes de perda localizada. Os itens marcados com origem
      'planilha' são os que já constavam das planilhas de origem, mantidos
-     com o mesmo valor para garantir a continuidade dos cálculos. */
+     com o mesmo valor para garantir a continuidade dos cálculos.
+
+     CURVAS POR MATERIAL: cada família de tubo tem o seu padrão de
+     conexão — FD/PVC/PRFV/concreto usam curvas de ponta-e-bolsa ou
+     flangeadas (90/45/22°30'/11°15', NBR 7675); PEAD usa joelhos de
+     eletrofusão (DE pequenos) e curvas GOMADAS fabricadas de segmentos
+     de tubo soldados de topo; aço usa curvas forjadas/estampadas (raio
+     longo R=1,5D ou curto R=1D, ASME B16.9) e curvas gomadas soldadas
+     nos grandes diâmetros. Os campos soFam/naoFam controlam para quais
+     famílias de catálogo a peça é OFERECIDA; uma peça já lançada segue
+     válida e calculando mesmo se o material do trecho mudar. */
+  var FAM_ACO = ['Aço', 'Aço galvanizado', 'Aço inoxidável'];
+  var FAM_SOLDADOS = ['PEAD'].concat(FAM_ACO);
+
   P.pecas = [
     { id: 'sino_succao',      rot: 'Sino de sucção',                 K: 0.30, cat: 'Sucção',        origem: 'planilha' },
     { id: 'valvula_pe',       rot: 'Válvula de pé com crivo',        K: 1.75, cat: 'Sucção',        origem: 'az' },
@@ -2221,18 +2251,43 @@ html.imprimindo-doc #doc-saida { display: block; }
     { id: 'entrada_normal',   rot: 'Entrada normal em canalização',  K: 0.50, cat: 'Sucção',        origem: 'az' },
     { id: 'entrada_borda',    rot: 'Entrada de borda',               K: 1.00, cat: 'Sucção',        origem: 'az' },
 
-    { id: 'curva90',          rot: 'Curva 90°',                      K: 0.40, cat: 'Curvas',        origem: 'planilha' },
-    { id: 'curva45',          rot: 'Curva 45°',                      K: 0.20, cat: 'Curvas',        origem: 'planilha' },
-    { id: 'curva22',          rot: 'Curva 22,5°',                    K: 0.10, cat: 'Curvas',        origem: 'planilha' },
-    { id: 'curva11',          rot: 'Curva 11,25°',                   K: 0.05, cat: 'Curvas',        origem: 'planilha' },
-    { id: 'cotovelo90',       rot: 'Cotovelo 90° (raio curto)',      K: 0.90, cat: 'Curvas',        origem: 'az' },
-    { id: 'cotovelo45',       rot: 'Cotovelo 45°',                   K: 0.40, cat: 'Curvas',        origem: 'az' },
+    /* curvas de ponta-e-bolsa / flangeadas (FD, PVC, PVC-O, PRFV, concreto) */
+    { id: 'curva90',          rot: 'Curva 90° (bolsa/flange)',       K: 0.40, cat: 'Curvas',        origem: 'planilha', naoFam: FAM_SOLDADOS },
+    { id: 'curva45',          rot: 'Curva 45° (bolsa/flange)',       K: 0.20, cat: 'Curvas',        origem: 'planilha', naoFam: FAM_SOLDADOS },
+    { id: 'curva22',          rot: 'Curva 22°30′ (bolsa/flange)',    K: 0.10, cat: 'Curvas',        origem: 'planilha', naoFam: FAM_SOLDADOS },
+    { id: 'curva11',          rot: 'Curva 11°15′ (bolsa/flange)',    K: 0.05, cat: 'Curvas',        origem: 'planilha', naoFam: FAM_SOLDADOS },
+    { id: 'cotovelo90',       rot: 'Cotovelo 90° (raio curto)',      K: 0.90, cat: 'Curvas',        origem: 'az',       naoFam: ['PEAD'] },
+    { id: 'cotovelo45',       rot: 'Cotovelo 45°',                   K: 0.40, cat: 'Curvas',        origem: 'az',       naoFam: ['PEAD'] },
+
+    /* curvas de aço: forjadas/estampadas (ASME B16.9) e gomadas soldadas */
+    { id: 'aco_curva90_rl',   rot: 'Curva 90° raio longo (R = 1,5D)', K: 0.25, cat: 'Curvas',       origem: 'crane', soFam: FAM_ACO },
+    { id: 'aco_curva90_rc',   rot: 'Curva 90° raio curto (R = 1D)',  K: 0.35, cat: 'Curvas',        origem: 'crane', soFam: FAM_ACO },
+    { id: 'aco_curva45',      rot: 'Curva 45° forjada',              K: 0.20, cat: 'Curvas',        origem: 'crane', soFam: FAM_ACO },
+    { id: 'aco_gomada90_1',   rot: 'Curva 90° gomada — 1 corte (2 gomos)',  K: 1.10, cat: 'Curvas', origem: 'mitra', soFam: FAM_ACO },
+    { id: 'aco_gomada90_2',   rot: 'Curva 90° gomada — 2 cortes (3 gomos)', K: 0.50, cat: 'Curvas', origem: 'mitra', soFam: FAM_ACO },
+    { id: 'aco_gomada90_3',   rot: 'Curva 90° gomada — 3 cortes (4 gomos)', K: 0.35, cat: 'Curvas', origem: 'mitra', soFam: FAM_ACO },
+    { id: 'aco_gomada45',     rot: 'Curva 45° gomada — 1 corte',     K: 0.25, cat: 'Curvas',        origem: 'mitra', soFam: FAM_ACO },
+    { id: 'aco_gomada30',     rot: 'Curva 30° gomada',               K: 0.12, cat: 'Curvas',        origem: 'mitra', soFam: FAM_ACO },
+    { id: 'aco_gomada22',     rot: 'Curva 22°30′ gomada',            K: 0.08, cat: 'Curvas',        origem: 'mitra', soFam: FAM_ACO },
+
+    /* curvas de PEAD: joelhos eletrofusão/injetados e gomadas termossoldadas */
+    { id: 'pead_joelho90',    rot: 'Joelho 90° eletrofusão / injetado', K: 0.50, cat: 'Curvas',     origem: 'lit',   soFam: ['PEAD'] },
+    { id: 'pead_joelho45',    rot: 'Joelho 45° eletrofusão / injetado', K: 0.25, cat: 'Curvas',     origem: 'lit',   soFam: ['PEAD'] },
+    { id: 'pead_gomada90_1',  rot: 'Curva 90° gomada — 1 corte (2 gomos)',  K: 1.10, cat: 'Curvas', origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada90_2',  rot: 'Curva 90° gomada — 2 cortes (3 gomos)', K: 0.50, cat: 'Curvas', origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada90_3',  rot: 'Curva 90° gomada — 3 cortes (4 gomos)', K: 0.35, cat: 'Curvas', origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada60',    rot: 'Curva 60° gomada — 1 corte',     K: 0.40, cat: 'Curvas',        origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada45',    rot: 'Curva 45° gomada — 1 corte',     K: 0.25, cat: 'Curvas',        origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada30',    rot: 'Curva 30° gomada',               K: 0.12, cat: 'Curvas',        origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_gomada22',    rot: 'Curva 22°30′ gomada',            K: 0.08, cat: 'Curvas',        origem: 'mitra', soFam: ['PEAD'] },
+    { id: 'pead_curva_tubo',  rot: 'Curva do próprio tubo (R ≥ 25·DN)', K: 0.05, cat: 'Curvas',     origem: 'lit',   soFam: ['PEAD'] },
 
     { id: 'reducao_exc',      rot: 'Redução excêntrica',             K: 0.13, cat: 'Transições',    origem: 'planilha' },
     { id: 'reducao_conc',     rot: 'Redução concêntrica',            K: 0.30, cat: 'Transições',    origem: 'planilha' },
     { id: 'reducao_gradual',  rot: 'Redução gradual',                K: 0.15, cat: 'Transições',    origem: 'az' },
     { id: 'ampliacao',        rot: 'Ampliação gradual',              K: 0.30, cat: 'Transições',    origem: 'az' },
     { id: 'junta_montagem',   rot: 'Junta de montagem / dilatação',  K: 0.10, cat: 'Transições',    origem: 'planilha' },
+    { id: 'pead_flange',      rot: 'Kit flange (colarinho + flange solto)', K: 0.10, cat: 'Transições', origem: 'lit', soFam: ['PEAD'] },
 
     { id: 'te_direta',        rot: 'Tê — passagem direta',           K: 0.60, cat: 'Derivações',    origem: 'planilha' },
     { id: 'te_lateral',       rot: 'Tê — saída de lado',             K: 1.30, cat: 'Derivações',    origem: 'planilha' },
@@ -2263,12 +2318,25 @@ html.imprimindo-doc #doc-saida { display: block; }
   P.fontePecas = {
     az: 'AZEVEDO NETTO, J. M. — Manual de Hidráulica, 9ª ed., Blucher. Tabela de coeficientes K de perda de carga localizada.',
     planilha: 'Valor adotado nas planilhas de pré-dimensionamento de origem (compatível com a tabela do Manual de Hidráulica).',
-    lit: 'Valor usual de catálogo de fabricante / literatura técnica — confirmar com o fornecedor da peça.'
+    lit: 'Valor usual de catálogo de fabricante / literatura técnica — confirmar com o fornecedor da peça.',
+    crane: 'CRANE Technical Paper 410 — Flow of Fluids Through Valves, Fittings and Pipe: curvas de aço forjadas, K = n·fT (raio longo R = 1,5D: 14·fT; raio curto R = 1D: 20·fT, com fT ≈ 0,017).',
+    mitra: 'Curvas gomadas (segmentos soldados ou termossoldados): IDELCHIK, Handbook of Hydraulic Resistance; MILLER, Internal Flow Systems; CRANE TP-410 (mitre bends). Ordem usual: 90° em 1 corte K ≈ 1,1; em 2 cortes ≈ 0,5; em 3 cortes ≈ 0,35; 45° em 1 corte ≈ 0,25. Valores para tubo liso — confirmar com o fabricante da conexão.'
   };
 
   P.buscarPeca = function (todas, id) {
     for (var i = 0; i < todas.length; i++) if (todas[i].id === id) return todas[i];
     return null;
+  };
+
+  /* Peças OFERECIDAS para uma família de catálogo (FD, PEAD, Aço...):
+     respeita soFam (só nessas famílias) e naoFam (em todas menos essas).
+     Sem família conhecida, oferece apenas as peças genéricas. */
+  P.pecasPara = function (familia) {
+    return P.pecas.filter(function (p) {
+      if (p.soFam) return familia ? p.soFam.indexOf(familia) >= 0 : false;
+      if (p.naoFam && familia) return p.naoFam.indexOf(familia) < 0;
+      return true;
+    });
   };
 
   /* ---------------- motores elétricos comerciais ----------------
@@ -6457,19 +6525,79 @@ html.imprimindo-doc #doc-saida { display: block; }
   };
 
   /* ================================================================
+     Faixa de resumo PADRONIZADA — a mesma composição em todas as abas:
+     extensão, vazões, alturas (geométrica, perdas, manométrica),
+     potências, NPSH e pressões extremas da linha.
+     ================================================================ */
+
+  F.faixaPadrao = function (st, ctx, res) {
+    var c = res.projeto;
+    var av = (PDA.Res && PDA.Res.alertas) ? PDA.Res.alertas(st, ctx, res) : {};
+
+    var somaL = 0;
+    ['succao', 'recalque', 'adutoras'].forEach(function (g) {
+      (c[g] || []).forEach(function (r) { somaL += r.L || 0; });
+    });
+
+    /* pressões extremas: da envoltória (com transitório) quando o perfil
+       está lançado; senão, do golpe (máx.) e da piezométrica (mín.) */
+    var pMax = null, pMaxSub = null, pMin = null, pMinSub = null;
+    if (res.envoltoria && res.envoltoria.pontos.length) {
+      pMax = res.envoltoria.criticoMax.pMax; pMaxSub = 'mca c/ transitório';
+      pMin = res.envoltoria.criticoMin.pMin; pMinSub = 'mca c/ transitório';
+    } else {
+      if (res.golpe && res.golpe.length) {
+        pMax = Math.max.apply(null, res.golpe.map(function (g) { return g.pressaoMaxMca; }));
+        pMaxSub = 'mca c/ transitório';
+      }
+      if (res.piezometrica && res.piezometrica.length) {
+        var ps = res.piezometrica.map(function (p) { return p.pressao; });
+        pMin = Math.min.apply(null, ps); pMinSub = 'mca em regime';
+        if (pMax === null) { pMax = Math.max.apply(null, ps); pMaxSub = 'mca em regime'; }
+      }
+    }
+    var avMin = (pMin !== null && pMin < 0)
+      ? { grave: pMin < -10,
+          txt: 'Pressão mínima NEGATIVA: a linha entra em subpressão' +
+               (pMin < -10 ? ' abaixo de −10 mca — risco de separação de coluna' : '') +
+               '. Veja a envoltória no Perfil e a aba Transitório e proteção.' }
+      : null;
+
+    return h('div', { class: 'faixa-resumo' },
+      chip('Extensão total', UI.num(somaL, 0), 'm'),
+      chip('Vazão total', UI.num(ctx.qTotal * 1000, 1), 'L/s (' + UI.num(ctx.qTotal * 3600, 0) + ' m³/h)'),
+      chip('Vazão por bomba', UI.num(ctx.qBomba * 1000, 1), 'L/s'),
+      F.chipAlerta('Hg — geométrica', UI.num(c.Hg, 2), 'm', av.hg),
+      chip('Perdas na sucção', UI.num(c.hSuccao, 2), 'm'),
+      F.chipAlerta('Perdas no recalque', UI.num(c.hRecalque, 2), 'm', av.perdas),
+      F.chipAlerta('Hm — manométrica', UI.num(c.Hm, 2), 'mca', av.hm, 'forte'),
+      chip('BHP por bomba', UI.num(c.bhpCv, 1), 'cv (' + UI.num(c.bhpKw, 1) + ' kW)'),
+      F.chipAlerta('Motor por bomba', UI.numEdit(c.motorCv), 'cv (' + UI.num(c.motorKw, 1) + ' kW)', av.motor, 'forte'),
+      chip('Potência em operação', UI.num(c.potTotalKw, 1), 'kW · ' + ctx.nOp + ' bomba(s)'),
+      c.npshd !== null ? F.chipAlerta('NPSH disponível', UI.num(c.npshd, 2), 'mca', av.npsh) : null,
+      pMax !== null ? F.chipAlerta('Pressão máxima', UI.num(pMax, 1), pMaxSub, av.pressao) : null,
+      pMin !== null ? F.chipAlerta('Pressão mínima', UI.num(pMin, 1), pMinSub, avMin) : null,
+      chip('Bombas', ctx.nOp + ' de ' + ctx.nInst, 'em operação'));
+  };
+
+  /* ================================================================
      Tabela de peças
      ================================================================ */
 
   F.tabelaPecas = function (st, ctx, conj, base) {
+    var tubo = PDA.C.resolverTubo(conj, ctx);
+    var familia = tubo && tubo.cat ? tubo.cat.familia : null;
+    /* só as peças do padrão de conexão DESTE material (curvas gomadas no
+       PEAD, forjadas/gomadas no aço, bolsa/flange no FD...) */
+    var oferecidas = PDA.P.pecasPara(familia);
     var cats = {}, ordem = [];
-    PDA.P.pecas.forEach(function (p) {
+    oferecidas.forEach(function (p) {
       if (!cats[p.cat]) { cats[p.cat] = []; ordem.push(p.cat); }
       cats[p.cat].push(p);
     });
 
     var Q = 0;
     try { Q = PDA.C.vazaoConjunto(F.raizChave(base), conj, ctx.nOp, ctx); } catch (e) { Q = 0; }
-    var tubo = PDA.C.resolverTubo(conj, ctx);
     var somaK = 0, somaH = 0;
 
     /* DN da peça: escolhido entre os itens do catálogo do trecho, e o
@@ -6504,11 +6632,20 @@ html.imprimindo-doc #doc-saida { display: block; }
         UI.celulaMover(caminhoArr, i, total),
         h('td', { class: 'esq' },
           h('select', { 'data-bind': base + '.pecas.' + i + '.pecaId', 'data-tipo': 'texto', 'data-estrutural': '1' },
-            ordem.map(function (c) {
-              return h('optgroup', { label: c }, cats[c].map(function (d) {
-                return h('option', { value: d.id, selected: d.id === p.pecaId }, d.rot);
-              }));
-            }))),
+            (function () {
+              var ops = ordem.map(function (c) {
+                return h('optgroup', { label: c }, cats[c].map(function (d) {
+                  return h('option', { value: d.id, selected: d.id === p.pecaId }, d.rot);
+                }));
+              });
+              /* peça lançada que não é do padrão deste material: continua
+                 válida e calculando — entra na lista marcada */
+              if (def && !oferecidas.some(function (d) { return d.id === p.pecaId; })) {
+                ops.unshift(h('option', { value: def.id, selected: true },
+                  def.rot + ' — padrão de outro material'));
+              }
+              return ops;
+            })())),
         h('td', { class: 'col-qtd' },
           h('input', { type: 'text', class: 'num', value: UI.numEdit(p.qtd),
                        'data-bind': base + '.pecas.' + i + '.qtd', 'data-tipo': 'num', inputmode: 'decimal' })),
@@ -6538,7 +6675,9 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     return h('div', {},
       h('div', { class: 'linha naoimprime', style: 'margin-bottom:8px' }, seletorNovo,
-        h('span', { class: 'nota' }, 'A peça entra no fim da lista.')),
+        h('span', { class: 'nota' }, 'A peça entra no fim da lista.' +
+          (familia === 'PEAD' ? ' Curvas do padrão PEAD: joelhos eletrofusão e curvas gomadas (segmentos termossoldados).'
+            : (familia && familia.indexOf('Aço') === 0 ? ' Curvas do padrão aço: forjadas (raio longo/curto) e gomadas soldadas.' : '')))),
       linhas.length ? h('div', { class: 'rolagem' }, h('table', { class: 'pecas-tab enxuta' },
         h('thead', {}, h('tr', {},
           h('th', { class: 'naoimprime' }, 'Ordem',
@@ -6825,14 +6964,7 @@ html.imprimindo-doc #doc-saida { display: block; }
           UI.campo(st, 'Bombas instaladas', 'bombas.instaladas', { sufixo: 'ud' }),
           UI.campo(st, 'Bombas em operação', 'bombas.operando', { sufixo: 'ud', chave: true })),
 
-        h('div', { class: 'faixa-resumo', style: 'margin:13px 0 0' },
-          F.chip('Vazão total', UI.num(ctx.qTotal * 1000, 1), 'L/s  ·  ' + UI.num(ctx.qTotal * 3600, 1) + ' m³/h'),
-          F.chip('Por bomba', UI.num(ctx.qBomba * 1000, 1), 'L/s'),
-          F.chipAlerta('Altura geométrica', UI.num(cen.Hg, 2),
-            'm  =  ' + UI.num(st.cotas.nivelChegada, 2) + ' − ' + UI.num(st.cotas.nivelSuccaoMin, 2),
-            alertaCota, 'forte'),
-          F.chip('Perdas totais', UI.num(cen.hSuccao + cen.hRecalque, 2), 'm'),
-          chip('Altura manométrica', UI.num(cen.Hm, 2), 'mca', 'forte')),
+        h('div', { style: 'margin:13px 0 0' }, F.faixaPadrao(st, ctx, res)),
 
         alertaCota ? F.blocoAviso(alertaCota) : null,
         outrosAvisos.map(function (a) { return F.blocoAviso(a); }),
@@ -6905,17 +7037,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       'Cenário de projeto: ' + ctx.nOp + ' de ' + ctx.nInst + ' bombas em operação', [
       UI.tabela([{ rot: 'Grupo', esq: true }, { rot: 'Trecho', esq: true }, { rot: 'Material', esq: true },
                  { rot: 'Diâmetro', esq: true }, 'DI (mm)', 'L (m)', 'Q (L/s)', 'v (m/s)',
-                 'J (m/km)', 'hf (m)', 'Σhₗ (m)', 'Total (m)'], linhas, rodape),
-      h('div', { class: 'faixa-resumo', style: 'margin:12px 0 0' },
-        F.chip('Extensão total', UI.num(somaL, 1), 'm'),
-        F.chip('Altura geométrica', UI.num(cen.Hg, 2), 'm'),
-        F.chip('Perda distribuída', UI.num(somaHf, 2), 'm'),
-        F.chip('Perda localizada', UI.num(somaHl, 2), 'm'),
-        chip('Altura manométrica', UI.num(cen.Hm, 2), 'mca', 'forte'),
-        F.chip('BHP por bomba', UI.num(cen.bhpCv, 1), 'cv  (' + UI.num(cen.bhpKw, 1) + ' kW)'),
-        chip('Motor por bomba', UI.numEdit(cen.motorCv), 'cv  (' + UI.num(cen.motorKw, 1) + ' kW)', 'forte'),
-        F.chip('Potência em operação', UI.num(cen.potTotalKw, 1), 'kW com ' + ctx.nOp + ' conjunto(s)'),
-        cen.npshd !== null ? F.chip('NPSH disponível', UI.num(cen.npshd, 2), 'mca') : null)
+                 'J (m/km)', 'hf (m)', 'Σhₗ (m)', 'Total (m)'], linhas, rodape)
     ], h('button', { class: 'btn mini naoimprime', type: 'button', 'data-acao': 'irAba', 'data-aba': 'resultados' },
       'Ver resultados completos'));
   };
@@ -7157,6 +7279,9 @@ html.imprimindo-doc #doc-saida { display: block; }
       corpo.push(h('div', { class: 'linha naoimprime', style: 'margin-bottom:8px' },
         h('button', { class: 'btn mini', type: 'button', 'data-acao': 'addPontoCurva' }, '+ ponto'),
         h('button', { class: 'btn mini', type: 'button', 'data-acao': 'colarCurva' }, 'Colar da planilha'),
+        (st.curvaBomba.pontos || []).length ? h('button', { class: 'btn mini', type: 'button', 'data-acao': 'copiarCurva',
+          title: 'Copia os pontos lançados como texto separado por tabulação — cole direto no Excel.' },
+          'Copiar para a planilha') : null,
         h('span', { class: 'nota' }, 'Mínimo de 3 pontos. Inclua a altura com vazão nula (shut-off) se tiver.')));
       corpo.push(linhas.length
         ? h('div', { class: 'rolagem', style: 'max-width:430px' }, h('table', { class: 'enxuta' },
@@ -7625,6 +7750,9 @@ html.imprimindo-doc #doc-saida { display: block; }
       h('div', { class: 'linha naoimprime', style: 'margin:11px 0 8px' },
         h('button', { class: 'btn primario', type: 'button', 'data-acao': 'colarPerfil' },
           'Colar perfil da planilha'),
+        pts.length ? h('button', { class: 'btn', type: 'button', 'data-acao': 'copiarPerfil',
+          title: 'Copia os pontos lançados como texto separado por tabulação — cole direto no Excel.' },
+          'Copiar para a planilha') : null,
         h('button', { class: 'btn', type: 'button', 'data-acao': 'addPontoPerfil' }, '+ ponto'),
         pts.length ? h('button', { class: 'btn perigo', type: 'button', 'data-acao': 'limparPerfil' }, 'Limpar tudo') : null,
         h('span', { class: 'nota' }, pts.length + ' ponto(s) · extensão do perfil ' + UI.num(calc.ultimoX, 1) + ' m' +
@@ -9031,24 +9159,12 @@ html.imprimindo-doc #doc-saida { display: block; }
 
   Res.init = function () { h = UI.h; };
 
-  /* ---------------- faixa de resumo do topo ---------------- */
+  /* ---------------- faixa de resumo do topo ----------------
+     A composição é a padronizada de F.faixaPadrao — a mesma em todas as
+     abas que exibem a faixa. Os sinais de alerta saem de Res.alertas. */
 
   Res.faixa = function (st, ctx, res) {
-    var c = res.projeto;
-    var av = Res.alertas(st, ctx, res);
-    return h('div', { class: 'faixa-resumo' },
-      PDA.F.chip('Vazão total', UI.num(ctx.qTotal * 1000, 1), 'L/s'),
-      PDA.F.chip('Por bomba', UI.num(ctx.qBomba * 1000, 1), 'L/s'),
-      PDA.F.chipAlerta('Hg', UI.num(c.Hg, 2), 'm', av.hg),
-      PDA.F.chipAlerta('Perdas totais', UI.num(c.hSuccao + c.hRecalque, 2), 'm', av.perdas),
-      PDA.F.chipAlerta('Hm', UI.num(c.Hm, 2), 'mca', av.hm, 'forte'),
-      PDA.F.chip('BHP por bomba', UI.num(c.bhpCv, 1), 'cv'),
-      PDA.F.chipAlerta('Motor', UI.numEdit(c.motorCv), 'cv (' + UI.num(c.motorKw, 1) + ' kW)', av.motor),
-      c.npshd !== null ? PDA.F.chipAlerta('NPSH disp.', UI.num(c.npshd, 2), 'mca', av.npsh) : null,
-      PDA.F.chipAlerta('Pressão máx.',
-        res.golpe && res.golpe.length ? UI.num(Math.max.apply(null, res.golpe.map(function (g) { return g.pressaoMaxMca; })), 0) : '—',
-        'mca c/ transitório', av.pressao),
-      PDA.F.chip('Bombas', ctx.nOp + ' de ' + ctx.nInst, 'em operação'));
+    return PDA.F.faixaPadrao(st, ctx, res);
   };
 
   /* Sinais de atenção para os resultados que costumam passar batido */
@@ -10364,7 +10480,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     var fixo = document.getElementById('fixo');
     var interno = fixo.firstChild;
     UI.limpar(interno);
-    var comFaixa = ['bombas', 'succao', 'barrilete', 'adutoras', 'perfil', 'resultados'].indexOf(App.aba) >= 0;
+    var comFaixa = ['bombas', 'succao', 'barrilete', 'adutoras', 'perfil', 'protecao', 'resultados'].indexOf(App.aba) >= 0;
     fixo.classList.toggle('ativa', comFaixa);
     if (comFaixa) {
       interno.appendChild(PDA.Res.faixa(st, ctx, res));
@@ -10729,6 +10845,22 @@ html.imprimindo-doc #doc-saida { display: block; }
 
       /* perfil da linha */
       case 'colarPerfil': PDA.Pf.modalColar(st); return;
+      case 'copiarPerfil': {
+        var tsvP = 'Distância (' + st.perfil.unidExt + ')\tCota (m)\tIdentificação\n' +
+          (st.perfil.pontos || []).map(function (p) {
+            return UI.numEdit(p.est) + '\t' + UI.numEdit(p.cota) + '\t' + (p.rot || '');
+          }).join('\n');
+        App.copiarTexto(tsvP, 'Pontos do perfil copiados — cole na planilha (Ctrl+V).');
+        return;
+      }
+      case 'copiarCurva': {
+        var tsvC = 'Q (' + (st.curvaBomba.unidQ || 'L/s') + ')\tH (mca)\n' +
+          (st.curvaBomba.pontos || []).map(function (p) {
+            return UI.numEdit(p.q) + '\t' + UI.numEdit(p.H);
+          }).join('\n');
+        App.copiarTexto(tsvC, 'Pontos da curva copiados — cole na planilha (Ctrl+V).');
+        return;
+      }
       case 'addPontoPerfil': {
         var pp = st.perfil.pontos;
         var ultX = pp.length ? Number(pp[pp.length - 1].est) || 0 : 0;
@@ -10947,6 +11079,30 @@ html.imprimindo-doc #doc-saida { display: block; }
 
   App.autoPreencherPNTodos = function () {
     App.st.adutoras.forEach(function (a, i) { App.autoPreencherPN('adutoras.' + i); });
+  };
+
+  /* Copia texto para a área de transferência; se o navegador negar a
+     permissão, abre um modal com o texto já selecionado para Ctrl+C. */
+  App.copiarTexto = function (texto, msgOk) {
+    function fallback() {
+      var ta = UI.h('textarea', {
+        rows: 10,
+        style: 'width:100%;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;white-space:pre'
+      }, texto);
+      UI.modal('Copiar para a planilha', [
+        UI.h('p', { class: 'nota', style: 'margin-bottom:8px' },
+          'O navegador não liberou a cópia automática. Selecione tudo (Ctrl+A), copie (Ctrl+C) e cole na planilha.'),
+        ta
+      ]);
+      setTimeout(function () { ta.focus(); ta.select(); }, 60);
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto).then(
+          function () { UI.toast(msgOk || 'Copiado para a área de transferência.'); },
+          fallback);
+      } else { fallback(); }
+    } catch (e) { fallback(); }
   };
 
   /* Move um item de posição dentro de um array do estado */
@@ -11202,7 +11358,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     a.extensao = 214; a.unidExt = 'm';
     a.cOverride = 130;
     a.usarCotas = true; a.cotaIni = 620; a.cotaFim = 642;
-    a.pecas = [PDA.E.novaPeca('curva90'), PDA.E.novaPeca('curva45'),
+    a.pecas = [PDA.E.novaPeca('pead_gomada90_2'), PDA.E.novaPeca('pead_gomada45'),
                PDA.E.novaPeca('ventosa'), PDA.E.novaPeca('descarga'), PDA.E.novaPeca('saida')];
     a.pecas[0].qtd = 2;
     return st;

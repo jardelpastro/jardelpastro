@@ -138,7 +138,7 @@
     var fixo = document.getElementById('fixo');
     var interno = fixo.firstChild;
     UI.limpar(interno);
-    var comFaixa = ['bombas', 'succao', 'barrilete', 'adutoras', 'perfil', 'resultados'].indexOf(App.aba) >= 0;
+    var comFaixa = ['bombas', 'succao', 'barrilete', 'adutoras', 'perfil', 'protecao', 'resultados'].indexOf(App.aba) >= 0;
     fixo.classList.toggle('ativa', comFaixa);
     if (comFaixa) {
       interno.appendChild(PDA.Res.faixa(st, ctx, res));
@@ -503,6 +503,22 @@
 
       /* perfil da linha */
       case 'colarPerfil': PDA.Pf.modalColar(st); return;
+      case 'copiarPerfil': {
+        var tsvP = 'Distância (' + st.perfil.unidExt + ')\tCota (m)\tIdentificação\n' +
+          (st.perfil.pontos || []).map(function (p) {
+            return UI.numEdit(p.est) + '\t' + UI.numEdit(p.cota) + '\t' + (p.rot || '');
+          }).join('\n');
+        App.copiarTexto(tsvP, 'Pontos do perfil copiados — cole na planilha (Ctrl+V).');
+        return;
+      }
+      case 'copiarCurva': {
+        var tsvC = 'Q (' + (st.curvaBomba.unidQ || 'L/s') + ')\tH (mca)\n' +
+          (st.curvaBomba.pontos || []).map(function (p) {
+            return UI.numEdit(p.q) + '\t' + UI.numEdit(p.H);
+          }).join('\n');
+        App.copiarTexto(tsvC, 'Pontos da curva copiados — cole na planilha (Ctrl+V).');
+        return;
+      }
       case 'addPontoPerfil': {
         var pp = st.perfil.pontos;
         var ultX = pp.length ? Number(pp[pp.length - 1].est) || 0 : 0;
@@ -721,6 +737,30 @@
 
   App.autoPreencherPNTodos = function () {
     App.st.adutoras.forEach(function (a, i) { App.autoPreencherPN('adutoras.' + i); });
+  };
+
+  /* Copia texto para a área de transferência; se o navegador negar a
+     permissão, abre um modal com o texto já selecionado para Ctrl+C. */
+  App.copiarTexto = function (texto, msgOk) {
+    function fallback() {
+      var ta = UI.h('textarea', {
+        rows: 10,
+        style: 'width:100%;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;white-space:pre'
+      }, texto);
+      UI.modal('Copiar para a planilha', [
+        UI.h('p', { class: 'nota', style: 'margin-bottom:8px' },
+          'O navegador não liberou a cópia automática. Selecione tudo (Ctrl+A), copie (Ctrl+C) e cole na planilha.'),
+        ta
+      ]);
+      setTimeout(function () { ta.focus(); ta.select(); }, 60);
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto).then(
+          function () { UI.toast(msgOk || 'Copiado para a área de transferência.'); },
+          fallback);
+      } else { fallback(); }
+    } catch (e) { fallback(); }
   };
 
   /* Move um item de posição dentro de um array do estado */
@@ -976,7 +1016,7 @@
     a.extensao = 214; a.unidExt = 'm';
     a.cOverride = 130;
     a.usarCotas = true; a.cotaIni = 620; a.cotaFim = 642;
-    a.pecas = [PDA.E.novaPeca('curva90'), PDA.E.novaPeca('curva45'),
+    a.pecas = [PDA.E.novaPeca('pead_gomada90_2'), PDA.E.novaPeca('pead_gomada45'),
                PDA.E.novaPeca('ventosa'), PDA.E.novaPeca('descarga'), PDA.E.novaPeca('saida')];
     a.pecas[0].qtd = 2;
     return st;

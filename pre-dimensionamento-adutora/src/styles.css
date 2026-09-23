@@ -146,19 +146,28 @@ main { max-width: 1500px; margin: 0 auto; padding: 16px; }
 }
 .faixa-fixa.ativa { display: block; }
 .faixa-fixa .interno { max-width: 1500px; margin: 0 auto; }
-.faixa-fixa .faixa-resumo { margin: 0; }
+.faixa-fixa .faixa-resumo {
+  margin: 0; padding: 6px 10px; gap: 4px 12px;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+}
+.faixa-fixa .chip .val { font-size: 13px; }
+.faixa-fixa .chip.forte .val { font-size: 14.5px; }
+.faixa-fixa .chip .rot { font-size: 9.5px; }
 
 #cabecalho-impressao { display: none; }
 .somenteimprime { display: none; }
 .valor-impresso { display: none; }
 
+/* A faixa de chips vira uma grade: os valores ficam alinhados em colunas
+   regulares em qualquer largura de tela, em vez de flutuarem. */
 .faixa-resumo {
-  display: flex; gap: 10px; flex-wrap: wrap;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 9px 14px; align-items: start;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r); padding: 10px 12px; margin-bottom: 14px;
   box-shadow: var(--sombra);
 }
-.chip { display: flex; flex-direction: column; gap: 1px; min-width: 92px; }
+.chip { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .chip .rot { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--texto-3); }
 .chip .val { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .chip.forte { padding: 2px 11px 3px; border-left: 3px solid var(--teal-vivo); background: var(--teal-claro); border-radius: 0 4px 4px 0; }
@@ -197,9 +206,15 @@ main { max-width: 1500px; margin: 0 auto; padding: 16px; }
 .cartao > .corpo { padding: 13px; }
 .cartao.recolhido > .corpo { display: none; }
 
-.grade { display: grid; gap: 11px 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.grade.g2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-.grade.g4 { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+/* Grades de campos: no máximo 3 colunas (2 em telas médias, 1 no
+   celular), para as entradas ficarem alinhadas em colunas regulares em
+   vez de se espalharem na horizontal. */
+.grade { display: grid; gap: 11px 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grade.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grade.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1150px) {
+  .grade, .grade.g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .linha { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
 
 /* ---------------- campos ---------------- */
@@ -584,7 +599,9 @@ button.btn.opcao-logo b { display: block; margin-bottom: 2px; }
   header.topo { padding: 8px 10px; }
   main { padding: 10px; }
   nav.abas { top: 47px; }
-  .grade { grid-template-columns: 1fr; }
+  .grade, .grade.g2, .grade.g4 { grid-template-columns: 1fr; }
+  /* no celular a faixa deixa de ser fixa (ocuparia a tela inteira) */
+  .faixa-fixa { position: static; }
 }
 
 /* ==================================================================
