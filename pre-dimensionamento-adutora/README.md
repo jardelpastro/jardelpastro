@@ -135,12 +135,15 @@ trecho — uma redução, uma válvula menor que a linha — basta escolher o **
 comercial**: o programa busca o diâmetro interno correspondente no catálogo e
 calcula a perda com a velocidade nesse diâmetro.
 
-**Faixa de resumo padronizada** — a mesma composição em todas as abas (fixa no
-topo ao rolar): extensão total, vazão total e por bomba, Hg geométrica, perdas na
+**Faixa de resumo padronizada** — a mesma composição no topo do Resumo e, fixa
+ao rolar, nas abas de dimensionamento e resultados (Bombas, Sucção, Barriletes,
+Adutora, Perfil, Transitório e proteção, Resultados): extensão total, vazão
+total e por bomba, Hg geométrica, perdas na
 sucção e no recalque, Hm manométrica, BHP, motor, potência em operação, NPSH
 disponível, pressão máxima e mínima da linha e bombas em operação — com sinais de
 alerta nos valores que merecem um segundo olhar. As grades de entrada ficam em
-**até 3 colunas alinhadas** (2 em telas médias, 1 no celular).
+**até 3 colunas alinhadas** (2 em telas médias, 1 no celular); em janelas baixas
+a faixa deixa de grudar no topo para não roubar a altura útil.
 
 **Copiar para a planilha** — os pontos do perfil e da curva da bomba lançados no
 programa copiam como texto tabulado num clique ("Copiar para a planilha") — cole

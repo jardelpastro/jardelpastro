@@ -211,7 +211,7 @@ main { max-width: 1500px; margin: 0 auto; padding: 16px; }
    vez de se espalharem na horizontal. */
 .grade { display: grid; gap: 11px 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .grade.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.grade.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grade.g4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 1150px) {
   .grade, .grade.g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -601,6 +601,12 @@ button.btn.opcao-logo b { display: block; margin-bottom: 2px; }
   nav.abas { top: 47px; }
   .grade, .grade.g2, .grade.g4 { grid-template-columns: 1fr; }
   /* no celular a faixa deixa de ser fixa (ocuparia a tela inteira) */
+  .faixa-fixa { position: static; }
+}
+
+/* janela baixa (celular deitado, monitor pequeno): a faixa fixa somada ao
+   cabeçalho e às abas roubaria quase toda a altura útil — deixa de grudar */
+@media (max-height: 560px) {
   .faixa-fixa { position: static; }
 }
 
