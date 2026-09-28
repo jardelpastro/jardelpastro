@@ -2125,6 +2125,64 @@ html.imprimindo-doc #doc-saida { display: block; }
     return null;
   };
 
+  /* ----------------------------------------------------------------
+     Tipos de junta por família de material.
+     A junta define a pressão admissível do CONJUNTO (tubo + junta) e o
+     comportamento de ancoragem: junta elástica não transmite esforço
+     axial (pede bloco); junta travada transmite (dispensa bloco no
+     trecho travado). Os PFA por DN e por junta são do catálogo do
+     fabricante.
+     ---------------------------------------------------------------- */
+  CAT.juntas = {
+    'Ferro fundido dúctil': [
+      { id: 'jgs', rot: 'JGS — junta elástica', ancora: false,
+        nota: 'Ponta e bolsa com anel de borracha. Não transmite esforço axial: curvas, tês e extremidades pedem bloco de ancoragem. É a junta de linha corrente.' },
+      { id: 'jti', rot: 'JTI — junta travada interna', ancora: true,
+        nota: 'Travamento pelo próprio anel (com insertos). Transmite o esforço axial: o trecho travado dispensa bloco, mas a PFA do conjunto cai em relação à elástica e varia com o DN — conferir no catálogo do fabricante.' },
+      { id: 'jte', rot: 'JTE — junta travada externa', ancora: true,
+        nota: 'Travamento por contra-flange/cordão externo. Transmite o esforço axial; PFA por DN conforme o catálogo do fabricante.' },
+      { id: 'flg', rot: 'Flangeada', ancora: true,
+        nota: 'União rígida por flanges — barrilete e casa de bombas. A classe do flange (PN 10/16/25/40) define a pressão admissível.' }
+    ],
+    'PEAD': [
+      { id: 'solda_topo', rot: 'Solda de topo', ancora: true,
+        nota: 'Emenda por termofusão de topo: a linha vira um tubo contínuo, autotravado — dispensa blocos. A pressão admissível é o PN do próprio tubo.' },
+      { id: 'eletrofusao', rot: 'Eletrofusão', ancora: true,
+        nota: 'Luvas eletrossoldáveis; autotravada como a solda de topo. PN do tubo.' },
+      { id: 'flange_pead', rot: 'Flange (colarinho + flange solto)', ancora: true,
+        nota: 'Transições para válvulas e equipamentos. A classe do flange pode limitar a pressão do conjunto.' }
+    ],
+    'Aço': [
+      { id: 'soldada', rot: 'Soldada', ancora: true,
+        nota: 'Linha contínua autotravada; a pressão admissível vem da espessura (SCH) e da solda.' },
+      { id: 'flg_aco', rot: 'Flangeada', ancora: true,
+        nota: 'Classe do flange (PN/classe ANSI) define a pressão admissível do conjunto.' },
+      { id: 'ranhurada', rot: 'Ranhurada (grooved)', ancora: false,
+        nota: 'Acoplamentos ranhurados: montagem rápida; verificar a pressão admissível do acoplamento e a necessidade de ancoragem conforme o fabricante.' }
+    ]
+  };
+  CAT.juntas['Aço galvanizado'] = CAT.juntas['Aço'];
+  CAT.juntas['Aço inoxidável'] = CAT.juntas['Aço'];
+
+  /* junta padrão de um catálogo: flangeados são flangeados; o resto,
+     a junta corrente da família */
+  CAT.juntaPadrao = function (cat) {
+    if (!cat) return '';
+    var lista = CAT.juntas[cat.familia];
+    if (!lista) return '';
+    if (/flangead|_flg|flg_/i.test(cat.id + ' ' + cat.nome)) {
+      var f = lista.filter(function (j) { return /^flg|flange/.test(j.id); })[0];
+      if (f) return f.id;
+    }
+    return lista[0].id;
+  };
+
+  CAT.junta = function (cat, id) {
+    var lista = cat ? CAT.juntas[cat.familia] : null;
+    if (!lista) return null;
+    return lista.filter(function (j) { return j.id === id; })[0] || null;
+  };
+
   PDA.CAT = CAT;
 })(window.PDA = window.PDA || {});
 
@@ -2662,6 +2720,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       unidExt: 'm',
       pnMcaOverride: null,
       pnAuto: true,          /* enquanto verdadeiro, o PN acompanha o catálogo */
+      junta: '',             /* '' = junta padrão do catálogo (CAT.juntaPadrao) */
       pecas: []
     };
   }
@@ -2694,6 +2753,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     alvo.unidExt = modelo.unidExt;
     alvo.pnMcaOverride = modelo.pnMcaOverride;
     alvo.pnAuto = modelo.pnAuto;
+    alvo.junta = modelo.junta || '';
     return alvo;
   };
 
@@ -2735,7 +2795,8 @@ html.imprimindo-doc #doc-saida { display: block; }
             fim:    { min: null, med: null, maxd: null, maxh: null }
           }
         },
-        chegada: { cotaTerreno: null, cotaGI: null, dnAfluenteMm: 400, laminaAfluentePct: 75, degrauEntradaM: 0.10 },
+        chegada: { modo: 'canal',    /* 'canal' (canal de entrada com gradeamento) | 'poco' (direto no poço, sem canal) */
+                   cotaTerreno: null, cotaGI: null, dnAfluenteMm: 400, laminaAfluentePct: 75, degrauEntradaM: 0.10 },
         canal: { larguraM: 0.6, alturaM: null, bordaLivreM: 0.3, nCanais: 1, nReserva: 0, comportas: true },
         bypass: {
           canal: 'auto',            /* 'auto' | 'sim' | 'nao' — canal de by-pass do gradeamento */
@@ -2806,6 +2867,10 @@ html.imprimindo-doc #doc-saida { display: block; }
           formato: 'retangular', L1: 3.0, L2: 3.0, diametroM: 3.0,
           nCamaras: 1, camaras: 'unica', espParedeM: 0.20,
           partidasHora: 6, considerarRodizio: true,
+          /* níveis intermediários entre NA mín e NA máx: partida de bombas
+             adicionais, alarmes… cada um com nome, desnível abaixo do NA máx
+             (ou cota absoluta) e se conta como nível usual de partida */
+          niveisExtras: [],
           alturaUtilM: null, naMaxOverride: null, degrauEntradaM: 0.10,
           dnBocaMm: 200, altMotorM: null, submergOverrideM: null,
           cotaFundoOverride: null, cotaLajeOverride: null,
@@ -3092,17 +3157,20 @@ html.imprimindo-doc #doc-saida { display: block; }
   };
 
   /* DI da peça em mm. Ordem de precedência:
-       1. DI informado diretamente (campo avançado)
-       2. DN comercial informado -> DI buscado no catálogo do trecho
-       3. DI do próprio trecho */
+       1. dnLocal = 'outro' -> DI digitado pelo usuário (reduções para DN
+          fora do catálogo do trecho, ex.: flange da bomba)
+       2. DN comercial escolhido -> DI buscado no catálogo do trecho
+       3. DI digitado (projetos antigos, sem o seletor 'outro')
+       4. DI do próprio trecho */
   C.diPeca = function (p, tubo) {
-    if (p.diLocalMm !== null && p.diLocalMm !== undefined && p.diLocalMm !== '' && Number(p.diLocalMm) > 0) {
-      return Number(p.diLocalMm);
-    }
+    var diDigitado = (p.diLocalMm !== null && p.diLocalMm !== undefined && p.diLocalMm !== '' && Number(p.diLocalMm) > 0)
+      ? Number(p.diLocalMm) : null;
+    if (p.dnLocal === 'outro') return diDigitado || (tubo ? tubo.diMm : 0);
     if (p.dnLocal !== null && p.dnLocal !== undefined && p.dnLocal !== '' && tubo && tubo.cat) {
       var it = C.itemPorRot(tubo.cat, p.dnLocal);
       if (it) return PDA.CAT.diInterno(tubo.cat, it);
     }
+    if (diDigitado) return diDigitado;
     return tubo ? tubo.diMm : 0;
   };
 
@@ -3119,18 +3187,72 @@ html.imprimindo-doc #doc-saida { display: block; }
     return i.mca;
   };
 
-  /* Detalha de onde veio a pressão admissível adotada */
+  /* PFA automática por material + junta:
+     - FD com junta elástica (JGS): parede pela EN 545 com a espessura mínima
+       de fundição; a junta elástica resiste a pressão >= à do corpo. Em
+       junta travada (JTI/JTE) e flange a PFA depende do DN e do fabricante —
+       NÃO se adota valor automático.
+     - Aço soldado ou flangeado: Barlow/EN 545 com 87,5 % da espessura
+       (tolerância usual de laminação). Ranhurado: o acoplamento governa.
+     - PEAD: o PN do próprio tubo já vem do catálogo (item.pn).            */
+  C.pnAutoJunta = function (conj, tubo) {
+    if (!tubo || tubo.semDiametro || !tubo.item || !tubo.item.e || !tubo.item.de) return null;
+    var cat = tubo.cat;
+    if (!cat || !PDA.CAT || !PDA.CAT.juntas || !PDA.CAT.juntas[cat.familia]) return null;
+    var jid = conj && conj.junta ? conj.junta : PDA.CAT.juntaPadrao(cat);
+    var j = PDA.CAT.junta(cat, jid);
+    if (!j) return null;
+    var sig = C.SIGMA_ADM[tubo.material];
+    if (!sig) return null;
+    var e = Number(tubo.item.e), de = Number(tubo.item.de), dn = Number(tubo.item.dn) || 0;
+    if (!(e > 0) || !(de > e)) return null;
+    var fd = /^fd_/.test(tubo.material);
+    if (fd && j.id !== 'jgs') return null;             /* travada/flange: catálogo do fabricante */
+    if (!fd && j.id !== 'soldada' && j.id !== 'flg_aco') return null;
+    var eMin = fd ? e - (1.3 + 0.001 * dn) : e * 0.875;
+    if (!(eMin > 0) || !(de > eMin)) return null;
+    var pfa = 20 * eMin * sig / (de - eMin);
+    if (fd && j.id === 'jgs') pfa = Math.min(64, pfa);
+    pfa = Math.floor(pfa);
+    if (!(pfa > 0)) return null;
+    return {
+      mca: pfa * 10, bar: pfa, junta: j,
+      nota: fd
+        ? 'PFA de ' + pfa + ' bar adotada automaticamente: parede pela EN 545 com a espessura mínima de ' +
+          'fundição (σ = ' + sig + ' MPa)' + (pfa === 64 ? ', limitada aos 64 bar da junta elástica' : '') +
+          '. A junta elástica ' + j.rot.split(' — ')[0] + ' resiste a pressão igual ou superior à do corpo. ' +
+          'Anteprojeto — confirme a PFA por DN no catálogo do fabricante.'
+        : 'PFA de ' + pfa + ' bar adotada automaticamente pela expressão de Barlow/EN 545 com 87,5 % da ' +
+          'espessura (tolerância de laminação) e σ = ' + sig + ' MPa. Confirme com a especificação do tubo e da solda.'
+    };
+  };
+
+  /* Detalha de onde veio a pressão admissível adotada.
+     Prioridades: valor digitado pelo usuário > PN do catálogo > PFA
+     automática por material + junta > ausente. O valor auto-preenchido
+     pelo programa (conj.pnAuto !== false) continua contando como
+     automático — só o que o usuário digitou vira "informado". */
   C.pnInfo = function (conj, tubo) {
+    var auto = null;
+    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) {
+      auto = { mca: Number(tubo.item.pn) * 10, origem: 'catalogo',
+               nota: 'PN ' + tubo.item.pn + ' bar do catálogo "' + tubo.cat.nome + '".' };
+    } else {
+      var aj = C.pnAutoJunta(conj, tubo);
+      if (aj) auto = { mca: aj.mca, bar: aj.bar, origem: 'junta', nota: aj.nota };
+    }
     if (conj && conj.pnMcaOverride !== null && conj.pnMcaOverride !== undefined && conj.pnMcaOverride !== '') {
-      return { mca: Number(conj.pnMcaOverride), origem: 'informado',
+      var v = Number(conj.pnMcaOverride);
+      if (conj.pnAuto !== false && auto && Math.abs(v - auto.mca) < 0.5) return auto;
+      return { mca: v, origem: 'informado',
                nota: 'Valor informado no campo PN / PFA do trecho.' };
     }
-    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) {
-      return { mca: Number(tubo.item.pn) * 10, origem: 'catalogo',
-               nota: 'PN ' + tubo.item.pn + ' bar do catálogo "' + tubo.cat.nome + '".' };
-    }
+    if (auto) return auto;
+    var jSel = (tubo && tubo.cat && PDA.CAT && PDA.CAT.junta) ? PDA.CAT.junta(tubo.cat, conj && conj.junta) : null;
     return { mca: null, origem: 'ausente',
-             nota: 'O catálogo deste tubo não traz a pressão admissível. Informe-a no campo PN / PFA do trecho.' };
+             nota: jSel && jSel.ancora
+               ? 'A PFA da ' + jSel.rot.split(' — ')[0] + ' depende do DN e do fabricante — confirme no catálogo e informe no campo PN / PFA.'
+               : 'O catálogo deste tubo não traz a pressão admissível. Informe-a no campo PN / PFA do trecho.' };
   };
 
   /* Resistência do CORPO do tubo pela expressão da EN 545 / ISO 10803:
@@ -4468,11 +4590,30 @@ html.imprimindo-doc #doc-saida { display: block; }
     return out;
   };
 
+  /* chegada direta no poço de sucção (sem canal de entrada): todo o trem
+     de canal / grades / Parshall / desarenador sai do cálculo e o NA máximo
+     amarra direto na GI do coletor afluente */
+  CE.semCanal = function (st) {
+    return st.eee && st.eee.chegada && st.eee.chegada.modo === 'poco';
+  };
+
   CE.perfilEntrada = function (st, vaz, grades, parshall, desarenador) {
     var ch = st.eee.chegada;
     var canal = st.eee.canal;
     var b = pos(canal.larguraM) || 0.6;
     var cotaGI = num(ch.cotaGI);
+
+    if (CE.semCanal(st)) {
+      return {
+        b: 0, pontos: [], seq: [], temCota: cotaGI !== null,
+        series: CE.seriesPerfil(st, vaz),
+        qq: { min: vaz.qMinRef, med: vaz.qMedFim, max: vaz.qDim },
+        cotaTerreno: num(ch.cotaTerreno), cotaGI: cotaGI,
+        fundoChegada: null, fundoDesarenador: null, saida: null,
+        altCanal: 0, semCanal: true
+      };
+    }
+
     var usarParshall = st.eee.parshall.usar !== false && st.eee.desarenador.usar !== false && desarenador.tipo === 'canal';
 
     var pontos = [];   /* de montante para jusante */
@@ -4586,7 +4727,7 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     return {
       b: b, pontos: pontos, seq: seq, temCota: temCota, series: series, qq: qq,
-      cotaTerreno: num(ch.cotaTerreno),
+      cotaTerreno: num(ch.cotaTerreno), cotaGI: cotaGI,
       fundoChegada: temCota ? fundoChegada : null,
       fundoDesarenador: fundoDesar, saida: saida,
       altCanal: pos(canal.alturaM) ||
@@ -4608,6 +4749,12 @@ html.imprimindo-doc #doc-saida { display: block; }
     var theta = 2 * Math.acos(1 - 2 * yD);
     var area = D * D / 8 * (theta - Math.sin(theta));
     var vChegada = area > 0 ? vaz.qDim / area : 0;
+
+    if (perfil.semCanal) {
+      /* sem canal de entrada: só a velocidade do coletor interessa */
+      return { semCanal: true, D: D, yD: yD, area: area, vChegada: vChegada,
+               vQMH: 0, vQmed: 0, hQMH: 0, bFaixa: null, checks: [], ok: true };
+    }
 
     var nOperC = CE.canais(st).oper;
     var p0 = perfil.pontos[0];
@@ -4700,12 +4847,22 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     /* níveis */
     var temCota = perfil.temCota;
+    /* degrau da entrada no poço: honra o valor digitado, INCLUSIVE zero —
+       só cai no padrão quando o campo está vazio */
+    var degrauPoco = num(p.degrauEntradaM);
+    if (degrauPoco === null) degrauPoco = crit.degrauEntradaPadraoM;
     var naMax = null, naMin = null, cotaFundo = null;
     if (temCota) {
       naMax = num(p.naMaxOverride);
-      if (naMax === null && perfil.saida) naMax = perfil.saida.fundoJusante - (pos(p.degrauEntradaM) || crit.degrauEntradaPadraoM);
+      if (naMax === null && perfil.semCanal) {
+        /* sem canal de entrada: o NA máx amarra direto na GI do coletor,
+           descontado apenas o degrau da entrada no poço */
+        var giChegada = num(st.eee.chegada.cotaGI);
+        naMax = giChegada !== null ? giChegada - degrauPoco : null;
+      }
+      if (naMax === null && perfil.saida) naMax = perfil.saida.fundoJusante - degrauPoco;
       if (naMax === null) naMax = perfil.fundoDesarenador !== null
-        ? perfil.fundoDesarenador - (pos(p.degrauEntradaM) || crit.degrauEntradaPadraoM)
+        ? perfil.fundoDesarenador - degrauPoco
         : null;
       if (naMax !== null) naMin = naMax - hUtil;
     }
@@ -4730,15 +4887,45 @@ html.imprimindo-doc #doc-saida { display: block; }
     if (cotaLaje === null && cotaTerreno !== null) cotaLaje = cotaTerreno + 0.10;
     var altTotal = (cotaLaje !== null && cotaFundo !== null) ? cotaLaje - cotaFundo : null;
 
+    /* ---- níveis intermediários (partida de bombas adicionais, alarmes) ----
+       cada um por desnível abaixo do NA máx ou por cota absoluta; os marcados
+       como "nível usual de partida" limitam o volume que rege a DETENÇÃO:
+       em operação normal o poço cicla entre o NA mín e o nível de partida —
+       o NA máx só é atingido nos picos. */
+    var niveisExtras = [];
+    (p.niveisExtras || []).forEach(function (nv, i) {
+      var cota = num(nv.cotaM);
+      var desniv = pos(nv.desnivelM);
+      if (cota === null && naMax !== null && desniv !== null) cota = naMax - desniv;
+      var e = { i: i, nome: nv.nome || ('Nível ' + (i + 1)),
+                usarDetencao: nv.usarDetencao !== false,
+                cota: cota, desnivel: null, vol: null,
+                tDetencao: null, tEnchimento: null, dentro: null };
+      if (cota !== null && naMax !== null && naMin !== null) {
+        e.desnivel = naMax - cota;
+        e.dentro = cota <= naMax + 1e-9 && cota >= naMin - 1e-9;
+        e.vol = Math.max(0, areaUtil * (cota - naMin));
+        e.tDetencao = qDetencao > 0 ? e.vol / qDetencao / 60 : Infinity;
+        e.tEnchimento = vaz.qMedFim > 0 ? e.vol / vaz.qMedFim / 60 : Infinity;
+      }
+      niveisExtras.push(e);
+    });
+    var nivelPartida = null;
+    niveisExtras.forEach(function (nv) {
+      if (nv.usarDetencao && nv.vol !== null && (nivelPartida === null || nv.vol < nivelPartida.vol)) nivelPartida = nv;
+    });
+    var volDetencao = nivelPartida ? nivelPartida.vol : volUtil;
+
     /* tempos característicos [min] */
     function minutos(vol, q) { return q > 0 ? vol / q / 60 : Infinity; }
     var tempos = {
       subidaIni: minutos(volUtil, vaz.qmhInicio),
       subidaFim: minutos(volUtil, vaz.qDim),
       descida: (nOp * qBomba - vaz.qMedFim) > 0 ? volUtil / (nOp * qBomba - vaz.qMedFim) / 60 : Infinity,
-      detencaoNorma: minutos(volUtil, qDetencao),         /* Qméd de início de plano — critério da norma */
-      detencaoIni: minutos(volUtil, vaz.qMinRef),          /* Qmín do horizonte — informativo, mais severo */
-      detencaoFim: minutos(volUtil, vaz.fases.fim.min.v || vaz.qMinRef),
+      detencaoNorma: minutos(volDetencao, qDetencao),     /* Qméd de início de plano — critério da norma */
+      detencaoNaMax: minutos(volUtil, qDetencao),          /* com o poço cheio até o NA máx — referência */
+      detencaoIni: minutos(volDetencao, vaz.qMinRef),      /* Qmín do horizonte — informativo, mais severo */
+      detencaoFim: minutos(volDetencao, vaz.fases.fim.min.v || vaz.qMinRef),
       cicloMin: qBomba > 0 ? 4 * volUtil / qBomba / 60 : Infinity,
       /* contingência: uma câmara isolada para limpeza, as demais operando */
       cicloCamaraIsolada: (camaras > 1 && qBomba > 0)
@@ -4751,8 +4938,23 @@ html.imprimindo-doc #doc-saida { display: block; }
       'volume útil ' + volUtil.toFixed(2).replace('.', ',') + ' m³ ≥ mínimo de ciclo ' + volMinTotal.toFixed(2).replace('.', ',') + ' m³');
     chk(volMaxDetencao <= 0 || tempos.detencaoNorma <= crit.detencaoMaxMin + 1e-9, tempos.detencaoNorma <= crit.detencaoMaxMin * 1.5,
       'detenção na Q média de início de plano = ' + (isFinite(tempos.detencaoNorma) ? tempos.detencaoNorma.toFixed(1).replace('.', ',') : '—') +
-      ' min (limite ' + crit.detencaoMaxMin + ' min — NBR 12208 / MPS SANEPAR; na Qmín do horizonte: ' +
+      ' min' + (nivelPartida ? ' até o nível "' + nivelPartida.nome + '" (ciclo usual de operação)' : '') +
+      ' (limite ' + crit.detencaoMaxMin + ' min — NBR 12208 / MPS SANEPAR; na Qmín do horizonte: ' +
       (isFinite(tempos.detencaoIni) ? tempos.detencaoIni.toFixed(1).replace('.', ',') : '—') + ' min)');
+    if (nivelPartida && nivelPartida.vol !== null) {
+      chk(nivelPartida.vol >= volMinCiclo - 1e-9, nivelPartida.vol >= volMinCiclo * 0.8,
+        'volume até o nível usual de partida "' + nivelPartida.nome + '" = ' +
+        nivelPartida.vol.toFixed(2).replace('.', ',') + ' m³ × mínimo de ciclo ' +
+        volMinCiclo.toFixed(2).replace('.', ',') + ' m³ — abaixo disso o conjunto que parte nesse nível ' +
+        'cicla mais rápido que o admissível');
+    }
+    niveisExtras.forEach(function (nv) {
+      if (nv.cota !== null && nv.dentro === false) {
+        chk(false, true, 'nível intermediário "' + nv.nome + '" (cota ' + nv.cota.toFixed(2).replace('.', ',') +
+          ' m) está fora da faixa entre o NA mín (' + naMin.toFixed(2).replace('.', ',') +
+          ' m) e o NA máx (' + naMax.toFixed(2).replace('.', ',') + ' m)');
+      }
+    });
     chk(tempos.cicloMin * 60 >= Tsistema - 1, tempos.cicloMin * 60 >= Tsistema * 0.9,
       'ciclo mínimo = ' + (isFinite(tempos.cicloMin) ? tempos.cicloMin.toFixed(1).replace('.', ',') : '—') +
       ' min × admissível ' + (Tsistema / 60).toFixed(1).replace('.', ',') + ' min (' + partidas + ' partidas/h' +
@@ -4785,6 +4987,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       rotForma: rotForma, areaTotal: areaTotal, areaUtil: areaUtil, areaCamara: areaCamara,
       hNec: hNec, hUtil: hUtil, volUtil: volUtil,
       naMax: naMax, naMin: naMin, cotaFundo: cotaFundo, cotaLaje: cotaLaje, altTotal: altTotal,
+      degrauPoco: degrauPoco, niveisExtras: niveisExtras, nivelPartida: nivelPartida, volDetencao: volDetencao,
       dnBocaMm: dnBocaMm, vBoca: vBoca, subMinVortice: subMinVortice, subMotor: subFabricante,
       submergencia: submergencia, tempos: tempos, temCota: temCota,
       checks: checks, ok: checks.every(function (c) { return c.ok; })
@@ -4809,10 +5012,28 @@ html.imprimindo-doc #doc-saida { display: block; }
     function nota(txt, dom) { checks.push({ ok: true, nota: true, txt: txt, dom: dom || 'gradeamento' }); }
     function fmt2(v, d) { return Number(v).toFixed(d === undefined ? 1 : d).replace('.', ','); }
 
-    var usaGrades = st.eee.grade.arranjo === 'grades';
+    var semCanal = CE.semCanal(st);
+    var usaGrades = !semCanal && st.eee.grade.arranjo === 'grades';
     var niveisAtivos = usaGrades ? grades : [];
     var temMecanizada = niveisAtivos.some(function (g) { return g.mec; });
     var mediaFinaManual = niveisAtivos.filter(function (g) { return !g.mec && g.nivel.id !== 'grossa'; });
+
+    /* ---- chegada direta no poço (sem canal de entrada) ---- */
+    if (semCanal) {
+      if (st.eee.grade.arranjo === 'nenhum') {
+        chk(false, false, 'Sem NENHUMA retenção de sólidos a montante das bombas: a NBR 12208/12209 pede ' +
+          'tratamento preliminar na elevatória — prever ao menos um cesto de retenção com içamento no poço');
+      } else {
+        nota('Chegada direta no poço de sucção (sem canal de entrada): arranjo admitido em EEEs pequenas, ' +
+          'com cesto de retenção removível no próprio poço, sob a boca do coletor. Sem canal não há Parshall ' +
+          'nem desarenador — prever medição de vazão na linha de recalque e atenção à areia nas bombas ' +
+          '(rotor adequado a sólidos)');
+      }
+      if (qDimLs >= conf.qGradeMecanizadaLs) {
+        chk(false, false, 'QMH de ' + fmt2(qDimLs) + ' L/s é alta demais para chegada direta no poço com cesto — ' +
+          'a NBR 12209 pede canal com grades mecanizadas acima de ' + conf.qGradeMecanizadaLs + ' L/s');
+      }
+    }
 
     /* ---- mecanização obrigatória (NBR 12209: >= 100 L/s, exceto grade grossa) ---- */
     if (usaGrades && qDimLs >= conf.qGradeMecanizadaLs && mediaFinaManual.length) {
@@ -4832,7 +5053,7 @@ html.imprimindo-doc #doc-saida { display: block; }
         : 'Mecanização: QMH de fim de plano = ' + fmt2(qDimLs) + ' L/s abaixo do limiar de ' +
           conf.qGradeMecanizadaLs + ' L/s da NBR 12209 — limpeza manual admitida');
     }
-    if (st.eee.grade.arranjo === 'cesto' && qDimLs >= conf.qGradeMecanizadaLs) {
+    if (!semCanal && st.eee.grade.arranjo === 'cesto' && qDimLs >= conf.qGradeMecanizadaLs) {
       chk(false, false, 'QMH de ' + fmt2(qDimLs) + ' L/s é alta demais para cesto de retenção — adotar canal ' +
         'com grades (mecanizadas acima de ' + conf.qGradeMecanizadaLs + ' L/s, NBR 12209)');
     }
@@ -5034,7 +5255,7 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     /* volumes no período (fim de plano) */
     var volGrad = desar.solidos.fim.gradeadoDia * dias;
-    var volAreia = st.eee.desarenador.usar !== false ? desar.solidos.fim.areiaDia * dias : 0;
+    var volAreia = (!CE.semCanal(st) && st.eee.desarenador.usar !== false) ? desar.solidos.fim.areiaDia * dias : 0;
 
     /* caçamba: tamanho e quantidade */
     var tipo = rs.cacambaTipo || 'auto';
@@ -5142,17 +5363,25 @@ html.imprimindo-doc #doc-saida { display: block; }
     if (!st.eee || st.eee.ativo === false) return null;
 
     var vaz = CE.vazoes(st);
+    var semCanal = CE.semCanal(st);
     var b = pos(st.eee.canal.larguraM) || 0.6;
     var canais = CE.canais(st);
     var vazCanal = CE.vazPorCanal(vaz, canais.oper);   /* cada canal em operação leva Q/n */
 
     var parshall = CE.varrerParshall(st, vaz);
     var desar = CE.calcDesarenador(st, vaz, parshall);
+    if (semCanal) {
+      /* sem canal de entrada não há Parshall nem desarenador: só as
+         quantidades de sólidos continuam valendo (para as caçambas) */
+      desar = { tipo: 'nenhum', nTotal: 0, nOper: 0, checks: [],
+                solidos: desar.solidos, diasAcumulo: desar.diasAcumulo,
+                cacamba: desar.cacamba, z: 0, lamina: null, ok: true };
+    }
 
     /* grades ativas — as lâminas dependem do perfil; primeiro uma estimativa
        com a lâmina do desarenador, depois o perfil refina em cadeia */
     var grades = [];
-    if (st.eee.grade.arranjo === 'grades') {
+    if (!semCanal && st.eee.grade.arranjo === 'grades') {
       var lamBase = desar.lamina || { min: 0.1, med: 0.2, max: 0.3 };
       st.eee.grade.niveis.forEach(function (nv) {
         if (!nv.ativo) return;
@@ -5196,9 +5425,9 @@ html.imprimindo-doc #doc-saida { display: block; }
     varre(poco.checks, 'Poço de sucção');
     varre(conformidade.checks, 'Conformidade');
     varre(residuos.checks, 'Resíduos e içamento');
-    if (parshall.escolhida && parshall.escolhida.classe === 'ruim') {
+    if (!semCanal && parshall.escolhida && parshall.escolhida.classe === 'ruim') {
       avisos.push({ grave: true, txt: 'Calha Parshall: a garganta escolhida não cobre a faixa de vazões do projeto.' });
-    } else if (parshall.escolhida && parshall.escolhida.classe === 'atencao') {
+    } else if (!semCanal && parshall.escolhida && parshall.escolhida.classe === 'atencao') {
       avisos.push({ grave: false, txt: 'Calha Parshall: ' + parshall.escolhida.motivos.join('; ') + '.' });
     }
     if (!perfil.temCota) {
@@ -6704,20 +6933,30 @@ html.imprimindo-doc #doc-saida { display: block; }
     var tubo = PDA.C.resolverTubo(conj, ctx);
     var somaK = 0, somaH = 0;
 
-    /* DN da peça: escolhido entre os itens do catálogo do trecho, e o
-       programa busca o DI correspondente */
+    /* DN da peça: escolhido entre os itens do catálogo do trecho (o programa
+       busca o DI correspondente) ou digitado, para reduções a um DN que não
+       existe no catálogo (ex.: o flange da bomba) */
     function selectDN(p, i) {
       if (!tubo || !tubo.cat) return h('span', { class: 'nota' }, '—');
-      return h('select', {
+      var sel = h('select', {
         'data-bind': base + '.pecas.' + i + '.dnLocal', 'data-tipo': 'texto', 'data-estrutural': '1',
         class: p.dnLocal ? 'editado' : '',
-        title: 'DN da peça, quando diferente do tubo do trecho. O DI correspondente é buscado no catálogo.'
+        title: 'DN da peça, quando diferente do tubo do trecho. O DI correspondente é buscado no catálogo — ou escolha "outro" e digite o DI.'
       }, [h('option', { value: '', selected: !p.dnLocal },
             'igual ao trecho' + (tubo.item && !tubo.semDiametro ? ' — ' + tubo.item.rot : ''))].concat(
         tubo.cat.itens.map(function (it) {
           return h('option', { value: it.rot, selected: it.rot === p.dnLocal },
             it.rot + ' — DI ' + UI.num(PDA.CAT.diInterno(tubo.cat, it), 0) + ' mm');
-        })));
+        })).concat([
+        h('option', { value: 'outro', selected: p.dnLocal === 'outro' }, 'outro — digitar DI (mm)…')
+      ]));
+      if (p.dnLocal !== 'outro') return sel;
+      return h('div', { style: 'display:flex;gap:4px;align-items:center' }, sel,
+        h('input', { type: 'text', class: 'num editado', style: 'width:64px',
+                     value: p.diLocalMm === null || p.diLocalMm === undefined ? '' : UI.numEdit(p.diLocalMm),
+                     placeholder: 'DI mm',
+                     title: 'Diâmetro INTERNO da peça, em mm — para uma redução, o DI do lado menor',
+                     'data-bind': base + '.pecas.' + i + '.diLocalMm', 'data-tipo': 'num', inputmode: 'decimal' }));
     }
 
     var caminhoArr = base + '.pecas';
@@ -6900,12 +7139,20 @@ html.imprimindo-doc #doc-saida { display: block; }
       return op.arr ? UI.blocoArrastavel(caixa, op.arr, op.i) : caixa;
     }
 
+    var catAtualJ = PDA.CAT.buscar(ctx.cats.todos, conj.catalogoId);
+    var juntasFam = catAtualJ ? PDA.CAT.juntas[catAtualJ.familia] : null;
+    if (juntasFam && !conj.junta) conj.junta = PDA.CAT.juntaPadrao(catAtualJ);
+
     var campos = [
       h('label', { class: 'campo' }, h('span', { class: 'rot' }, 'Catálogo / material do tubo'),
         F.selectCatalogo(st, ctx.cats, base + '.catalogoId')),
       h('label', { class: 'campo' + (op.adutora ? ' chave' : '') },
         h('span', { class: 'rot' }, 'Diâmetro adotado'),
         F.selectDiametro(st, ctx.cats, conj, base + '.itemRot')),
+      juntasFam ? UI.select(st, 'Tipo de junta', base + '.junta',
+        juntasFam.map(function (j) { return { v: j.id, rot: j.rot }; }),
+        { dica: juntasFam.map(function (j) { return j.rot + ' — ' + j.nota; }).join('\n\n') +
+          '\n\nA junta define a pressão admissível do CONJUNTO (a PFA da junta travada difere da elástica e varia com o DN — conferir no catálogo do fabricante) e a necessidade de blocos de ancoragem: junta travada transmite o esforço axial e dispensa bloco no trecho travado.' }) : null,
       UI.campo(st, 'Extensão', base + '.extensao',
         { unid: { grandeza: 'extensao', caminho: base + '.unidExt' }, chave: !!op.adutora })
     ];
@@ -6939,30 +7186,37 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     if (op.adutora) {
       var tuboAtual = PDA.C.resolverTubo(conj, ctx);
-      var pnCat = tuboAtual && tuboAtual.item && tuboAtual.item.pn ? Number(tuboAtual.item.pn) * 10 : null;
       var pnInfo = PDA.C.pnInfo(conj, tuboAtual);
       var pfaCorpo = PDA.C.pfaCorpoBar(tuboAtual);
+      var pnAutoInfo = (function () {                     /* o que o programa adotaria sozinho */
+        if (tuboAtual && !tuboAtual.semDiametro && tuboAtual.item && tuboAtual.item.pn) {
+          return { mca: Number(tuboAtual.item.pn) * 10, origem: 'catalogo' };
+        }
+        var aj = PDA.C.pnAutoJunta(conj, tuboAtual);
+        return aj ? { mca: aj.mca, origem: 'junta' } : null;
+      })();
       corpo.push(UI.sub('Pressão admissível e cotas do trecho'));
       corpo.push(h('div', { class: 'grade' },
         UI.campo(st, 'PN / PFA do tubo (mca)', base + '.pnMcaOverride', {
           chave: pnInfo.mca === null,
-          editado: conj.pnMcaOverride !== null && conj.pnMcaOverride !== '' && conj.pnMcaOverride !== undefined,
-          placeholder: pnCat !== null ? UI.num(pnCat, 0) : 'informar',
+          editado: pnInfo.origem === 'informado',
+          placeholder: pnAutoInfo ? UI.num(pnAutoInfo.mca, 0) : 'informar',
           dica: 'Pressão de serviço admissível do tubo, em mca, usada para conferir a pressão em regime permanente e a sobrepressão do transitório.\n\n' +
                 pnInfo.nota +
-                (pnCat !== null ? '\n\nO campo é preenchido automaticamente quando o catálogo traz o PN; troque o valor se o seu fornecedor indicar outro.' : '') +
-                (pfaCorpo ? '\n\nA resistência do CORPO deste tubo, pela expressão da EN 545 (PFA = 20·e·σ/(DE−e), com σ = ' +
-                  PDA.C.SIGMA_ADM[tuboAtual.material] + ' MPa), é de ' + UI.num(pfaCorpo, 0) + ' bar. ' +
-                  'Na prática a pressão admissível do conjunto é limitada pela JUNTA e costuma ser bem menor — ' +
-                  'por isso o programa não adota esse número sozinho.' : '')
+                (pnAutoInfo ? '\n\nO campo é preenchido AUTOMATICAMENTE pelo material e pela junta escolhidos — troque o valor se o catálogo do seu fornecedor indicar outro.' : '') +
+                (pfaCorpo && pnInfo.origem !== 'junta' ? '\n\nReferência: a resistência do CORPO deste tubo pela EN 545 (PFA = 20·e·σ/(DE−e), σ = ' +
+                  PDA.C.SIGMA_ADM[tuboAtual.material] + ' MPa) é de ' + UI.num(pfaCorpo, 0) + ' bar — limite superior; a junta costuma governar.' : '')
         }),
-        F.seletorPFA(st, conj, base, tuboAtual, pfaCorpo),
+        F.seletorPFA(st, conj, base, tuboAtual, pfaCorpo, pnInfo),
         UI.check(st, 'Informar cotas deste trecho', base + '.usarCotas',
           { dica: 'Serve para traçar o perfil e verificar a pressão em cada nó. A cota final do ÚLTIMO trecho é a mesma "cota de chegada" da aba Bombas e níveis — o programa mantém as duas iguais automaticamente.' }),
         conj.usarCotas ? UI.campo(st, 'Cota inicial (m)', base + '.cotaIni',
           { title: 'Altitude absoluta do início do trecho' }) : null,
         conj.usarCotas ? UI.campo(st, 'Cota final (m)', base + '.cotaFim',
           { title: 'Altitude absoluta do fim do trecho' }) : null));
+      if (pnInfo.origem !== 'informado') {
+        corpo.push(h('p', { class: 'nota', style: 'margin-top:6px' }, pnInfo.nota));
+      }
     }
 
     corpo.push(UI.sub('Peças e conexões do trecho'));
@@ -6975,19 +7229,22 @@ html.imprimindo-doc #doc-saida { display: block; }
     return op.arr ? UI.blocoArrastavel(caixa, op.arr, op.i) : caixa;
   };
 
-  /* Escolha rápida da pressão admissível, quando o catálogo não traz PN */
-  F.seletorPFA = function (st, conj, base, tubo, pfaCorpo) {
-    if (tubo && tubo.item && tubo.item.pn) return null;   /* já vem do catálogo */
+  /* Escolha rápida da pressão admissível — só quando o programa não tem
+     como adotar um valor sozinho (junta travada, acoplamento ranhurado,
+     catálogo sem PN): serve para informar outro PN em um clique. */
+  F.seletorPFA = function (st, conj, base, tubo, pfaCorpo, pnInfo) {
+    var temAuto = !!(tubo && !tubo.semDiametro && tubo.item && tubo.item.pn) ||
+                  !!PDA.C.pnAutoJunta(conj, tubo);
+    if (temAuto) return null;    /* o programa já adota a classe sozinho */
     var opcoes = [{ v: '', rot: '— escolher um degrau —' }].concat(
       PDA.C.DEGRAUS_PFA_BAR.map(function (b) {
         return { v: String(b * 10), rot: 'PN ' + b + ' bar   (' + (b * 10) + ' mca)' };
       }));
     var atual = conj.pnMcaOverride === null || conj.pnMcaOverride === undefined ? '' : String(conj.pnMcaOverride);
     return h('label', { class: 'campo' },
-      h('span', { class: 'rot' }, 'Preencher com um degrau normativo',
-        UI.dica('As classes K do ferro fundido dúctil não têm uma pressão admissível única: a PFA depende da classe, do DN e do tipo de junta, e o valor que governa costuma ser o da junta, não o da parede.\n\n' +
-                'Esta lista traz os degraus usuais de pressão da EN 545 para escolha rápida — ela NÃO diz qual deles se aplica ao seu DN. Confirme no catálogo do fabricante.\n\n' +
-                'Se o tubo for flangeado, prefira os catálogos "Flangeado PN 10/16/25/40": eles já trazem o PN e preenchem o campo sozinhos.' +
+      h('span', { class: 'rot' }, 'Informar um PN usual',
+        UI.dica('Para esta combinação de material e junta o programa não adota uma PFA sozinho: em junta travada (JTI/JTE) e em acoplamento ranhurado o valor depende do DN e do fabricante.\n\n' +
+                'Esta lista traz os degraus usuais de pressão da EN 545 para escolha rápida — ela NÃO diz qual deles se aplica ao seu DN. Confirme no catálogo do fabricante.' +
                 (pfaCorpo ? '\n\nReferência: a resistência do corpo deste tubo pela EN 545 é de ' + UI.num(pfaCorpo, 0) + ' bar — um limite superior, não a PFA do conjunto.' : ''))),
       h('select', { 'data-bind': base + '.pnMcaOverride', 'data-tipo': 'num', 'data-estrutural': '1' },
         opcoes.map(function (o) {
@@ -7750,7 +8007,8 @@ html.imprimindo-doc #doc-saida { display: block; }
     ];
     if (st.economia.ativo) {
       corpo.push(h('div', { class: 'grade', style: 'margin-top:11px' },
-        UI.campo(st, 'Tarifa de energia', 'economia.tarifa', { sufixo: 'R$/kWh' }),
+        UI.campo(st, 'Tarifa de energia', 'economia.tarifa', { sufixo: 'R$/kWh',
+          dica: 'Entra só na coluna "Energia (mil R$/ano)" da comparação de diâmetros — o custo anual da perda de carga. Se a coluna do tubo estiver muito maior que a de energia, mudar a tarifa quase não move o total: confira os coeficientes de custo do tubo logo abaixo, com a tabela de conferência em R$/m.' }),
         UI.campo(st, 'Horas de operação por dia', 'economia.horasDia', { sufixo: 'h/dia' }),
         UI.campo(st, 'Horizonte de análise', 'economia.anos', { sufixo: 'anos' }),
         UI.campo(st, 'Taxa de desconto', 'economia.taxa', { sufixo: '% a.a.',
@@ -7936,18 +8194,31 @@ html.imprimindo-doc #doc-saida { display: block; }
     var r = res && res.eee ? res.eee : eee(st);
     var raiz = h('div', {});
     var gr = st.eee.grade;
+    var semCanal = CE.semCanal(st);
 
     /* --- chegada --- */
-    raiz.appendChild(UI.cartao('Chegada do esgoto', 'coletor/interceptor afluente e canal de entrada',
+    raiz.appendChild(UI.cartao('Chegada do esgoto',
+      semCanal ? 'coletor afluente descarregando direto no poço de sucção' : 'coletor/interceptor afluente e canal de entrada',
       [h('div', { class: 'grade' },
+        UI.select(st, 'Como o esgoto chega à EEE', 'eee.chegada.modo', [
+          { v: 'canal', rot: 'Canal de entrada com gradeamento (usual)' },
+          { v: 'poco', rot: 'Direto no poço de sucção — sem canal' }
+        ], { chave: true,
+             dica: 'CANAL: o coletor descarrega num canal com grades (e, em geral, Parshall e desarenador) antes do poço — o arranjo usual.\n\n' +
+                   'DIRETO NO POÇO: em EEEs pequenas o coletor pode descarregar direto no poço de sucção, com um cesto de retenção removível sob a boca do coletor. Sem canal não há Parshall nem desarenador; todos os cartões correspondentes somem e o NA máximo amarra direto na GI do coletor.' }),
         UI.campo(st, 'Cota do terreno (m)', 'eee.chegada.cotaTerreno',
           { dica: 'Cota do terreno na área da elevatória. Serve de referência para a laje e a profundidade do poço.' }),
         UI.campo(st, 'Cota da GI da tubulação de chegada (m)', 'eee.chegada.cotaGI',
-          { chave: true, dica: 'Geratriz inferior do coletor afluente no ponto de entrada. É a amarra de todo o perfil hidráulico: canal, grades, Parshall e NA máximo do poço descem a partir dela.' }),
+          { chave: true, dica: semCanal
+              ? 'Geratriz inferior do coletor afluente na descarga no poço. O NA máximo do poço fica logo abaixo dela (menos o degrau de entrada, na aba Poço de sucção).'
+              : 'Geratriz inferior do coletor afluente no ponto de entrada. É a amarra de todo o perfil hidráulico: canal, grades, Parshall e NA máximo do poço descem a partir dela.' }),
         UI.campo(st, 'DN da tubulação afluente (mm)', 'eee.chegada.dnAfluenteMm'),
-        UI.campo(st, 'Largura do canal (m)', 'eee.canal.larguraM',
+        semCanal ? null : UI.campo(st, 'Largura do canal (m)', 'eee.canal.larguraM',
           { chave: true, dica: 'Larguras usuais de canal: ' + DE.largurasCanal.map(function (v) { return UI.num(v, 2); }).join(' · ') + ' m. A mesma largura vale para as grades.' })),
-      avancado('chegada',
+      semCanal ? h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
+        r && r.canal ? chip('v no coletor de chegada (QMH)', n(r.canal.vChegada, 2) + ' m/s',
+          'DN ' + n(r.canal.D * 1000, 0) + ' a ' + n(r.canal.yD * 100, 0) + '% de lâmina', 'forte') : null)
+      : avancado('chegada',
         h('div', { class: 'grade' },
           UI.campo(st, 'Lâmina no coletor afluente (% do DN)', 'eee.chegada.laminaAfluentePct',
             { dica: 'Relação y/D do coletor na QMH (NBR 9649 limita a 75%). Define a área molhada e a velocidade de chegada.' }),
@@ -7961,7 +8232,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       ]));
 
     /* --- velocidades: chegada × canal --- */
-    if (r && r.canal) {
+    if (!semCanal && r && r.canal) {
       var cn = r.canal;
       raiz.appendChild(UI.cartao('Velocidades — chegada e canal',
         'o coletor chega com velocidade própria; o canal precisa ficar na faixa',
@@ -7981,12 +8252,16 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     /* --- arranjo --- */
     var canais = CE.canais(st);
-    raiz.appendChild(UI.cartao('Arranjo do gradeamento', 'grades em série ou cesto removível · canais em paralelo',
+    raiz.appendChild(UI.cartao('Arranjo do gradeamento',
+      semCanal ? 'retenção de sólidos no próprio poço de sucção' : 'grades em série ou cesto removível · canais em paralelo',
       [h('div', { class: 'grade' },
-        UI.select(st, 'Tipo de retenção de sólidos', 'eee.grade.arranjo', [
+        UI.select(st, 'Tipo de retenção de sólidos', 'eee.grade.arranjo', semCanal ? [
+          { v: 'cesto', rot: 'Cesto com içamento dentro do poço (sob a boca do coletor)' },
+          { v: 'nenhum', rot: 'Nenhum — sem retenção de sólidos (não recomendado)' }
+        ] : [
           { v: 'grades', rot: 'Grades no canal (grossa / média / fina, manual ou mecanizada)' },
           { v: 'cesto', rot: 'Cesto com içamento (gradeamento grosso simplificado)' }
-        ], { chave: true, dica: DE.cesto.nota + '\n\nEm estações maiores, o usual é o canal com grades em série (e canal de contorno para manutenção). ' }),
+        ], { chave: true, dica: DE.cesto.nota + (semCanal ? '' : '\n\nEm estações maiores, o usual é o canal com grades em série (e canal de contorno para manutenção). ') }),
         st.eee.grade.arranjo === 'grades' ? UI.campo(st, 'Canais de gradeamento (total)', 'eee.canal.nCanais',
           { sufixo: 'ud', chave: true,
             dica: 'Canais em paralelo, todos com o mesmo conjunto de grades. Cada canal em operação conduz Q/n. Arranjos usuais: 1 (pequenas EEEs, com canal de by-pass), 2 (um opera, um reserva) e 3 (dois operam, um reserva — usual quando o gradeamento é mecanizado e a vazão é grande).' }) : null,
@@ -8057,10 +8332,11 @@ html.imprimindo-doc #doc-saida { display: block; }
         h('td', {}, c.nota ? h('span', { class: 'tag cinza' }, 'Nota') : UI.tagClasse(cl)));
     });
 
-    return UI.cartao('By-pass e conformidade normativa',
+    var semCanalCf = CE.semCanal(st);
+    return UI.cartao(semCanalCf ? 'Conformidade normativa' : 'By-pass e conformidade normativa',
       'NBR 12208 / NBR 12209 · exigências de concessionária',
       [h('div', { class: 'grade' },
-        cf.canais.reserva >= 1
+        semCanalCf ? null : cf.canais.reserva >= 1
           ? h('div', { class: 'campo' },
               h('span', { class: 'rot' }, 'Canal de by-pass do gradeamento',
                 UI.dica('O canal RESERVA já cumpre a função de by-pass: é isolado por comportas e assume a vazão ' +
@@ -8080,7 +8356,7 @@ html.imprimindo-doc #doc-saida { display: block; }
                        'limpeza MANUAL usada como reserva/by-pass (um canal 1+1 já atende: a reserva É o by-pass). ' +
                        'O canal de by-pass nunca deve lançar esgoto sem gradear: leva grade manual com espaçamento ' +
                        'igual ou imediatamente superior ao da grade principal.' }),
-        cf.canais.reserva >= 1 ? UI.select(st, 'Grade do canal reserva', 'eee.bypass.reservaGrade', [
+        !semCanalCf && cf.canais.reserva >= 1 ? UI.select(st, 'Grade do canal reserva', 'eee.bypass.reservaGrade', [
           { v: 'manual', rot: 'Manual (admitido pela NBR 12209)' },
           { v: 'mecanizada', rot: 'Mecanizada (padrão SABESP em grandes unidades)' }
         ], { dica: 'A NBR 12209 admite que a unidade reserva seja de limpeza manual — o rastelo mecânico da ' +
@@ -8099,7 +8375,7 @@ html.imprimindo-doc #doc-saida { display: block; }
                   'ser MENOR OU IGUAL a este valor — senão a grade deixa passar o que a bomba não engole.' }),
         h('div', { style: 'display:flex;align-items:flex-end;padding-bottom:2px' },
           UI.botaoFonte(['nbr12209', 'nbr12208', 'mps_sanepar', 'nts_sabesp'], DE.fonteConf))),
-       cf.bypass.necessario && bp.canal !== 'sim'
+       !semCanalCf && cf.bypass.necessario && bp.canal !== 'sim'
          ? h('div', { class: 'aviso erro', style: 'margin-top:8px' },
              h('b', {}, 'Canal de by-pass necessário'),
              'Motivo: ' + cf.bypass.motivo + '. Preveja o canal de by-pass com grade manual ou acrescente um canal reserva isolável.')
@@ -8201,6 +8477,39 @@ html.imprimindo-doc #doc-saida { display: block; }
     var r = res && res.eee ? res.eee : eee(st);
     var raiz = h('div', {});
     if (!r) return raiz;
+
+    /* chegada direta no poço: não há canal, Parshall nem desarenador —
+       sobram as quantidades de resíduos e as caçambas */
+    if (CE.semCanal(st)) {
+      var corpoSem = [
+        h('div', { class: 'aviso info' },
+          h('b', {}, 'Chegada direta no poço de sucção — sem canal de entrada'),
+          'Nesse arranjo não há Calha Parshall nem desarenador: o coletor descarrega direto no poço, com ' +
+          (st.eee.grade.arranjo === 'cesto' ? 'o cesto de retenção sob a boca do coletor (aba Chegada e gradeamento). ' : 'a retenção de sólidos desativada. ') +
+          'A medição de vazão, quando exigida, vai para a linha de recalque (medidor eletromagnético), e a areia ' +
+          'que entrar será removida na limpeza periódica do poço. Para voltar ao arranjo com canal, troque o modo ' +
+          'de chegada na aba "Chegada e gradeamento".',
+          h('div', { class: 'linha naoimprime', style: 'margin-top:8px' },
+            h('button', { class: 'btn mini', type: 'button', 'data-acao': 'irAba', 'data-aba': 'gradeamento' }, 'Ir para Chegada e gradeamento'))),
+        UI.sub('Quantidades esperadas de sólidos'),
+        avancado('desar-taxas',
+          h('div', { class: 'grade' },
+            UI.campo(st, 'Taxa de material gradeado (L/m³)', 'eee.desarenador.taxaGradeadoLm3',
+              { dica: 'Usual de 0,03 a 0,08 L/m³, conforme o espaçamento da tela do cesto.' }),
+            UI.campo(st, 'Dias de acúmulo para remoção', 'eee.desarenador.diasAcumulo'))),
+        UI.tabela([{ rot: 'Fase', esq: true }, 'Esgoto (m³/d)', 'Gradeado (m³/d)', 'Gradeado (m³/' + r.desarenador.diasAcumulo + ' d)'],
+          CE.FASES.map(function (f) {
+            var s = r.desarenador.solidos[f.id];
+            return h('tr', {},
+              h('td', { class: 'esq' }, f.rot),
+              h('td', {}, n(s.volEsgotoDia, 0)),
+              h('td', {}, n(s.gradeadoDia, 3)), h('td', {}, n(s.gradeadoDia * r.desarenador.diasAcumulo, 2)));
+          }))
+      ];
+      FE.blocoCacambas(st, r).forEach(function (nEl) { corpoSem.push(nEl); });
+      raiz.appendChild(UI.cartao('Resíduos e caçambas', 'sem canal de entrada, a aba se resume aos sólidos retidos', corpoSem));
+      return raiz;
+    }
 
     /* --- seleção da calha --- */
     var linhas = r.parshall.linhas.map(function (l) {
@@ -8332,7 +8641,18 @@ html.imprimindo-doc #doc-saida { display: block; }
           h('td', {}, n(s.gradeadoDia, 3)), h('td', {}, n(s.gradeadoDia * d.diasAcumulo, 2)));
       })));
     /* caçambas */
+    FE.blocoCacambas(st, r).forEach(function (nEl) { corpo.push(nEl); });
+
+    raiz.appendChild(UI.cartao('Desarenador', 'remoção de areia a montante do poço', corpo));
+    return raiz;
+  };
+
+  /* caçambas de resíduos — usado na aba do desarenador e, sem canal de
+     entrada, num cartão próprio */
+  FE.blocoCacambas = function (st, r) {
+    var corpo = [];
     var rs = r.residuos;
+    var semCanal = CE.semCanal(st);
     corpo.push(UI.sub('Caçambas de resíduos'));
     corpo.push(h('div', { class: 'grade' },
       UI.select(st, 'Tipo de caçamba', 'eee.residuos.cacambaTipo', [
@@ -8350,7 +8670,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       chip('Caçamba adotada', n(rs.cap, 0) + ' m³ — ' + (rs.tipo === 'rollon' ? 'roll-on' : 'estacionária'),
         rs.dias + ' dias de acúmulo', 'forte'),
       chip('P/ material gradeado', rs.nGradeado + ' ud', n(rs.volGradPeriodo, 2) + ' m³ no período'),
-      st.eee.desarenador.usar !== false ? chip('P/ areia', rs.nAreia + ' ud',
+      !semCanal && st.eee.desarenador.usar !== false ? chip('P/ areia', rs.nAreia + ' ud',
         n(rs.volAreiaPeriodo, 2) + ' m³ · enchimento ' + Math.round(DE.residuos.fatorEnchimentoAreia * 100) + ' %') : null,
       chip('Reserva', rs.nReserva + ' ud'),
       chip('Total de caçambas', rs.nTotal + ' ud', null, 'forte'),
@@ -8363,9 +8683,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       'estanque com dreno DN 50, faixa de acesso ≥ 3,5 m, gabarito vertical livre ≥ 4,5 m e reta de aproximação ' +
       'de ré ~10 m para o poliguindaste. ',
       UI.botaoFonte(['nbr12209', 'jordao', 'metcalf', 'mps_sanepar'], DE.fonteDesarenador + '\n\n' + DE.fonteResiduos)));
-
-    raiz.appendChild(UI.cartao('Desarenador', 'remoção de areia a montante do poço', corpo));
-    return raiz;
+    return corpo;
   };
 
   /* ================================================================
@@ -8422,7 +8740,10 @@ html.imprimindo-doc #doc-saida { display: block; }
           { placeholder: n(p.hUtil, 2), editado: !!st.eee.poco.alturaUtilM,
             dica: 'Entre NA mínimo e NA máximo. Em branco: a necessária pelo volume de ciclo, com mínimo prático de ' + n(DE.critPoco.alturaUtilMinM, 2) + ' m.' }),
         UI.campo(st, 'Degrau da entrada no poço (m)', 'eee.poco.degrauEntradaM',
-          { dica: 'Queda entre o canal de saída da Parshall e o NA máximo do poço.' })),
+          { dica: (CE.semCanal(st)
+              ? 'Queda entre a GI do coletor afluente e o NA máximo do poço.'
+              : 'Queda entre o canal de saída da Parshall e o NA máximo do poço.') +
+            ' O valor digitado vale tal e qual — inclusive 0. Vazio: ' + n(DE.critPoco.degrauEntradaPadraoM, 2) + ' m.' })),
        h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
          chip('Poço', p.rotForma, p.camaras > 1 ? p.camaras + ' câmaras' : 'câmara única', 'forte'),
          p.camaras > 1 ? chip('Bombas por câmara', n(p.bombasPorCamara, p.bombasPorCamara % 1 ? 1 : 0) + ' ud',
@@ -8466,6 +8787,52 @@ html.imprimindo-doc #doc-saida { display: block; }
          chip('Cota do fundo', p.cotaFundo !== null ? n(p.cotaFundo, 3) + ' m' : '—'),
          chip('Profundidade total', p.altTotal !== null ? n(p.altTotal, 2) + ' m' : '—', 'laje ao fundo'))]));
 
+    /* níveis intermediários: partida de bombas adicionais, alarmes… */
+    var nvx = p.niveisExtras || [];
+    raiz.appendChild(UI.cartao('Níveis intermediários',
+      'partida de bombas adicionais e alarmes — controlam o tempo de detenção',
+      [h('p', { class: 'nota', style: 'margin:0 0 8px' },
+        'Entre o NA mínimo (parada) e o NA máximo, defina os níveis de partida de cada conjunto e os de alarme. ' +
+        'O nível marcado como "usual de partida" é o que rege a DETENÇÃO: em operação normal o poço cicla entre ' +
+        'o NA mín e ele — o NA máximo só é atingido nos picos ou com bombas fora de serviço.'),
+       nvx.length ? UI.tabela(
+        [{ rot: 'Nome', esq: true }, 'Desnível abaixo do NA máx (m)', 'ou cota (m)', 'Usual de partida',
+         'Cota resultante (m)', 'Volume até o NA mín (m³)', 'Detenção (min)', ''],
+        nvx.map(function (nv, i) {
+          var base = 'eee.poco.niveisExtras.' + i;
+          var raw = (st.eee.poco.niveisExtras || [])[i] || {};
+          return h('tr', {},
+            h('td', { class: 'esq' },
+              h('input', { type: 'text', value: raw.nome || '', style: 'min-width:110px',
+                           'data-bind': base + '.nome', 'data-tipo': 'texto' })),
+            h('td', {}, h('input', { type: 'text', class: 'num',
+              value: raw.desnivelM === null || raw.desnivelM === undefined ? '' : UI.numEdit(raw.desnivelM),
+              'data-bind': base + '.desnivelM', 'data-tipo': 'num', inputmode: 'decimal' })),
+            h('td', {}, h('input', { type: 'text', class: 'num',
+              value: raw.cotaM === null || raw.cotaM === undefined ? '' : UI.numEdit(raw.cotaM),
+              title: 'Cota absoluta — quando preenchida, prevalece sobre o desnível',
+              'data-bind': base + '.cotaM', 'data-tipo': 'num', inputmode: 'decimal' })),
+            h('td', {}, h('input', { type: 'checkbox', checked: raw.usarDetencao !== false,
+              title: 'Nível em que a bomba costuma partir no ciclo normal — limita o volume da verificação de detenção',
+              'data-bind': base + '.usarDetencao', 'data-tipo': 'bool' })),
+            h('td', {}, nv.cota !== null && nv.cota !== undefined ? n(nv.cota, 3) : '—'),
+            h('td', {}, nv.vol !== null && nv.vol !== undefined ? n(nv.vol, 2) : '—'),
+            h('td', {}, nv.tDetencao !== null && nv.tDetencao !== undefined && isFinite(nv.tDetencao) ? n(nv.tDetencao, 1) : '—'),
+            h('td', { class: 'naoimprime' },
+              h('button', { class: 'btn mini icone perigo', type: 'button',
+                            'data-acao': 'delNivelPoco', 'data-i': i, title: 'Remover' }, '×')));
+        })) : h('p', { class: 'vazio' }, 'Nenhum nível intermediário — o ciclo considera só NA mín e NA máx.'),
+       h('div', { class: 'linha naoimprime', style: 'margin-top:8px' },
+         h('button', { class: 'btn', type: 'button', 'data-acao': 'addNivelPoco' }, '+ Adicionar nível'),
+         h('span', { class: 'nota' }, 'Ex.: partida da 2ª bomba, alarme de nível alto…')),
+       p.nivelPartida ? h('div', { class: 'faixa-resumo', style: 'margin-top:8px' },
+         chip('Nível usual de partida', p.nivelPartida.nome,
+           p.nivelPartida.cota !== null ? 'cota ' + n(p.nivelPartida.cota, 3) + ' m' : null, 'forte'),
+         chip('Volume do ciclo usual', n(p.volDetencao, 2) + ' m³', 'até o NA mín'),
+         chip('Detenção no ciclo usual', isFinite(p.tempos.detencaoNorma) ? n(p.tempos.detencaoNorma, 1) + ' min' : '—',
+           '≤ ' + DE.critPoco.detencaoMaxMin + ' min', p.tempos.detencaoNorma > DE.critPoco.detencaoMaxMin ? 'alerta' : null),
+         chip('Detenção com o poço cheio', isFinite(p.tempos.detencaoNaMax) ? n(p.tempos.detencaoNaMax, 1) + ' min' : '—', 'até o NA máx — só nos picos')) : null]));
+
     /* movimentação de cargas e resíduos */
     raiz.appendChild(FE.cartaoMovimentacao(st, r));
 
@@ -8481,7 +8848,8 @@ html.imprimindo-doc #doc-saida { display: block; }
             h('td', {}, n(pt.na.min, 3)), h('td', {}, n(pt.na.med, 3)), h('td', {}, n(pt.na.max, 3)));
         }).concat(r.perfil.saida ? [
           h('tr', {}, h('td', { class: 'esq' }, 'Crista da Calha Parshall'),
-            h('td', {}, n(r.perfil.saida.crista, 3)), h('td', {}, '—'), h('td', {}, '—'), h('td', {}, '—')),
+            h('td', {}, n(r.perfil.saida.crista, 3)), h('td', {}, '—'), h('td', {}, '—'), h('td', {}, '—'))
+        ] : []).concat(p.naMax !== null ? [
           h('tr', {}, h('td', { class: 'esq' }, 'Poço — NA máximo / NA mínimo'),
             h('td', {}, p.cotaFundo !== null ? n(p.cotaFundo, 3) : '—'),
             h('td', {}, p.naMin !== null ? n(p.naMin, 3) : '—'), h('td', {}, '—'),
@@ -8563,8 +8931,10 @@ html.imprimindo-doc #doc-saida { display: block; }
     if (r.perfil.temCota) {
       corpo.push(FE.svgPerfilEntrada(r));
       corpo.push(h('p', { class: 'nota' },
-        'Perfil da chegada ao poço de sucção, com o fundo em degraus, as grades, a Calha Parshall e os níveis do poço. ' +
-        'Cada linha é o NA da vazão escolhida acima; a lâmina d\'água sombreada corresponde à maior vazão exibida.'));
+        r.perfil.semCanal
+          ? 'Chegada direta no poço de sucção: o coletor afluente descarrega sobre o cesto de retenção, e o NA máximo fica logo abaixo da GI do coletor. Os níveis intermediários definidos na aba Poço de sucção aparecem tracejados.'
+          : 'Perfil da chegada ao poço de sucção, com o fundo em degraus, as grades, a Calha Parshall e os níveis do poço. ' +
+            'Cada linha é o NA da vazão escolhida acima; a lâmina d\'água sombreada corresponde à maior vazão exibida.'));
     } else {
       corpo.push(h('div', { class: 'aviso info' },
         h('b', {}, 'Perfil sem amarração de cota'),
@@ -8855,6 +9225,7 @@ html.imprimindo-doc #doc-saida { display: block; }
     cotas.push(p.naMax, p.naMin, p.cotaFundo);
     if (p.cotaLaje !== null) cotas.push(p.cotaLaje);
     if (cotaTerreno !== null) cotas.push(cotaTerreno);
+    if (perfil.cotaGI !== null && perfil.cotaGI !== undefined) cotas.push(perfil.cotaGI);
     var cMin = Math.min.apply(null, cotas), cMax = Math.max.apply(null, cotas);
     var amp = Math.max(cMax - cMin, 0.5);
     var mT = 26, mB = 46, mE = 74, mD = 92;
@@ -8884,7 +9255,10 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     /* segmentos horizontais: pontos do canal + parshall + poço */
     var nSeg = perfil.pontos.length;
-    var wPoco = Math.max(190, Math.min(300, 60 + p.nInst * 44 + (p.camaras - 1) * 8));
+    var semCanal = !!perfil.semCanal;
+    var wPoco = semCanal
+      ? Math.max(320, Math.min(560, 120 + p.nInst * 60 + (p.camaras - 1) * 10))
+      : Math.max(190, Math.min(300, 60 + p.nInst * 44 + (p.camaras - 1) * 8));
     var wParshall = perfil.saida ? 80 : 0, gap = 4;
     var wCanal = (W - mE - mD - wParshall - wPoco - gap * 2) / Math.max(1, nSeg);
 
@@ -8902,10 +9276,10 @@ html.imprimindo-doc #doc-saida { display: block; }
       x0 = xIni(i2);
       dAgua += 'L' + (x0 + wCanal) + ' ' + py(pt2.fundo) + ' L' + x0 + ' ' + py(pt2.fundo) + ' ';
     }
-    g.appendChild(sv('path', { class: 'agua', d: dAgua + 'Z' }));
+    if (dAgua) g.appendChild(sv('path', { class: 'agua', d: dAgua + 'Z' }));
 
     /* linhas de NA por série */
-    series.forEach(function (s) {
+    if (perfil.pontos.length) series.forEach(function (s) {
       var d = '';
       perfil.pontos.forEach(function (pt, i) {
         var y = py(pt.na[s.key]);
@@ -8921,7 +9295,7 @@ html.imprimindo-doc #doc-saida { display: block; }
       var y = py(topoCanal[i]);
       dTopo += (i === 0 ? 'M' : 'L') + xIni(i) + ' ' + y + ' L' + (xIni(i) + wCanal) + ' ' + y + ' ';
     });
-    g.appendChild(sv('path', { class: 'estrutura', d: dTopo, 'stroke-width': 1.2, 'stroke-dasharray': '6 3' }));
+    if (dTopo) g.appendChild(sv('path', { class: 'estrutura', d: dTopo, 'stroke-width': 1.2, 'stroke-dasharray': '6 3' }));
 
     /* fundo do canal (degraus) + grades com rótulo manual/mec */
     var dF = '';
@@ -8944,10 +9318,12 @@ html.imprimindo-doc #doc-saida { display: block; }
       g.appendChild(sv('text', { x: x + wCanal / 2, y: HH - 14, 'text-anchor': 'middle', class: 'cota-t' },
         'fundo ' + UI.num(pt.fundo, 2)));
     });
-    g.appendChild(sv('path', { class: 'estrutura', d: dF, 'stroke-width': 2 }));
+    if (dF) g.appendChild(sv('path', { class: 'estrutura', d: dF, 'stroke-width': 2 }));
 
     /* dimensão da altura do canal, no primeiro trecho */
-    dimV(xIni(0) + 12, perfil.pontos[0].fundo, topoCanal[0], 'H canal ' + UI.num(perfil.altCanal, 2) + ' m');
+    if (perfil.pontos.length) {
+      dimV(xIni(0) + 12, perfil.pontos[0].fundo, topoCanal[0], 'H canal ' + UI.num(perfil.altCanal, 2) + ' m');
+    }
 
     /* Parshall */
     var xP = xIni(nSeg) + gap;
@@ -8964,9 +9340,24 @@ html.imprimindo-doc #doc-saida { display: block; }
     }
 
     /* ---- poço de sucção ---- */
-    var xPo = xP + wParshall + gap;
+    var xPo = semCanal ? (W - mD - wPoco) : (xP + wParshall + gap);
     var yNAx = py(p.naMax), yNAn = py(p.naMin), yF = py(p.cotaFundo);
     var yLaje = py(p.cotaLaje !== null ? p.cotaLaje : cMax);
+
+    /* sem canal: o coletor afluente chega direto ao poço */
+    if (semCanal && perfil.cotaGI !== null && perfil.cotaGI !== undefined) {
+      var yGI = py(perfil.cotaGI);
+      var dnTxt = r.canal && r.canal.D ? 'DN ' + UI.num(r.canal.D * 1000, 0) : '';
+      var hTubo = Math.max(6, r.canal && r.canal.D ? Math.min(26, r.canal.D / amp * (HH - mT - mB)) : 10);
+      g.appendChild(sv('line', { class: 'estrutura', 'stroke-width': 2, x1: mE + 6, x2: xPo, y1: yGI, y2: yGI }));
+      g.appendChild(sv('line', { class: 'estrutura', 'stroke-width': 2, x1: mE + 6, x2: xPo, y1: yGI - hTubo, y2: yGI - hTubo }));
+      g.appendChild(sv('path', { class: 'cota', fill: 'none',
+        d: 'M' + (xPo - 26) + ' ' + (yGI - hTubo / 2) + ' L' + (xPo - 8) + ' ' + (yGI - hTubo / 2) +
+           ' M' + (xPo - 14) + ' ' + (yGI - hTubo / 2 - 4) + ' L' + (xPo - 8) + ' ' + (yGI - hTubo / 2) +
+           ' L' + (xPo - 14) + ' ' + (yGI - hTubo / 2 + 4) }));
+      g.appendChild(sv('text', { x: mE + 10, y: yGI - hTubo - 5 },
+        'coletor afluente ' + dnTxt + ' — GI ' + UI.num(perfil.cotaGI, 2)));
+    }
 
     /* água */
     g.appendChild(sv('rect', { class: 'agua', x: xPo + 3, y: yNAx, width: wPoco - 6, height: Math.max(2, yF - yNAx) }));
@@ -9009,6 +9400,33 @@ html.imprimindo-doc #doc-saida { display: block; }
     g.appendChild(sv('line', { class: 'agua-l', 'stroke-dasharray': '4 3', x1: xPo, x2: xPo + wPoco, y1: yNAn, y2: yNAn }));
     g.appendChild(sv('text', { class: 'cota-t', x: xPo + 5, y: yNAx - 3 }, 'NA máx ' + UI.num(p.naMax, 2)));
     g.appendChild(sv('text', { class: 'cota-t', x: xPo + 5, y: yNAn - 3 }, 'NA mín ' + UI.num(p.naMin, 2)));
+
+    /* níveis intermediários (partidas de bombas adicionais, alarmes) */
+    (p.niveisExtras || []).forEach(function (nv) {
+      if (nv.cota === null || nv.cota === undefined) return;
+      var yNv = py(nv.cota);
+      if (Math.abs(yNv - yNAx) < 6 || Math.abs(yNv - yNAn) < 6) return;   /* colado num NA principal: sem rótulo */
+      g.appendChild(sv('line', { class: 'agua-l', 'stroke-dasharray': '2 4', opacity: 0.85,
+        x1: xPo, x2: xPo + wPoco, y1: yNv, y2: yNv }));
+      g.appendChild(sv('text', { class: 'cota-t', x: xPo + wPoco - 5, y: yNv - 3, 'text-anchor': 'end' },
+        (nv.nome || 'nível') + ' ' + UI.num(nv.cota, 2)));
+    });
+
+    /* cesto de retenção sob a boca do coletor (chegada direta no poço) */
+    if (semCanal && r.cesto && perfil.cotaGI !== null && perfil.cotaGI !== undefined) {
+      var yCes = py(perfil.cotaGI);
+      var hCes = Math.max(14, (r.cesto.alt || 0.8) / amp * (HH - mT - mB));
+      var wCes = Math.min(56, wPoco * 0.2);
+      g.appendChild(sv('rect', { x: xPo + 10, y: yCes, width: wCes, height: hCes,
+        fill: 'none', class: 'estrutura', 'stroke-width': 1.4, 'stroke-dasharray': '3 2' }));
+      var kCes;
+      for (kCes = 1; kCes < 4; kCes++) {
+        g.appendChild(sv('line', { class: 'estrutura', 'stroke-width': 0.7, opacity: 0.7,
+          x1: xPo + 10 + wCes * kCes / 4, x2: xPo + 10 + wCes * kCes / 4, y1: yCes, y2: yCes + hCes }));
+      }
+      g.appendChild(sv('text', { class: 'rotulo', x: xPo + 10 + wCes / 2, y: yCes + hCes + 11,
+        'text-anchor': 'middle' }, 'cesto'));
+    }
     g.appendChild(sv('text', { class: 'cota-t', x: xPo + 5, y: yF + 12 }, 'fundo ' + UI.num(p.cotaFundo, 2)));
     g.appendChild(sv('text', { x: xPo + wPoco / 2, y: HH - 26, 'text-anchor': 'middle' }, 'Poço de sucção'));
     g.appendChild(sv('text', { x: xPo + wPoco / 2, y: HH - 14, 'text-anchor': 'middle', class: 'cota-t' },
@@ -9019,7 +9437,9 @@ html.imprimindo-doc #doc-saida { display: block; }
     var xDim = xPo + wPoco + 12;
     dimV(xDim, p.naMin, p.cotaFundo, 'subm. ' + UI.num(p.submergencia, 2) + ' m');
     if (cotaTerreno !== null) {
-      dimV(xPo + 16, cotaTerreno, p.cotaFundo, 'prof. ' + UI.num(cotaTerreno - p.cotaFundo, 2) + ' m');
+      /* sem canal, o cesto ocupa o canto esquerdo do poço: a profundidade vai para a parede direita */
+      if (semCanal) dimV(xPo + wPoco - 16, cotaTerreno, p.cotaFundo, 'prof. ' + UI.num(cotaTerreno - p.cotaFundo, 2) + ' m', 'end');
+      else dimV(xPo + 16, cotaTerreno, p.cotaFundo, 'prof. ' + UI.num(cotaTerreno - p.cotaFundo, 2) + ' m');
     }
 
     /* linha do terreno */
@@ -9029,17 +9449,20 @@ html.imprimindo-doc #doc-saida { display: block; }
       g.appendChild(sv('text', { x: W - mD + 22, y: yT - 3, 'text-anchor': 'end' }, 'terreno ' + UI.num(cotaTerreno, 2)));
     }
 
-    /* legenda das séries, no canto superior esquerdo (área livre do desenho) */
-    var lx = mE + 16, ly = mT + 6;
-    g.appendChild(sv('rect', { x: lx - 8, y: ly - 12, width: 196, height: series.length * 15 + 14,
-      fill: 'var(--surface)', stroke: 'var(--border)', rx: 4, opacity: 0.92 }));
-    series.forEach(function (s, i) {
-      var yy2 = ly + i * 15;
-      g.appendChild(sv('line', { x1: lx, x2: lx + 24, y1: yy2, y2: yy2, stroke: s.cor, 'stroke-width': 2.4,
-        'stroke-dasharray': s.traco || null }));
-      g.appendChild(sv('text', { x: lx + 30, y: yy2 + 3 },
-        (s.rotCurto || s.key) + ' — ' + UI.num(s.Q * 1000, 1) + ' L/s'));
-    });
+    /* legenda das séries, no canto superior esquerdo (área livre do desenho) —
+       sem canal não há linhas de NA por vazão para legendar */
+    if (!semCanal) {
+      var lx = mE + 16, ly = mT + 6;
+      g.appendChild(sv('rect', { x: lx - 8, y: ly - 12, width: 196, height: series.length * 15 + 14,
+        fill: 'var(--surface)', stroke: 'var(--border)', rx: 4, opacity: 0.92 }));
+      series.forEach(function (s, i) {
+        var yy2 = ly + i * 15;
+        g.appendChild(sv('line', { x1: lx, x2: lx + 24, y1: yy2, y2: yy2, stroke: s.cor, 'stroke-width': 2.4,
+          'stroke-dasharray': s.traco || null }));
+        g.appendChild(sv('text', { x: lx + 30, y: yy2 + 3 },
+          (s.rotCurto || s.key) + ' — ' + UI.num(s.Q * 1000, 1) + ' L/s'));
+      });
+    }
 
     svg.appendChild(g);
     return svg;
@@ -9570,7 +9993,13 @@ html.imprimindo-doc #doc-saida { display: block; }
         h('td', {}, UI.tagClasse(cl))));
     }
 
-    if (st.eee.grade.arranjo === 'grades') {
+    var semCanal = PDA.CE.semCanal(st);
+    if (semCanal) {
+      linha('Chegada direta no poço (sem canal)', r.cesto ? true : false,
+        r.cesto ? 'coletor descarrega no poço, com cesto de retenção sob a boca'
+                : 'SEM retenção de sólidos a montante das bombas — prever ao menos um cesto');
+    }
+    if (!semCanal && st.eee.grade.arranjo === 'grades') {
       grades.forEach(function (gcalc) {
         var rot = ({ grossa: 'Grade grossa', media: 'Grade média', fina: 'Grade fina' })[gcalc.nivel.id];
         linha(rot + ' (' + (gcalc.mec ? 'mecanizada' : 'manual') + ')',
@@ -9583,13 +10012,13 @@ html.imprimindo-doc #doc-saida { display: block; }
         UI.num(r.cesto.comp, 2) + ' × ' + UI.num(r.cesto.larg, 2) + ' × ' + UI.num(r.cesto.alt, 2) +
         ' m · v tela = ' + UI.num(r.cesto.v, 2) + ' m/s · içamento ' + UI.num(r.cesto.cargaTotal, 0) + ' kg');
     }
-    if (st.eee.parshall.usar !== false && esc) {
+    if (!semCanal && st.eee.parshall.usar !== false && esc) {
       linha('Calha Parshall ' + esc.rot,
         esc.classe === 'bom' ? true : (esc.classe === 'atencao' ? null : false),
         'faixa ' + UI.num(esc.qMinLs, 2) + ' a ' + UI.num(esc.qMaxLs, 0) + ' L/s · Ha(QMH) = ' +
         UI.num(esc.haMax, 3) + ' m · z = ' + UI.num(d.z || 0, 3) + ' m');
     }
-    if (st.eee.desarenador.usar !== false) {
+    if (!semCanal && st.eee.desarenador.usar !== false) {
       var rotD = ({ canal: 'Desarenador — canal', quadrado: 'Desarenador — caixa quadrada',
                     aerado: 'Desarenador aerado', vortice: 'Desarenador tipo vórtice' })[d.tipo];
       linha(rotD, d.ok ? true : (d.checks.every(function (c) { return c.ok || c.atencao; }) ? null : false),
@@ -9609,8 +10038,9 @@ html.imprimindo-doc #doc-saida { display: block; }
       linha('Conformidade normativa (NBR 12208/12209' +
         (cf.concessionaria !== 'nenhuma' ? ' + ' + (cf.concessionaria === 'sanepar' ? 'SANEPAR' : 'SABESP') : '') + ')',
         reprova === 0 ? (atencaoN === 0 ? true : null) : false,
-        cf.canais.n + ' canal(is) de gradeamento (' + cf.canais.oper + '+' + cf.canais.reserva +
-        (cf.canais.reserva >= 1 ? ' — reserva é o by-pass' : (st.eee.bypass.canal === 'sim' ? ' + by-pass' : '')) + ')' +
+        (semCanal ? 'chegada direta no poço, sem canal de gradeamento'
+          : cf.canais.n + ' canal(is) de gradeamento (' + cf.canais.oper + '+' + cf.canais.reserva +
+            (cf.canais.reserva >= 1 ? ' — reserva é o by-pass' : (st.eee.bypass.canal === 'sim' ? ' + by-pass' : '')) + ')') +
         ' · ' + reprova + ' não conformidade(s) · ' + atencaoN + ' atenção(ões)');
     }
     if (r.residuos) {
@@ -11034,20 +11464,29 @@ html.imprimindo-doc #doc-saida { display: block; }
 
     UI.set(App.st, bind, valor);
 
-    /* troca de catálogo: o diâmetro anterior pode não existir no novo */
+    /* troca de catálogo: o diâmetro anterior pode não existir no novo,
+       e a junta anterior pode não existir na nova família */
     if (/\.catalogoId$/.test(bind) || bind === 'catalogoId') {
       var basePai = bind.replace(/\.?catalogoId$/, '');
       var c = basePai ? UI.get(App.st, basePai) : App.st;
-      if (c) c.itemRot = '';
+      if (c) { c.itemRot = ''; if (c.junta !== undefined) c.junta = ''; }
     }
 
-    /* pressão admissível: acompanha o catálogo enquanto o usuário não digitar
-       um valor próprio */
+    /* pressão admissível: acompanha o catálogo e a junta enquanto o usuário
+       não digitar um valor próprio */
     if (/\.pnMcaOverride$/.test(bind)) {
       var conjPN = UI.get(App.st, bind.replace('.pnMcaOverride', ''));
       if (conjPN) conjPN.pnAuto = false;
-    } else if (/\.(catalogoId|itemRot)$/.test(bind)) {
-      App.autoPreencherPN(bind.replace(/\.(catalogoId|itemRot)$/, ''));
+    } else if (/\.(catalogoId|itemRot|junta)$/.test(bind)) {
+      App.autoPreencherPN(bind.replace(/\.(catalogoId|itemRot|junta)$/, ''));
+    }
+
+    /* modo de chegada da EEE: sem canal, o arranjo de retenção vira cesto
+       (ou nenhum); de volta ao canal, volta às grades */
+    if (bind === 'eee.chegada.modo') {
+      var gA = App.st.eee.grade;
+      if (valor === 'poco' && gA.arranjo === 'grades') gA.arranjo = 'cesto';
+      if (valor === 'canal' && gA.arranjo === 'nenhum') gA.arranjo = 'grades';
     }
 
     /* cota de chegada e cota final do último trecho são o mesmo número:
@@ -11148,6 +11587,17 @@ html.imprimindo-doc #doc-saida { display: block; }
       case 'parshallAuto':
         st.eee.parshall.escolhida = '';
         App.render(); UI.toast('Calha Parshall de volta à sugestão do programa.'); return;
+
+      case 'addNivelPoco':
+        st.eee.poco.niveisExtras.push({
+          nome: 'Partida B' + (st.eee.poco.niveisExtras.length + 2),
+          desnivelM: null, cotaM: null, usarDetencao: true
+        });
+        App.render(); return;
+
+      case 'delNivelPoco':
+        st.eee.poco.niveisExtras.splice(Number(i), 1);
+        App.render(); return;
 
       case 'addAdutora':
         st.adutoras.push(PDA.E.novaAdutora(st.adutoras.length + 1,
@@ -11329,11 +11779,13 @@ html.imprimindo-doc #doc-saida { display: block; }
     var ctx;
     try { ctx = PDA.C.contexto(App.st, App.cats); } catch (e) { return; }
     var tubo = PDA.C.resolverTubo(conj, ctx);
-    if (tubo && !tubo.semDiametro && tubo.item && tubo.item.pn && conj.itemRot) {
+    if (!tubo || tubo.semDiametro || !conj.itemRot) { conj.pnMcaOverride = null; return; }
+    if (tubo.item && tubo.item.pn) {
       conj.pnMcaOverride = Number(tubo.item.pn) * 10;
-    } else {
-      conj.pnMcaOverride = null;
+      return;
     }
+    var aj = PDA.C.pnAutoJunta(conj, tubo);
+    conj.pnMcaOverride = aj ? aj.mca : null;
   };
 
   /* Aplica o preenchimento automático a todos os trechos de adutora */
@@ -11364,6 +11816,20 @@ html.imprimindo-doc #doc-saida { display: block; }
         bm.pesoKg = mv.cargaBombaKg;
       }
     }
+    /* campos novos em estruturas que o migrar não percorre (arrays) */
+    if (App.st.eee) {
+      if (App.st.eee.chegada && App.st.eee.chegada.modo !== 'poco' && App.st.eee.chegada.modo !== 'canal') {
+        App.st.eee.chegada.modo = 'canal';
+      }
+      if (App.st.eee.poco && !Array.isArray(App.st.eee.poco.niveisExtras)) {
+        App.st.eee.poco.niveisExtras = [];
+      }
+    }
+    function garantirJunta(c) { if (c && c.junta === undefined) c.junta = ''; }
+    garantirJunta(App.st.succaoIndividual); garantirJunta(App.st.barrileteIndividual);
+    (App.st.succaoComum.trechos || []).forEach(garantirJunta);
+    (App.st.barrileteComum.trechos || []).forEach(garantirJunta);
+    (App.st.adutoras || []).forEach(garantirJunta);
   };
 
   App.autoPreencherPNTodos = function () {
@@ -12563,8 +13029,10 @@ html.imprimindo-doc #doc-saida { display: block; }
       var dm = t.diM;
       var A = Math.PI * dm * dm / 4;
 
+      var juntaR = PDA.CAT.junta(t.cat, r.conj.junta || PDA.CAT.juntaPadrao(t.cat));
       D.p('Tubo adotado: ' + t.cat.nome + ', ' + t.item.rot + ', com diâmetro interno de ' + n(t.diMm, 1) +
-          ' mm' + (t.item.e ? ' e espessura de parede de ' + n(t.item.e, 1) + ' mm' : '') + '. ' +
+          ' mm' + (t.item.e ? ' e espessura de parede de ' + n(t.item.e, 1) + ' mm' : '') +
+          (juntaR ? ', junta ' + juntaR.rot.toLowerCase() : '') + '. ' +
           'Extensão de ' + n(r.L, 1) + ' m e vazão de ' + n(r.Q * 1000, 1) + ' L/s' +
           (r.nBombas ? ' (' + r.nBombas + ' bomba(s))' : '') + '.');
 
@@ -13022,13 +13490,45 @@ html.imprimindo-doc #doc-saida { display: block; }
       'Estudo de vazões do projeto. Valores com * estimados pelos coeficientes K1, K2 e K3.');
     D.p('A vazão de dimensionamento hidráulico das unidades e dos conjuntos elevatórios é a máxima horária de ' +
         'fim de plano, ' + n(r.vaz.qDim * 1000) + ' L/s. A vazão mínima do horizonte, ' + n(r.vaz.qMinRef * 1000) +
-        ' L/s, governa a faixa de medição da Calha Parshall e o tempo de detenção no poço de sucção.');
+        ' L/s, governa ' + (PDA.CE.semCanal(st) ? 'o tempo de detenção no poço de sucção.'
+          : 'a faixa de medição da Calha Parshall e o tempo de detenção no poço de sucção.'));
   };
 
   MEM.capituloPreliminar = function (D, st, ctx, res) {
     var r = res.eee;
     var crit = PDA.DE.critGrade;
+    var semCanal = PDA.CE.semCanal(st);
     D.capitulo('Tratamento preliminar');
+
+    if (semCanal) {
+      D.p('Nesta elevatória o coletor afluente (DN ' + ne(st.eee.chegada.dnAfluenteMm) + ' mm' +
+          (Number(st.eee.chegada.cotaGI) ? ', geratriz inferior na cota ' + n(Number(st.eee.chegada.cotaGI), 2) + ' m' : '') +
+          ') descarrega diretamente ' +
+          'no poço de sucção, sem canal de entrada — arranjo admitido em estações de pequeno porte ' +
+          MEM.cit('jordao') + '. ' +
+          (st.eee.grade.arranjo === 'cesto'
+            ? 'A retenção de sólidos grosseiros é feita por cesto removível instalado sob a boca do coletor, ' +
+              'dentro do próprio poço, retirado por içamento para limpeza.'
+            : 'Não há dispositivo de retenção de sólidos a montante das bombas — condição desaconselhada, ' +
+              'registrada no quadro de conformidade.') +
+          ' Sem canal, não há Calha Parshall nem desarenador: a medição de vazão, quando exigida, é feita na ' +
+          'linha de recalque, e a areia afluente é removida na limpeza periódica do poço.');
+      D.usar('jordao');
+      if (st.eee.grade.arranjo === 'cesto' && r.cesto) {
+        MEM.secaoCesto(D, st, r);
+      }
+      var rsSem = res.eee.residuos;
+      if (rsSem) {
+        D.p('Para a remoção do material retido adotam-se caçambas ' +
+            (rsSem.tipo === 'rollon' ? 'roll-on/roll-off' : 'estacionárias (poliguindaste)') + ' de ' +
+            n(rsSem.cap, 0) + ' m³ — ' + rsSem.nGradeado + ' para o material gradeado' +
+            (rsSem.nReserva > 0 ? ' e ' + rsSem.nReserva + ' de reserva' : '') +
+            ', com autonomia de ' + rsSem.dias + ' dias na condição de fim de plano.');
+      }
+      MEM.secaoConformidade(D, st, ctx, res);
+      return;
+    }
+
     D.p('O esgoto afluente passa por tratamento preliminar antes do poço de sucção, para proteger os conjuntos ' +
         'elevatórios e a linha de recalque: retenção de sólidos grosseiros no gradeamento e remoção de areia no ' +
         'desarenador, com a vazão medida e a velocidade controlada pela Calha Parshall ' +
@@ -13101,11 +13601,20 @@ html.imprimindo-doc #doc-saida { display: block; }
       });
     }
 
-    if (st.eee.grade.arranjo === 'cesto' && r.cesto) {
+    if (st.eee.grade.arranjo === 'cesto' && r.cesto) MEM.secaoCesto(D, st, r);
+    MEM.secoesParshallDesarenador(D, st, ctx, res);
+    MEM.secaoConformidade(D, st, ctx, res);
+  };
+
+  /* cesto de retenção — usado no arranjo com canal e na chegada direta no poço */
+  MEM.secaoCesto = function (D, st, r) {
+    {
       D.secao('Cesto de retenção de sólidos');
       var cs = r.cesto;
-      D.p('Em lugar do canal com grades, adota-se cesto de retenção removível por içamento — solução usual em ' +
-          'elevatórias de pequeno porte ' + D.usar('jordao') + '. O cesto, em barras espaçadas de ' +
+      D.p((PDA.CE.semCanal(st)
+            ? 'A retenção de sólidos é feita por cesto removível por içamento, dentro do próprio poço de sucção, sob a boca do coletor '
+            : 'Em lugar do canal com grades, adota-se cesto de retenção removível por içamento — solução usual em elevatórias de pequeno porte ') +
+          D.usar('jordao') + '. O cesto, em barras espaçadas de ' +
           ne(cs.espacMm) + ' mm, faz o papel do gradeamento grosso; a limpeza é feita retirando-o por talha ou ' +
           'monovia e descarregando em caçamba.');
       D.tabela('Dimensionamento do cesto de retenção',
@@ -13121,6 +13630,11 @@ html.imprimindo-doc #doc-saida { display: block; }
         ].map(function (l) { return h('tr', {}, h('td', { class: 'esq' }, l[0]), h('td', {}, l[1])); }),
         'Calculado pelo programa.');
     }
+  };
+
+  /* Calha Parshall e desarenador — só no arranjo com canal de entrada */
+  MEM.secoesParshallDesarenador = function (D, st, ctx, res) {
+    var r = res.eee;
 
     /* ---- Parshall ---- */
     if (st.eee.parshall.usar !== false) {
@@ -13228,21 +13742,32 @@ html.imprimindo-doc #doc-saida { display: block; }
           D.usar('jordao') + '.');
     }
 
-    /* ---- canais, by-pass e conformidade ---- */
+  };
+
+  /* ---- canais, by-pass e conformidade ---- */
+  MEM.secaoConformidade = function (D, st, ctx, res) {
     var cf = res.eee.conformidade;
-    D.secao('Canais, by-pass e conformidade normativa');
-    var canaisTxt = cf.canais.n === 1 ? 'canal único de gradeamento'
-      : cf.canais.n + ' canais de gradeamento em paralelo (' + cf.canais.oper + ' em operação e ' +
-        cf.canais.reserva + ' de reserva — a reserva cumpre a função de by-pass), isoláveis por comportas';
-    D.p('O tratamento preliminar foi concebido com ' + canaisTxt +
-        (cf.canais.reserva === 0 && st.eee.bypass.canal === 'sim' ? ', além de canal de by-pass com grade de limpeza manual' : '') + '. ' +
-        (cf.temMecanizada
-          ? 'Havendo gradeamento mecanizado, a NBR 12209 exige no mínimo duas unidades — cada uma com capacidade ' +
-            'para a vazão total afluente — admitindo que uma delas seja grade de limpeza manual usada como ' +
-            'reserva/by-pass ' + D.usar('nbr12209') + '.'
-          : 'A NBR 12209 exige limpeza mecanizada das grades média e fina quando a vazão máxima afluente de fim ' +
-            'de plano atinge ' + PDA.DE.conf.qGradeMecanizadaLs + ' L/s — neste projeto, ' +
-            n(res.eee.vaz.qDim * 1000, 1) + ' L/s ' + D.usar('nbr12209') + '.'));
+    var semCanal = PDA.CE.semCanal(st);
+    D.secao(semCanal ? 'Conformidade normativa' : 'Canais, by-pass e conformidade normativa');
+    if (semCanal) {
+      D.p('Sem canal de entrada, não há canais de gradeamento nem by-pass: a contingência da estação fica por ' +
+          'conta do extravasor/RAC e da energia de emergência, verificados no quadro abaixo junto às demais ' +
+          'exigências da NBR 12208/12209' +
+          (cf.concessionaria !== 'nenhuma' ? ' e da concessionária' : '') + '.');
+    } else {
+      var canaisTxt = cf.canais.n === 1 ? 'canal único de gradeamento'
+        : cf.canais.n + ' canais de gradeamento em paralelo (' + cf.canais.oper + ' em operação e ' +
+          cf.canais.reserva + ' de reserva — a reserva cumpre a função de by-pass), isoláveis por comportas';
+      D.p('O tratamento preliminar foi concebido com ' + canaisTxt +
+          (cf.canais.reserva === 0 && st.eee.bypass.canal === 'sim' ? ', além de canal de by-pass com grade de limpeza manual' : '') + '. ' +
+          (cf.temMecanizada
+            ? 'Havendo gradeamento mecanizado, a NBR 12209 exige no mínimo duas unidades — cada uma com capacidade ' +
+              'para a vazão total afluente — admitindo que uma delas seja grade de limpeza manual usada como ' +
+              'reserva/by-pass ' + D.usar('nbr12209') + '.'
+            : 'A NBR 12209 exige limpeza mecanizada das grades média e fina quando a vazão máxima afluente de fim ' +
+              'de plano atinge ' + PDA.DE.conf.qGradeMecanizadaLs + ' L/s — neste projeto, ' +
+              n(res.eee.vaz.qDim * 1000, 1) + ' L/s ' + D.usar('nbr12209') + '.'));
+    }
     D.tabela('Verificações de conformidade normativa',
       [{ rot: 'Verificação', esq: true }, 'Situação'],
       cf.checks.map(function (c) {
@@ -13294,6 +13819,23 @@ html.imprimindo-doc #doc-saida { display: block; }
         return h('tr', {}, h('td', { class: 'esq' }, l[0]), h('td', {}, l[1]));
       }),
       'Calculado pelo programa.');
+
+    if ((p.niveisExtras || []).length) {
+      D.p('Entre o NA mínimo e o NA máximo foram definidos níveis operacionais intermediários (partida de ' +
+          'conjuntos adicionais e alarmes). O nível usual de partida limita o volume que rege o tempo de ' +
+          'detenção: em operação normal o poço cicla entre o NA mínimo e esse nível, e o NA máximo só é ' +
+          'atingido nos picos ou com conjuntos fora de serviço.');
+      D.tabela('Níveis operacionais intermediários',
+        [{ rot: 'Nível', esq: true }, 'Cota (m)', 'Volume até o NA mín (m³)', 'Detenção na Qméd de início (min)'],
+        p.niveisExtras.map(function (nv) {
+          return h('tr', {},
+            h('td', { class: 'esq' }, nv.nome + (nv.usarDetencao ? ' (usual de partida)' : '')),
+            h('td', {}, nv.cota !== null ? n(nv.cota, 3) : '—'),
+            h('td', {}, nv.vol !== null ? n(nv.vol, 2) : '—'),
+            h('td', {}, nv.tDetencao !== null && isFinite(nv.tDetencao) ? n(nv.tDetencao, 1) : '—'));
+        }),
+        'Calculado pelo programa.');
+    }
 
     D.secao('Submergência mínima');
     D.p('A submergência mínima sobre a boca de sucção, contra a formação de vórtices, segue a recomendação do ' +
@@ -13411,10 +13953,13 @@ html.imprimindo-doc #doc-saida { display: block; }
       (comEEE ? ' — a vazão máxima horária de fim de plano' : '') +
       ', por meio de ' + ctx.nInst + ' conjunto(s) elevatório(s), sendo ' + ctx.nOp +
       ' em operação simultânea na condição de projeto.' +
-      (comEEE ? ' A montante do poço de sucção, o esgoto passa por tratamento preliminar com ' +
-        (st.eee.grade.arranjo === 'cesto' ? 'cesto de retenção de sólidos com içamento' : 'gradeamento') +
-        (st.eee.parshall.usar !== false ? ', medição de vazão em Calha Parshall' : '') +
-        (st.eee.desarenador.usar !== false ? ' e desarenador' : '') + '.' : '');
+      (comEEE ? (PDA.CE.semCanal(st)
+        ? ' O coletor afluente descarrega diretamente no poço de sucção' +
+          (st.eee.grade.arranjo === 'cesto' ? ', com cesto de retenção de sólidos removível por içamento sob a boca do coletor.' : ', sem retenção de sólidos a montante das bombas.')
+        : ' A montante do poço de sucção, o esgoto passa por tratamento preliminar com ' +
+          (st.eee.grade.arranjo === 'cesto' ? 'cesto de retenção de sólidos com içamento' : 'gradeamento') +
+          (st.eee.parshall.usar !== false ? ', medição de vazão em Calha Parshall' : '') +
+          (st.eee.desarenador.usar !== false ? ' e desarenador' : '') + '.') : '');
 
     var p2 = 'A ' + (esgoto ? 'linha de recalque' : 'adutora') + ' possui extensão total de ' +
       n(extensao, 0) + ' m' + (listaMat.length ? ', em ' + listaMat.join(' e ') : '') + ', vencendo ' +
@@ -13424,7 +13969,9 @@ html.imprimindo-doc #doc-saida { display: block; }
       n(c.bhpCv, 1) + ' cv por conjunto, para a qual se adotam motores comerciais de ' + ne(c.motorCv) + ' cv.';
 
     var p3 = 'O estudo compreende ' +
-      (comEEE ? 'as vazões de projeto, o tratamento preliminar (gradeamento, Calha Parshall e desarenador), ' +
+      (comEEE ? 'as vazões de projeto, ' +
+        (PDA.CE.semCanal(st) ? 'a chegada direta no poço de sucção com a retenção de sólidos, '
+          : 'o tratamento preliminar (gradeamento, Calha Parshall e desarenador), ') +
         'o poço de sucção com seus níveis operacionais, ' : '') +
       'o dimensionamento das tubulações de sucção e recalque, a verificação das ' +
       'velocidades e das perdas de carga, o cálculo da altura manométrica e da potência dos conjuntos, ' +
